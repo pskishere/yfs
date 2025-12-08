@@ -1,0 +1,48 @@
+services:
+  # 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: yfs-backend
+    environment:
+      # Ollama服务配置 - 使用宿主机网络（可选，如果使用Ollama AI分析）
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    volumes:
+      - ./stock_cache.db:/app/stock_cache.db
+      - ./backend:/app/backend
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - yfs-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: yfs-frontend
+    restart: unless-stopped
+    networks:
+      - yfs-network
+
+  # Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: yfs-nginx
+    ports:
+      - "8086:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - yfs-network
+
+networks:
+  yfs-network:
+    driver: bridge
