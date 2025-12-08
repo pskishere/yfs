@@ -8,8 +8,10 @@ services:
     environment:
       # Ollama服务配置 - 使用宿主机网络（可选，如果使用Ollama AI分析）
       - OLLAMA_HOST=http://host.docker.internal:11434
+      # 数据库路径
+      - DB_PATH=/app/data/stock_cache.db
     volumes:
-      - ./stock_cache.db:/app/stock_cache.db
+      - ./data:/app/data
       - ./backend:/app/backend
     restart: unless-stopped
     extra_hosts:

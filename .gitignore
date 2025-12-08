@@ -54,6 +54,8 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+data/
+!data/.gitkeep
 
 # Temporary files
 tmp/

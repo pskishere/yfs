@@ -81,15 +81,14 @@ def _save_stock_info_if_available(symbol: str):
         logger.warning(f"获取股票信息失败: {e}")
 
 
-def _perform_analysis(symbol: str, duration: str, bar_size: str, model: str, use_cache: bool = True):
+def _perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool = True):
     """
-    执行技术分析的核心逻辑
+    执行技术分析的核心逻辑 - 只负责数据获取和保存，不包含AI分析
     
     Args:
         symbol: 股票代码
         duration: 数据周期
         bar_size: K线周期
-        model: AI模型名称
         use_cache: 是否使用缓存
         
     Returns:
@@ -99,25 +98,16 @@ def _perform_analysis(symbol: str, duration: str, bar_size: str, model: str, use
     if use_cache:
         cached_result = get_cached_analysis(symbol, duration, bar_size)
         if cached_result:
-            if cached_result.get('ai_analysis'):
-                return cached_result, None
-            if check_ollama_available():
-                try:
-                    # 获取额外数据用于AI分析
-                    extra_data = _get_extra_analysis_data(symbol)
-                    ai_analysis = perform_ai_analysis(
-                        symbol, cached_result['indicators'], cached_result['signals'], 
-                        duration, model, extra_data
-                    )
-                    cached_result['ai_analysis'] = ai_analysis
-                    cached_result['model'] = model
-                    cached_result['ai_available'] = True
-                    save_analysis_cache(symbol, duration, bar_size, cached_result)
-                except Exception as e:
-                    logger.warning(f"AI分析执行失败: {e}")
-                    cached_result['ai_available'] = False
-                    cached_result['ai_error'] = str(e)
-            return cached_result, None
+            # 返回缓存数据（不包含AI分析）
+            result = {
+                'success': True,
+                'indicators': cached_result.get('indicators'),
+                'signals': cached_result.get('signals'),
+                'candles': cached_result.get('candles'),
+                'extra_data': cached_result.get('extra_data'),
+                'data_saved': True  # 标记数据已保存
+            }
+            return result, None
     
     # 获取并保存股票信息
     _save_stock_info_if_available(symbol)
@@ -139,20 +129,8 @@ def _perform_analysis(symbol: str, duration: str, bar_size: str, model: str, use
     # 获取额外数据（股息、机构持仓等）
     extra_data = _get_extra_analysis_data(symbol)
     
-    # 执行AI分析
-    ai_analysis = None
-    if check_ollama_available():
-        logger.info("检测到 Ollama 可用，开始AI分析...")
-        try:
-            ai_analysis = perform_ai_analysis(
-                symbol, indicators, signals, duration, model, extra_data
-            )
-        except Exception as e:
-            logger.warning(f"AI分析执行失败: {e}")
-    else:
-        logger.info("Ollama 不可用，跳过AI分析")
-    
-    result = create_success_response(indicators, signals, formatted_candles, ai_analysis, model)
+    # 创建结果（不包含AI分析）
+    result = create_success_response(indicators, signals, formatted_candles, None, None)
     
     # 将额外数据添加到结果中
     if extra_data:
@@ -175,9 +153,87 @@ def _perform_analysis(symbol: str, duration: str, bar_size: str, model: str, use
                     print(f"  {i}. {item.get('title', 'N/A')}")
             print(f"{'='*60}\n")
     
+    # 保存数据到数据库（不包含AI分析）
     save_analysis_cache(symbol, duration, bar_size, result)
+    result['data_saved'] = True
     
     return result, None
+
+
+def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
+    """
+    执行AI分析 - 从数据库读取已保存的数据进行分析
+    
+    Args:
+        symbol: 股票代码
+        duration: 数据周期
+        bar_size: K线周期
+        model: AI模型名称
+        
+    Returns:
+        (ai_analysis_result_dict, error_response_tuple or None)
+    """
+    # 从数据库读取已保存的数据
+    cached_result = get_cached_analysis(symbol, duration, bar_size)
+    if not cached_result:
+        return None, ({
+            'success': False,
+            'message': '数据不存在，请先调用 /api/analyze 接口获取数据'
+        }, 404)
+    
+    # 检查是否已有AI分析结果
+    if cached_result.get('ai_analysis'):
+        logger.info(f"返回已缓存的AI分析结果: {symbol}")
+        return {
+            'success': True,
+            'ai_analysis': cached_result['ai_analysis'],
+            'model': cached_result.get('model'),
+            'ai_available': True,
+            'cached': True
+        }, None
+    
+    # 检查Ollama是否可用
+    if not check_ollama_available():
+        return None, ({
+            'success': False,
+            'message': 'Ollama服务不可用，无法执行AI分析'
+        }, 503)
+    
+    try:
+        # 获取额外数据用于AI分析
+        extra_data = cached_result.get('extra_data') or _get_extra_analysis_data(symbol)
+        
+        # 执行AI分析
+        logger.info(f"开始AI分析: {symbol}, 模型: {model}")
+        ai_analysis = perform_ai_analysis(
+            symbol, 
+            cached_result['indicators'], 
+            cached_result['signals'], 
+            duration, 
+            model, 
+            extra_data
+        )
+        
+        # 更新缓存，保存AI分析结果
+        cached_result['ai_analysis'] = ai_analysis
+        cached_result['model'] = model
+        cached_result['ai_available'] = True
+        save_analysis_cache(symbol, duration, bar_size, cached_result)
+        
+        return {
+            'success': True,
+            'ai_analysis': ai_analysis,
+            'model': model,
+            'ai_available': True,
+            'cached': False
+        }, None
+        
+    except Exception as e:
+        logger.error(f"AI分析执行失败: {e}")
+        return None, ({
+            'success': False,
+            'message': f'AI分析执行失败: {str(e)}'
+        }, 500)
 
 
 def _get_extra_analysis_data(symbol: str) -> dict:
@@ -239,22 +295,20 @@ def health():
 def analyze_stock(symbol):
     """
     技术分析 - 计算技术指标并生成买卖信号
-    自动检测 Ollama 是否可用，如果可用则自动执行AI分析
+    只负责数据获取和保存，不包含AI分析
     使用SQLite缓存当天的查询结果，避免重复查询
     
     查询参数:
     - duration: 数据周期 (默认: '3 M')
     - bar_size: K线周期 (默认: '1 day')
-    - model: AI模型名称 (默认: 'deepseek-v3.1:671b-cloud')
     """
     duration = request.args.get('duration', '3 M')
     bar_size = request.args.get('bar_size', '1 day')
-    model = request.args.get('model', 'deepseek-v3.1:671b-cloud')
     
     symbol_upper = symbol.upper()
-    logger.info(f"技术分析: {symbol_upper}, {duration}, {bar_size}")
+    logger.info(f"技术分析（数据获取）: {symbol_upper}, {duration}, {bar_size}")
     
-    result, error_response = _perform_analysis(symbol_upper, duration, bar_size, model, use_cache=True)
+    result, error_response = _perform_analysis(symbol_upper, duration, bar_size, use_cache=True)
     
     if error_response:
         return jsonify(_clean_nan_values(error_response[0])), error_response[1]
@@ -266,7 +320,31 @@ def analyze_stock(symbol):
 def refresh_analyze_stock(symbol):
     """
     刷新技术分析 - 强制重新获取数据并分析，不使用缓存
-    自动检测 Ollama 是否可用，如果可用则自动执行AI分析
+    只负责数据获取和保存，不包含AI分析
+    
+    查询参数:
+    - duration: 数据周期 (默认: '3 M')
+    - bar_size: K线周期 (默认: '1 day')
+    """
+    duration = request.args.get('duration', '3 M')
+    bar_size = request.args.get('bar_size', '1 day')
+    
+    symbol_upper = symbol.upper()
+    logger.info(f"刷新技术分析（强制重新获取）: {symbol_upper}, {duration}, {bar_size}")
+    
+    result, error_response = _perform_analysis(symbol_upper, duration, bar_size, use_cache=False)
+    
+    if error_response:
+        return jsonify(_clean_nan_values(error_response[0])), error_response[1]
+    
+    return jsonify(_clean_nan_values(result))
+
+
+@app.route('/api/ai-analyze/<symbol>', methods=['POST'])
+def ai_analyze_stock(symbol):
+    """
+    AI分析 - 基于已保存的数据执行AI分析
+    需要先调用 /api/analyze 接口获取数据并保存到数据库
     
     查询参数:
     - duration: 数据周期 (默认: '3 M')
@@ -278,9 +356,9 @@ def refresh_analyze_stock(symbol):
     model = request.args.get('model', 'deepseek-v3.1:671b-cloud')
     
     symbol_upper = symbol.upper()
-    logger.info(f"刷新技术分析（强制重新获取）: {symbol_upper}, {duration}, {bar_size}")
+    logger.info(f"AI分析: {symbol_upper}, {duration}, {bar_size}, 模型: {model}")
     
-    result, error_response = _perform_analysis(symbol_upper, duration, bar_size, model, use_cache=False)
+    result, error_response = _perform_ai_analysis(symbol_upper, duration, bar_size, model)
     
     if error_response:
         return jsonify(_clean_nan_values(error_response[0])), error_response[1]
@@ -682,8 +760,16 @@ def main():
     """
     启动API服务
     """
-    # 初始化数据库
-    init_database()
+    try:
+        # 初始化数据库
+        logger.info("正在初始化数据库...")
+        init_database()
+        logger.info("✅ 数据库初始化成功")
+    except Exception as e:
+        logger.error(f"❌ 数据库初始化失败，服务无法启动: {e}")
+        import traceback
+        traceback.print_exc()
+        return
     
     logger.info("✅ YFinance 数据服务就绪")
     

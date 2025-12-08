@@ -22,7 +22,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 数据库路径
-DB_PATH = os.getenv('DB_PATH', 'stock_cache.db')
+# 默认使用 data 目录，与 Docker 环境保持一致
+DB_PATH = os.getenv('DB_PATH', 'data/stock_cache.db')
+# 转换为绝对路径
+if not os.path.isabs(DB_PATH):
+    DB_PATH = os.path.abspath(DB_PATH)
 
 # Ollama配置
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
@@ -51,12 +55,39 @@ def init_database():
     """
     初始化SQLite数据库，创建分析结果缓存表、股票信息表和K线数据表
     """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # 创建分析结果缓存表
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS analysis_cache (
+    try:
+        logger.info(f"开始初始化数据库: {DB_PATH}")
+        
+        # 确保数据库文件所在目录存在
+        db_dir = os.path.dirname(DB_PATH)
+        if db_dir and db_dir != '.' and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            logger.info(f"创建数据库目录: {db_dir}")
+        
+        # 检查路径是否是目录（错误情况）
+        if os.path.isdir(DB_PATH):
+            logger.error(f"❌ 数据库路径是一个目录而不是文件: {DB_PATH}")
+            raise ValueError(f"数据库路径不能是目录: {DB_PATH}")
+        
+        # 检查数据库文件是否存在
+        db_exists = os.path.exists(DB_PATH)
+        if db_exists:
+            logger.info(f"数据库文件已存在: {DB_PATH}")
+        else:
+            logger.info(f"创建新数据库文件: {DB_PATH}")
+        
+        # 检查目录是否有写权限
+        db_dir = os.path.dirname(DB_PATH) or '.'
+        if not os.access(db_dir, os.W_OK):
+            logger.error(f"❌ 数据库目录没有写权限: {db_dir}")
+            raise PermissionError(f"数据库目录没有写权限: {db_dir}")
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # 创建分析结果缓存表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_cache (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             duration TEXT NOT NULL,
@@ -71,21 +102,21 @@ def init_database():
             ai_available INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, duration, bar_size, query_date)
-        )
-    ''')
-    
-    # 创建股票信息表，用于缓存股票代码和全名
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS stock_info (
+            )
+        ''')
+        
+        # 创建股票信息表，用于缓存股票代码和全名
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS stock_info (
             symbol TEXT PRIMARY KEY,
             name TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 创建K线数据表，用于缓存全量K线数据
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS kline_data (
+            )
+        ''')
+        
+        # 创建K线数据表，用于缓存全量K线数据
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS kline_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             interval TEXT NOT NULL,
@@ -98,12 +129,12 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, interval, date)
-        )
-    ''')
-    
-    # 创建机构持仓表
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS institutional_holders (
+            )
+        ''')
+        
+        # 创建机构持仓表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS institutional_holders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             date_reported TEXT,
@@ -115,12 +146,12 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, holder, date_reported)
-        )
-    ''')
-    
-    # 创建内部交易表
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS insider_transactions (
+            )
+        ''')
+        
+        # 创建内部交易表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS insider_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             insider TEXT,
@@ -134,12 +165,12 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, insider, start_date, shares)
-        )
-    ''')
-    
-    # 创建分析师推荐表
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS analyst_recommendations (
+            )
+        ''')
+        
+        # 创建分析师推荐表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analyst_recommendations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             date TEXT NOT NULL,
@@ -152,12 +183,12 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, date, firm)
-        )
-    ''')
-    
-    # 创建股票新闻表
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS stock_news (
+            )
+        ''')
+        
+        # 创建股票新闻表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS stock_news (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             title TEXT,
@@ -166,12 +197,12 @@ def init_database():
             publish_time TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, link)
-        )
-    ''')
-    
-    # 创建收益数据表
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS earnings_data (
+            )
+        ''')
+        
+        # 创建收益数据表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS earnings_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
             quarter TEXT NOT NULL,
@@ -180,23 +211,33 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(symbol, quarter)
-        )
-    ''')
+            )
+        ''')
+        
+        # 创建索引以提高查询速度
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_symbol_duration_bar_date 
+            ON analysis_cache(symbol, duration, bar_size, query_date)
+        ''')
+        
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_kline_symbol_interval_date 
+            ON kline_data(symbol, interval, date DESC)
+        ''')
+        
+        conn.commit()
+        conn.close()
+        logger.info("✅ 数据库初始化完成")
     
-    # 创建索引以提高查询速度
-    cursor.execute('''
-        CREATE INDEX IF NOT EXISTS idx_symbol_duration_bar_date 
-        ON analysis_cache(symbol, duration, bar_size, query_date)
-    ''')
-    
-    cursor.execute('''
-        CREATE INDEX IF NOT EXISTS idx_kline_symbol_interval_date 
-        ON kline_data(symbol, interval, date DESC)
-    ''')
-    
-    conn.commit()
-    conn.close()
-    logger.info("数据库初始化完成")
+    except sqlite3.Error as e:
+        logger.error(f"❌ 数据库初始化失败: {e}")
+        logger.error(f"数据库路径: {DB_PATH}")
+        logger.error(f"当前工作目录: {os.getcwd()}")
+        raise
+    except Exception as e:
+        logger.error(f"❌ 数据库初始化时发生未知错误: {e}")
+        logger.error(f"数据库路径: {DB_PATH}")
+        raise
 
 
 def get_cached_analysis(symbol, duration, bar_size):

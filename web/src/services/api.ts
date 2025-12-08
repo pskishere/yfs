@@ -157,29 +157,26 @@ export const cancelOrder = async (orderId: number): Promise<ApiResponse> => {
 };
 
 /**
- * 技术分析 - 后端会自动检测 Ollama 并执行AI分析
+ * 技术分析 - 获取数据并保存到数据库（不包含AI分析）
  * @param symbol - 股票代码
  * @param duration - 数据周期，默认 '3 M'
  * @param barSize - K线周期，默认 '1 day'
- * @param model - AI模型名称，默认 'deepseek-v3.1:671b-cloud'（仅在Ollama可用时使用）
  */
 export const analyze = async (
   symbol: string,
   duration: string = '3 M',
-  barSize: string = '1 day',
-  model: string = 'deepseek-v3.1:671b-cloud'
+  barSize: string = '1 day'
 ): Promise<AnalysisResult> => {
   try {
     const params = new URLSearchParams({
       duration: duration,
       bar_size: barSize,
-      model: model, // 传递模型参数，后端会在Ollama可用时使用
     });
 
     const response = await api.get<AnalysisResult>(
       `/api/analyze/${symbol.toUpperCase()}?${params.toString()}`,
       {
-        timeout: 120000, // AI分析可能需要更长时间，增加到120秒
+        timeout: 60000, // 数据获取超时时间60秒
       }
     );
     return handleResponse<AnalysisResult>(response) as AnalysisResult;
@@ -190,7 +187,8 @@ export const analyze = async (
 };
 
 /**
- * AI分析 - 兼容接口，实际调用 analyze 函数
+ * AI分析 - 基于已保存的数据执行AI分析
+ * 需要先调用 analyze 接口获取数据并保存到数据库
  * @param symbol - 股票代码
  * @param duration - 数据周期，默认 '3 M'
  * @param barSize - K线周期，默认 '1 day'
@@ -201,9 +199,26 @@ export const aiAnalyze = async (
   duration: string = '3 M',
   barSize: string = '1 day',
   model: string = 'deepseek-v3.1:671b-cloud'
-): Promise<AnalysisResult> => {
-  // 直接调用统一的 analyze 接口，后端会自动检测 Ollama
-  return analyze(symbol, duration, barSize, model);
+): Promise<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string }> => {
+  try {
+    const params = new URLSearchParams({
+      duration: duration,
+      bar_size: barSize,
+      model: model,
+    });
+
+    const response = await api.post<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string }>(
+      `/api/ai-analyze/${symbol.toUpperCase()}?${params.toString()}`,
+      {},
+      {
+        timeout: 120000, // AI分析可能需要更长时间，增加到120秒
+      }
+    );
+    return handleResponse(response);
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
 };
 
 /**
@@ -250,30 +265,27 @@ export const getIndicatorInfo = async (indicator: string = ''): Promise<Indicato
 };
 
 /**
- * 刷新分析 - 强制重新获取数据，不使用缓存
+ * 刷新分析 - 强制重新获取数据，不使用缓存（不包含AI分析）
  * @param symbol - 股票代码
  * @param duration - 数据周期，默认 '3 M'
  * @param barSize - K线周期，默认 '1 day'
- * @param model - AI模型名称，默认 'deepseek-v3.1:671b-cloud'（仅在Ollama可用时使用）
  */
 export const refreshAnalyze = async (
   symbol: string,
   duration: string = '3 M',
-  barSize: string = '1 day',
-  model: string = 'deepseek-v3.1:671b-cloud'
+  barSize: string = '1 day'
 ): Promise<AnalysisResult> => {
   try {
     const params = new URLSearchParams({
       duration: duration,
       bar_size: barSize,
-      model: model,
     });
 
     const response = await api.post<AnalysisResult>(
       `/api/refresh-analyze/${symbol.toUpperCase()}?${params.toString()}`,
       {},
       {
-        timeout: 120000, // 刷新可能需要更长时间，增加到120秒
+        timeout: 60000, // 刷新超时时间60秒
       }
     );
     return handleResponse<AnalysisResult>(response) as AnalysisResult;

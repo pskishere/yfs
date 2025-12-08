@@ -39,6 +39,7 @@ import {
   getOrders,
   cancelOrder,
   analyze,
+  aiAnalyze,
   getHotStocks,
   getIndicatorInfo,
   refreshAnalyze,
@@ -84,6 +85,15 @@ const MainPage: React.FC = () => {
   const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
   const [aiAnalysisDrawerVisible, setAiAnalysisDrawerVisible] = useState<boolean>(false);
   const [currentSymbol, setCurrentSymbol] = useState<string>('');
+  const [aiStatus, setAiStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [aiStatusMsg, setAiStatusMsg] = useState<string>('等待AI分析');
+
+  const aiStatusColorMap: Record<typeof aiStatus, 'default' | 'processing' | 'success' | 'error'> = {
+    idle: 'default',
+    running: 'processing',
+    success: 'success',
+    error: 'error',
+  };
 
   // 热门股票相关状态
   const [, setHotStocks] = useState<HotStock[]>([]);
@@ -185,6 +195,49 @@ const MainPage: React.FC = () => {
   };
 
   /**
+   * AI分析 - 使用已保存的数据执行AI分析，不阻塞页面
+   */
+  const runAiAnalysis = async (
+    symbol: string,
+    duration: string,
+    barSize: string,
+    model: string,
+    baseResult?: AnalysisResult | null
+  ): Promise<void> => {
+    if (!symbol) return;
+    setAiStatus('running');
+    setAiStatusMsg('AI分析中...');
+    try {
+      const aiResult = await aiAnalyze(symbol, duration, barSize, model);
+      if (aiResult && aiResult.success && aiResult.ai_analysis) {
+        const updatedResult = {
+          ...(baseResult || analysisResult),
+          ai_analysis: aiResult.ai_analysis,
+          model: aiResult.model,
+          ai_available: aiResult.ai_available,
+        } as AnalysisResult;
+        setAnalysisResult(updatedResult);
+        setAiAnalysisResult(updatedResult);
+        setAiAnalysisDrawerVisible(true);
+        setAiStatus('success');
+        setAiStatusMsg('AI分析完成');
+        message.success('AI分析完成');
+      } else if (aiResult?.message) {
+        setAiStatus('error');
+        setAiStatusMsg(aiResult.message);
+        message.warning(aiResult.message);
+      } else {
+        setAiStatus('error');
+        setAiStatusMsg('AI分析不可用');
+      }
+    } catch (e: any) {
+      setAiStatus('error');
+      setAiStatusMsg(e?.message || 'AI分析失败');
+      message.warning(e?.message || 'AI分析失败，但数据已成功获取');
+    }
+  };
+
+  /**
    * 执行分析 - 使用合并后的接口，一次请求同时获取技术分析和AI分析
    */
   const handleAnalyze = async (values: any): Promise<void> => {
@@ -196,73 +249,45 @@ const MainPage: React.FC = () => {
     setAnalysisLoading(true);
     setAnalysisResult(null);
     setAiAnalysisResult(null);
+    setAiStatus('idle');
+    setAiStatusMsg('等待AI分析');
 
+    let dataResult: any = null;
+
+    // 第一步：获取数据并保存到数据库（只在此阶段显示 loading）
     try {
       const { symbol, duration, barSize, model } = values;
       const durationValue = duration || '3 M';
       const barSizeValue = barSize || '1 day';
       const modelValue = model || 'deepseek-v3.1:671b-cloud';
 
-      console.log('🚀 开始分析:', symbol, durationValue, barSizeValue);
-      let result = await analyze(symbol, durationValue, barSizeValue, modelValue);
-      
-      // 如果 result 是字符串，尝试解析
-      if (typeof result === 'string') {
-        console.log('⚠️ result 是字符串，尝试解析...');
+      console.log('🚀 开始获取数据:', symbol, durationValue, barSizeValue);
+      dataResult = await analyze(symbol, durationValue, barSizeValue);
+
+      if (typeof dataResult === 'string') {
         try {
-          result = JSON.parse(result);
-          console.log('✅ 解析成功:', result);
+          dataResult = JSON.parse(dataResult);
         } catch (e) {
-          console.error('❌ 解析失败:', e);
           throw new Error('无法解析服务器返回的数据');
         }
       }
-      
-      console.log('📥 API 返回:', result);
-      console.log('📥 result 类型:', typeof result);
-      console.log('📥 result.success:', result?.success);
-      console.log('📥 result.success 类型:', typeof result?.success);
 
-      if (result && result.success) {
-        console.log('=== 分析结果 ===');
-        console.log('result keys:', Object.keys(result));
-        console.log('extra_data 存在:', 'extra_data' in result);
-        console.log('extra_data 值:', result.extra_data);
-        if (result.extra_data) {
-          console.log('extra_data keys:', Object.keys(result.extra_data));
-          Object.keys(result.extra_data).forEach(key => {
-            const val = (result.extra_data as any)[key];
-            if (Array.isArray(val)) {
-              console.log(`  ${key}: ${val.length} 条`);
-            } else {
-              console.log(`  ${key}:`, typeof val);
-            }
-          });
-        }
-        console.log('✅ 设置 analysisResult state');
-        setAnalysisResult(result);
+      if (dataResult && dataResult.success) {
+        setAnalysisResult(dataResult);
         setCurrentSymbol(symbol);
-
-        if (result.ai_analysis) {
-          setAiAnalysisResult(result);
-          setAiAnalysisDrawerVisible(true);
-        }
-        console.log('✅ 分析完成');
       } else {
-        console.log('❌ 分析失败:', result);
-        let errorMsg = result?.message || '分析失败';
-        if (result?.error_code === 200) {
-          errorMsg = `股票代码 "${symbol}" 不存在或无权限查询，请检查代码是否正确`;
-        } else if (result?.error_code) {
-          errorMsg = `错误[${result.error_code}]: ${result.message}`;
-        }
+        const errorMsg = dataResult?.message || '分析失败';
         message.error(errorMsg, 5);
+        return;
       }
+      // 数据阶段结束，关闭 loading
+      setAnalysisLoading(false);
+
+      // 第二步：非阻塞触发AI分析（不显示转圈）
+      runAiAnalysis(symbol, durationValue, barSizeValue, modelValue, dataResult);
     } catch (error: any) {
       console.error('❌ 异常错误:', error);
       message.error(error.message || '分析失败');
-    } finally {
-      console.log('🏁 设置 loading = false');
       setAnalysisLoading(false);
     }
   };
@@ -284,18 +309,21 @@ const MainPage: React.FC = () => {
     setAnalysisLoading(true);
     setAnalysisResult(null);
     setAiAnalysisResult(null);
+    setAiStatus('idle');
+    setAiStatusMsg('等待AI分析');
 
+    // 第一步：刷新数据（只在此阶段显示 loading）
     try {
-      const result = await refreshAnalyze(currentSymbol, duration, barSize, model);
+      const result = await refreshAnalyze(currentSymbol, duration, barSize);
 
       if (result && result.success) {
         setAnalysisResult(result);
-        if (result.ai_analysis) {
-          setAiAnalysisResult(result);
-          setAiAnalysisDrawerVisible(true);
-        }
-        message.success('数据已刷新');
+        setAnalysisLoading(false);
+
+        // 第二步：自动触发AI分析（不显示转圈）
+        runAiAnalysis(currentSymbol, duration, barSize, model, result);
       } else {
+        setAnalysisLoading(false);
         let errorMsg = result?.message || '刷新失败';
         if (result?.error_code === 200) {
           errorMsg = `股票代码 "${currentSymbol}" 不存在或无权限查询，请检查代码是否正确`;
@@ -305,9 +333,8 @@ const MainPage: React.FC = () => {
         message.error(errorMsg, 5);
       }
     } catch (error: any) {
-      message.error(error.message || '刷新失败');
-    } finally {
       setAnalysisLoading(false);
+      message.error(error.message || '刷新失败');
     }
   };
 
@@ -551,6 +578,22 @@ const MainPage: React.FC = () => {
                           >
                         刷新
                           </Button>
+                          <Button
+                            type="default"
+                            size="small"
+                            icon={<RobotOutlined />}
+                            disabled={!currentSymbol || aiStatus === 'running' || !analysisResult}
+                            onClick={() => {
+                              const formValues = analyzeForm.getFieldsValue();
+                              const duration = formValues.duration || '3 M';
+                              const barSize = formValues.barSize || '1 day';
+                              const model = formValues.model || 'deepseek-v3.1:671b-cloud';
+                              runAiAnalysis(currentSymbol, duration, barSize, model, analysisResult);
+                            }}
+                          >
+                            AI分析
+                          </Button>
+                          <Tag color={aiStatusColorMap[aiStatus]}>{aiStatusMsg}</Tag>
                     </Space>
                     
                     <Descriptions
