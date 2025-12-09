@@ -2,7 +2,7 @@
  * 主页面 - 股票分析功能
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
   Table,
@@ -70,7 +70,6 @@ interface StockOption {
 
 const MainPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   
   // 持仓相关状态
   const [positions, setPositions] = useState<Position[]>([]);
