@@ -2,6 +2,7 @@
  * 主页面 - 股票分析功能
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
   Table,
@@ -32,6 +33,7 @@ import {
   RiseOutlined,
   FallOutlined,
   RightOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons';
 import {
   getPositions,
@@ -67,6 +69,9 @@ interface StockOption {
 }
 
 const MainPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
   // 持仓相关状态
   const [positions, setPositions] = useState<Position[]>([]);
   const [positionsLoading, setPositionsLoading] = useState<boolean>(false);
@@ -105,6 +110,8 @@ const MainPage: React.FC = () => {
 
   // 防抖定时器引用
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 标记是否已从 URL 加载过
+  const hasLoadedFromUrlRef = useRef<boolean>(false);
 
   // 技术指标解释信息
   const [indicatorInfoMap, setIndicatorInfoMap] = useState<Record<string, IndicatorInfo>>({});
@@ -280,6 +287,8 @@ const MainPage: React.FC = () => {
       if (dataResult && dataResult.success) {
         setAnalysisResult(dataResult);
         setCurrentSymbol(symbol);
+        // 更新 URL 参数
+        updateUrlParams(symbol);
       } else {
         const errorMsg = dataResult?.message || '分析失败';
         message.error(errorMsg, 5);
@@ -394,6 +403,50 @@ const MainPage: React.FC = () => {
     return <IndicatorLabel label={label} indicatorKey={indicatorKey} indicatorInfoMap={indicatorInfoMap} />;
   };
 
+  /**
+   * 更新 URL 参数（不触发页面刷新）
+   */
+  const updateUrlParams = (symbol: string): void => {
+    const params = new URLSearchParams();
+    params.set('symbol', symbol);
+    setSearchParams(params, { replace: true });
+  };
+
+  /**
+   * 分享功能 - 复制带参数的 URL 到剪贴板
+   */
+  const handleShare = async (): Promise<void> => {
+    if (!currentSymbol) {
+      message.warning('请先进行一次分析');
+      return;
+    }
+    
+    const params = new URLSearchParams();
+    params.set('symbol', currentSymbol);
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      message.success('分享链接已复制到剪贴板');
+    } catch (err) {
+      // 降级方案：使用传统方法
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        message.success('分享链接已复制到剪贴板');
+      } catch (e) {
+        message.error('复制失败，请手动复制链接');
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   useEffect(() => {
     loadHotStocks();
     loadIndicatorInfo();
@@ -419,6 +472,28 @@ const MainPage: React.FC = () => {
       }
       window.removeEventListener('resize', handleResize);
     };
+  }, []);
+
+  /**
+   * 从 URL 参数自动加载分析（仅在首次加载时执行一次）
+   */
+  useEffect(() => {
+    if (hasLoadedFromUrlRef.current) return;
+    
+    const symbolFromUrl = searchParams.get('symbol');
+    if (symbolFromUrl) {
+      hasLoadedFromUrlRef.current = true;
+      
+      analyzeForm.setFieldsValue({
+        symbol: symbolFromUrl.toUpperCase(),
+      });
+      
+      setTimeout(() => {
+        handleAnalyze({
+          symbol: symbolFromUrl.toUpperCase(),
+        });
+      }, 100);
+    }
   }, []);
 
   /**
@@ -596,6 +671,15 @@ const MainPage: React.FC = () => {
                             }}
                           >
                             AI分析
+                          </Button>
+                          <Button
+                            type="default"
+                            size="small"
+                            icon={<ShareAltOutlined />}
+                            onClick={handleShare}
+                            disabled={!currentSymbol}
+                          >
+                            分享
                           </Button>
                           <Tag color={aiStatusColorMap[aiStatus]}>{aiStatusMsg}</Tag>
                     </Space>
