@@ -205,7 +205,7 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
         
         # 执行AI分析
         logger.info(f"开始AI分析: {symbol}, 模型: {model}")
-        ai_analysis = perform_ai_analysis(
+        ai_analysis, ai_prompt = perform_ai_analysis(
             symbol, 
             cached_result['indicators'], 
             cached_result['signals'], 
@@ -214,8 +214,9 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
             extra_data
         )
         
-        # 更新缓存，保存AI分析结果
+        # 更新缓存，保存AI分析结果和提示词
         cached_result['ai_analysis'] = ai_analysis
+        cached_result['ai_prompt'] = ai_prompt
         cached_result['model'] = model
         cached_result['ai_available'] = True
         save_analysis_cache(symbol, duration, bar_size, cached_result)
@@ -263,8 +264,8 @@ def _get_extra_analysis_data(symbol: str) -> dict:
         if earnings:
             extra_data['earnings'] = earnings
             
-        # 获取新闻（简化版）
-        news = get_news(symbol, limit=5)
+        # 获取新闻（用于AI分析，获取更多新闻以提供更全面的信息）
+        news = get_news(symbol, limit=30)
         if news and len(news) > 0:
             extra_data['news'] = news
             logger.info(f"已添加新闻数据到extra_data: {symbol}, {len(news)}条")
@@ -299,10 +300,10 @@ def analyze_stock(symbol):
     使用SQLite缓存当天的查询结果，避免重复查询
     
     查询参数:
-    - duration: 数据周期 (默认: '3 M')
+    - duration: 数据周期 (默认: '5y')
     - bar_size: K线周期 (默认: '1 day')
     """
-    duration = request.args.get('duration', '3 M')
+    duration = request.args.get('duration', '5y')
     bar_size = request.args.get('bar_size', '1 day')
     
     symbol_upper = symbol.upper()
@@ -323,10 +324,10 @@ def refresh_analyze_stock(symbol):
     只负责数据获取和保存，不包含AI分析
     
     查询参数:
-    - duration: 数据周期 (默认: '3 M')
+    - duration: 数据周期 (默认: '5y')
     - bar_size: K线周期 (默认: '1 day')
     """
-    duration = request.args.get('duration', '3 M')
+    duration = request.args.get('duration', '5y')
     bar_size = request.args.get('bar_size', '1 day')
     
     symbol_upper = symbol.upper()
@@ -347,11 +348,11 @@ def ai_analyze_stock(symbol):
     需要先调用 /api/analyze 接口获取数据并保存到数据库
     
     查询参数:
-    - duration: 数据周期 (默认: '3 M')
+    - duration: 数据周期 (默认: '5y')
     - bar_size: K线周期 (默认: '1 day')
     - model: AI模型名称 (默认: 'deepseek-v3.1:671b-cloud')
     """
-    duration = request.args.get('duration', '3 M')
+    duration = request.args.get('duration', '5y')
     bar_size = request.args.get('bar_size', '1 day')
     model = request.args.get('model', 'deepseek-v3.1:671b-cloud')
     
@@ -568,10 +569,10 @@ def get_news_endpoint(symbol):
     """
     获取股票新闻
     查询参数:
-    - limit: 新闻数量限制 (默认: 10)
+    - limit: 新闻数量限制 (默认: 50)
     """
     symbol_upper = symbol.upper()
-    limit = int(request.args.get('limit', 10))
+    limit = int(request.args.get('limit', 50))
     logger.info(f"获取新闻: {symbol_upper}")
     
     try:
@@ -629,12 +630,12 @@ def comprehensive_analysis(symbol):
     查询参数:
     - include_options: 是否包含期权数据 (默认: false)
     - include_news: 是否包含新闻 (默认: true)
-    - news_limit: 新闻数量限制 (默认: 10)
+    - news_limit: 新闻数量限制 (默认: 50)
     """
     symbol_upper = symbol.upper()
     include_options = request.args.get('include_options', 'false').lower() == 'true'
     include_news = request.args.get('include_news', 'true').lower() == 'true'
-    news_limit = int(request.args.get('news_limit', 10))
+    news_limit = int(request.args.get('news_limit', 50))
     
     logger.info(f"全面分析: {symbol_upper}")
     
@@ -683,12 +684,12 @@ def get_all_data_endpoint(symbol):
     查询参数:
     - include_options: 是否包含期权数据 (默认: false)
     - include_news: 是否包含新闻 (默认: true)
-    - news_limit: 新闻数量限制 (默认: 10)
+    - news_limit: 新闻数量限制 (默认: 50)
     """
     symbol_upper = symbol.upper()
     include_options = request.args.get('include_options', 'false').lower() == 'true'
     include_news = request.args.get('include_news', 'true').lower() == 'true'
-    news_limit = int(request.args.get('news_limit', 10))
+    news_limit = int(request.args.get('news_limit', 50))
     
     logger.info(f"获取所有数据: {symbol_upper}")
     

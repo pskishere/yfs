@@ -257,93 +257,93 @@ def get_fundamental_data(symbol: str):
         return None
 
 
-def _is_trading_hours() -> bool:
-    """
-    判断当前是否在美股交易时间内
-    美股交易时间：周一至周五 09:30-16:00 ET（东部时间）
-    """
-    try:
-        et_tz = pytz.timezone('US/Eastern')
-        now_et = pd.Timestamp.now(tz=et_tz)
-        
-        # 检查是否为工作日（周一到周五）
-        if now_et.weekday() >= 5:  # 5=周六, 6=周日
-            return False
-        
-        # 检查是否在交易时间内（09:30-16:00 ET）
-        hour = now_et.hour
-        minute = now_et.minute
-        
-        # 09:30 之前或 16:00 之后都不在交易时间内
-        if hour < 9 or (hour == 9 and minute < 30):
-            return False
-        if hour >= 16:
-            return False
-        
-        return True
-    except Exception as e:
-        logger.warning(f"判断交易时间失败: {e}")
-        return False
 
 
-def _get_realtime_data(symbol: str, interval: str) -> Optional[pd.DataFrame]:
+def _calculate_period_from_duration(duration: str) -> str:
     """
-    获取实时数据（盘中）
-    仅在交易时间内调用，获取当天的实时分钟级数据
+    根据duration参数计算yfinance的period参数
+    duration是最大值，但至少2年起步
+    
+    Args:
+        duration: 数据周期，如 '1 M', '3 M', '1 Y', '2 Y'
+    
+    Returns:
+        yfinance的period字符串，如 '2y', '3y'等
     """
     try:
-        ticker = yf.Ticker(symbol)
-        
-        # 根据interval确定获取实时数据的粒度
-        # 如果请求的是分钟级数据，获取1分钟数据；否则获取5分钟数据
-        if interval in ['1m', '2m', '5m']:
-            realtime_interval = interval
-        elif interval in ['15m', '30m']:
-            realtime_interval = '5m'  # 使用5分钟数据作为实时数据
+        duration = duration.strip().upper()
+        if 'Y' in duration:
+            years = int(duration.replace('Y', '').strip())
+            # 至少2年
+            return f"{max(years, 2)}y"
+        elif 'M' in duration:
+            months = int(duration.replace('M', '').strip())
+            # 转换为年份，至少2年
+            years = max((months / 12), 2)
+            return f"{int(years)}y"
+        elif 'W' in duration:
+            weeks = int(duration.replace('W', '').strip())
+            # 转换为年份，至少2年
+            years = max((weeks / 52), 2)
+            return f"{int(years)}y"
+        elif 'D' in duration:
+            days = int(duration.replace('D', '').strip())
+            # 转换为年份，至少2年
+            years = max((days / 252), 2)
+            return f"{int(years)}y"
         else:
-            # 对于小时级或日级数据，不需要实时数据
-            return None
-        
-        # 获取当天的数据（包含实时数据）
-        today_data = ticker.history(period='1d', interval=realtime_interval)
-        
-        if today_data.empty:
-            return None
-        
-        # 移除时区信息
-        if today_data.index.tzinfo is not None:
-            today_data.index = today_data.index.tz_localize(None)
-        
-        # 只返回今天的数据
-        today = pd.Timestamp.now().normalize()
-        today_data = today_data[today_data.index >= today]
-        
-        if today_data.empty:
-            return None
-        
-        logger.info(f"获取实时数据: {symbol}, {len(today_data)}条, 最新: {today_data.index[-1]}")
-        
-        # 打印实时数据
-        print(f"\n{'='*60}")
-        print(f"📊 实时数据 ({symbol}, {realtime_interval}):")
-        print(f"{'='*60}")
-        print(f"实时数据条数: {len(today_data)}")
-        print(f"时间范围: {today_data.index[0]} 至 {today_data.index[-1]}")
-        print(f"\n最新10条实时数据:")
-        print(today_data.tail(10).to_string())
-        print(f"\n实时数据统计:")
-        print(f"  最新价格: {today_data['Close'].iloc[-1]:.2f}")
-        print(f"  最高价: {today_data['High'].max():.2f}")
-        print(f"  最低价: {today_data['Low'].min():.2f}")
-        if 'Volume' in today_data.columns:
-            print(f"  总成交量: {today_data['Volume'].sum():,.0f}")
-        print(f"{'='*60}\n")
-        
-        return today_data
-        
+            # 默认至少2年
+            return "2y"
     except Exception as e:
-        logger.warning(f"获取实时数据失败: {symbol}, 错误: {e}")
-        return None
+        logger.warning(f"解析duration失败: {duration}, 错误: {e}，使用默认2y")
+        return "2y"
+
+
+def _filter_by_duration(df: pd.DataFrame, duration: str) -> pd.DataFrame:
+    """
+    根据duration参数截取对应周期的数据
+    
+    Args:
+        df: 完整的历史数据DataFrame
+        duration: 数据周期，如 '1 M', '3 M', '1 Y'
+    
+    Returns:
+        截取后的DataFrame
+    """
+    if df is None or df.empty:
+        return df
+    
+    try:
+        # 解析duration
+        duration = duration.strip().upper()
+        if 'M' in duration:
+            # 月份，如 '1 M', '3 M'
+            months = int(duration.replace('M', '').strip())
+            # 大约每个交易日，3个月约65个交易日
+            days = months * 22  # 每月约22个交易日
+        elif 'Y' in duration:
+            # 年份，如 '1 Y', '2 Y'
+            years = int(duration.replace('Y', '').strip())
+            days = years * 252  # 每年约252个交易日
+        elif 'W' in duration:
+            # 周，如 '1 W', '4 W'
+            weeks = int(duration.replace('W', '').strip())
+            days = weeks * 5  # 每周约5个交易日
+        elif 'D' in duration:
+            # 天，如 '1 D', '30 D'
+            days = int(duration.replace('D', '').strip())
+        else:
+            # 默认返回全部数据
+            return df
+        
+        # 从最新日期往前截取
+        if len(df) > days:
+            return df.tail(days)
+        else:
+            return df
+    except Exception as e:
+        logger.warning(f"解析duration失败: {duration}, 错误: {e}，返回全部数据")
+        return df
 
 
 def _format_historical_data(df: pd.DataFrame):
@@ -406,33 +406,28 @@ def get_historical_data(symbol: str, duration: str = '1 D',
         
         yf_interval = interval_map.get(bar_size, '1d')
         
-        # 尝试从缓存获取数据
-        cached_df = get_kline_from_cache(symbol, yf_interval)
-        
-        # 统一时区处理
-        now_local = pd.Timestamp.now()
-        et_tz = pytz.timezone('US/Eastern')
-        now_et = now_local.tz_localize('UTC').astimezone(et_tz) if now_local.tzinfo is None else now_local.astimezone(et_tz)
-        
-        # 美股交易时间：09:30-16:00 ET
-        if now_et.hour < 16 or (now_et.hour == 16 and now_et.minute == 0):
-            expected_latest_date = (now_et.date() - timedelta(days=1))
-        else:
-            expected_latest_date = now_et.date()
-        
-        # 考虑周末：如果是周六/周日，往前推到周五
-        while expected_latest_date.weekday() >= 5:  # 5=周六, 6=周日
-            expected_latest_date -= timedelta(days=1)
+        # 尝试从缓存获取数据（固定1day周期）
+        cached_df = get_kline_from_cache(symbol)
         
         today = pd.Timestamp.now().normalize().tz_localize(None)
-        one_year_ago = today - timedelta(days=365)
         
-        # 检查缓存数据的完整性
+        # 根据duration计算需要的数据量（至少2年）
+        period = _calculate_period_from_duration(duration)
+        # 解析period，计算需要的天数（至少730天=2年）
+        if period.endswith('y'):
+            years = int(period.replace('y', ''))
+            required_days = years * 252  # 每年约252个交易日
+        else:
+            required_days = 730  # 默认2年
+        
+        required_date = today - timedelta(days=required_days)
+        
+        # 检查缓存数据的完整性（根据duration要求）
         need_full_refresh = False
         
         if cached_df is None or cached_df.empty:
             need_full_refresh = True
-            logger.info(f"无缓存数据，需要全量获取: {symbol}, {yf_interval}")
+            logger.info(f"无缓存数据，需要全量获取: {symbol}, {period}")
         else:
             if cached_df.index.tzinfo is not None:
                 cached_df.index = cached_df.index.tz_localize(None)
@@ -440,17 +435,19 @@ def get_historical_data(symbol: str, duration: str = '1 D',
             first_date = cached_df.index[0]
             last_date = cached_df.index[-1]
             
-            if first_date > one_year_ago:
-                logger.info(f"缓存数据不足1年（最早: {first_date}），需要全量刷新")
+            if first_date > required_date:
+                logger.info(f"缓存数据不足{duration}（最早: {first_date}, 需要: {required_date}），需要全量刷新")
                 need_full_refresh = True
             elif last_date.date() < (today - timedelta(days=7)).date():
                 logger.info(f"缓存数据过旧（最新: {last_date}），需要全量刷新")
                 need_full_refresh = True
         
         if need_full_refresh:
-            logger.info(f"从 yfinance 获取全量数据: {symbol}, 2y, {yf_interval}")
+            # 根据duration计算需要的period，但至少2年
+            period = _calculate_period_from_duration(duration)
+            logger.info(f"从 yfinance 获取全量数据: {symbol}, {period}")
             ticker = yf.Ticker(symbol)
-            df = ticker.history(period='2y', interval=yf_interval)
+            df = ticker.history(period=period, interval=yf_interval)
             
             if df.empty:
                 logger.warning(f"无法获取历史数据: {symbol}")
@@ -467,249 +464,19 @@ def get_historical_data(symbol: str, duration: str = '1 D',
             if df.index.tzinfo is not None:
                 df.index = df.index.tz_localize(None)
             
-            # 所有数据都保存到缓存
-            save_kline_to_cache(symbol, yf_interval, df)
-            logger.info(f"全量数据已缓存: {symbol}, {yf_interval}, {len(df)}条, 时间范围: {df.index[0]} - {df.index[-1]}")
+            # 所有数据都保存到缓存（固定1day周期）
+            save_kline_to_cache(symbol, df)
+            logger.info(f"全量数据已缓存: {symbol}, 1day, {len(df)}条, 时间范围: {df.index[0]} - {df.index[-1]}")
             
-            # 盘中实时数据混入（仅在交易时间内）
-            if yf_interval in ['1m', '2m', '5m', '15m', '30m']:
-                if _is_trading_hours():
-                    try:
-                        realtime_data = _get_realtime_data(symbol, yf_interval)
-                        if realtime_data is not None and not realtime_data.empty:
-                            # 合并实时数据到历史数据
-                            df = pd.concat([df, realtime_data])
-                            df = df[~df.index.duplicated(keep='last')]
-                            df = df.sort_index()
-                            
-                            logger.info(f"盘中实时数据已混入: {symbol}, 实时数据{len(realtime_data)}条, 总计{len(df)}条, 最新: {df.index[-1]}")
-                    except Exception as e:
-                        logger.warning(f"混入实时数据失败: {symbol}, 错误: {e}")
-                else:
-                    logger.debug(f"非交易时间，不混入实时数据: {symbol}, {yf_interval}")
-            
-            return _format_historical_data(df), None
+            # 根据duration截取数据
+            filtered_df = _filter_by_duration(df, duration)
+            logger.info(f"根据duration={duration}截取数据: {len(filtered_df)}条交易日")
+            return _format_historical_data(filtered_df), None
         
-        last_cached_date = cached_df.index[-1]
-        logger.info(f"使用缓存数据并增量更新: {symbol}, {yf_interval}, 最新: {last_cached_date.date()}")
-        
-        # 对于日K线，如果缓存中已经有今天的数据，就不需要重新拉取
-        is_daily = (yf_interval == '1d')
-        today_date = today.date()
-        last_cached_date_only = last_cached_date.date() if hasattr(last_cached_date, 'date') else last_cached_date
-        
-        # 检查是否在交易时间内（盘中状态）
-        is_trading = _is_trading_hours()
-        is_minute_interval = yf_interval in ['1m', '2m', '5m', '15m', '30m']
-        
-        # 初始化 final_df，默认使用缓存数据
-        final_df = None
-        
-        # 盘中状态时，分钟级K线需要重新获取实时数据（跳过缓存检查）
-        if is_trading and is_minute_interval:
-            logger.info(f"盘中状态，分钟级K线需要重新获取实时数据: {symbol}, {yf_interval}")
-            print(f"\n{'='*60}")
-            print(f"📊 盘中状态检测 ({symbol}, {yf_interval}):")
-            print(f"{'='*60}")
-            print(f"状态: 交易时间内，强制重新获取实时数据")
-            print(f"缓存日期: {last_cached_date_only}")
-            print(f"缓存数据条数: {len(cached_df)}")
-            print(f"最新数据时间: {cached_df.index[-1]}")
-            print(f"{'='*60}\n")
-            # 强制重新获取数据，不检查缓存是否最新
-            final_df = None  # 标记需要重新获取
-        elif is_daily and last_cached_date_only >= today_date:
-            logger.info(f"日K线缓存已包含今天数据: {symbol}, 缓存日期={last_cached_date_only}, 今天={today_date}, 无需重新拉取")
-            print(f"\n{'='*60}")
-            print(f"📊 缓存状态 ({symbol}, {yf_interval}):")
-            print(f"{'='*60}")
-            print(f"状态: 日K线缓存已包含今天数据")
-            print(f"缓存日期: {last_cached_date_only}")
-            print(f"今天日期: {today_date}")
-            print(f"缓存数据条数: {len(cached_df)}")
-            print(f"最新数据时间: {cached_df.index[-1]}")
-            print(f"{'='*60}\n")
-            final_df = cached_df.copy()
-        elif last_cached_date_only >= expected_latest_date:
-            # 盘中状态时，即使缓存已是最新，也要重新获取实时数据
-            if is_trading and is_minute_interval:
-                logger.info(f"盘中状态，缓存已是最新但需要获取实时数据: {symbol}, {yf_interval}")
-                print(f"\n{'='*60}")
-                print(f"📊 盘中状态检测 ({symbol}, {yf_interval}):")
-                print(f"{'='*60}")
-                print(f"状态: 交易时间内，缓存已是最新，但需要获取实时数据")
-                print(f"缓存日期: {last_cached_date_only}")
-                print(f"缓存数据条数: {len(cached_df)}")
-                print(f"最新数据时间: {cached_df.index[-1]}")
-                print(f"{'='*60}\n")
-                # 标记需要重新获取实时数据
-                final_df = None
-            else:
-                logger.info(f"缓存已是最新数据: {symbol}, 缓存日期={last_cached_date_only}, 预期最新={expected_latest_date}")
-                print(f"\n{'='*60}")
-                print(f"📊 缓存状态 ({symbol}, {yf_interval}):")
-                print(f"{'='*60}")
-                print(f"状态: 缓存已是最新数据")
-                print(f"缓存日期: {last_cached_date_only}")
-                print(f"预期最新日期: {expected_latest_date}")
-                print(f"缓存数据条数: {len(cached_df)}")
-                print(f"最新数据时间: {cached_df.index[-1]}")
-                print(f"{'='*60}\n")
-                final_df = cached_df.copy()
-        
-        # 如果需要重新获取（盘中状态）或缓存不是最新的
-        # final_df 为 None 表示需要重新获取，或者缓存日期过旧也需要重新获取
-        if final_df is None or last_cached_date_only < expected_latest_date:
-            try:
-                ticker = yf.Ticker(symbol)
-                # 盘中状态时，获取当天的数据以确保获取最新实时数据
-                if is_trading and is_minute_interval:
-                    period = '1d'  # 只获取当天的数据，包含实时数据
-                    logger.info(f"盘中状态，获取当天实时数据: {symbol}, {yf_interval}")
-                else:
-                    period = '10d'
-                new_data = ticker.history(period=period, interval=yf_interval)
-                
-                if not new_data.empty:
-                    if new_data.index.tzinfo is not None:
-                        new_data.index = new_data.index.tz_localize(None)
-                    
-                    # 盘中状态时，打印获取到的实时数据
-                    if is_trading and is_minute_interval:
-                        print(f"\n{'='*60}")
-                        print(f"📊 盘中实时数据 ({symbol}, {yf_interval}):")
-                        print(f"{'='*60}")
-                        print(f"获取到的数据条数: {len(new_data)}")
-                        print(f"时间范围: {new_data.index[0]} 至 {new_data.index[-1]}")
-                        print(f"\n最新10条实时数据:")
-                        print(new_data.tail(10).to_string())
-                        print(f"\n实时数据统计:")
-                        print(f"  最新价格: {new_data['Close'].iloc[-1]:.2f}")
-                        print(f"  最高价: {new_data['High'].max():.2f}")
-                        print(f"  最低价: {new_data['Low'].min():.2f}")
-                        if 'Volume' in new_data.columns:
-                            print(f"  总成交量: {new_data['Volume'].sum():,.0f}")
-                        print(f"{'='*60}\n")
-                    
-                    new_data_filtered = new_data[new_data.index > last_cached_date]
-                    
-                    if not new_data_filtered.empty:
-                        # 打印增量更新数据
-                        print(f"\n{'='*60}")
-                        print(f"📈 增量更新数据 ({symbol}, {yf_interval}):")
-                        print(f"{'='*60}")
-                        print(f"新增数据条数: {len(new_data_filtered)}")
-                        print(f"时间范围: {new_data_filtered.index[0]} 至 {new_data_filtered.index[-1]}")
-                        print(f"\n增量数据详情:")
-                        print(new_data_filtered.to_string())
-                        print(f"\n增量数据统计:")
-                        print(f"  最新价格: {new_data_filtered['Close'].iloc[-1]:.2f}")
-                        print(f"  最高价: {new_data_filtered['High'].max():.2f}")
-                        print(f"  最低价: {new_data_filtered['Low'].min():.2f}")
-                        if 'Volume' in new_data_filtered.columns:
-                            print(f"  总成交量: {new_data_filtered['Volume'].sum():,.0f}")
-                        print(f"{'='*60}\n")
-                        logger.info(f"📈 增量更新数据 ({symbol}, {yf_interval}): 新增{len(new_data_filtered)}条, 时间范围: {new_data_filtered.index[0]} 至 {new_data_filtered.index[-1]}")
-                        
-                        combined_df = pd.concat([cached_df, new_data])
-                        combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
-                        combined_df = combined_df.sort_index()
-                        
-                        # 所有数据都保存到缓存（包括增量数据）
-                        save_kline_to_cache(symbol, yf_interval, new_data)
-                        logger.info(f"增量数据已保存到缓存: {symbol}, {yf_interval}, {len(new_data_filtered)}条")
-                        
-                        logger.info(f"增量更新完成: {symbol}, 新增{len(new_data_filtered)}条, 总计{len(combined_df)}条, 最新: {combined_df.index[-1].date()}")
-                        final_df = combined_df
-                    else:
-                        # 盘中状态时，即使没有新数据，也合并获取到的数据（可能包含实时更新）
-                        if is_trading and is_minute_interval:
-                            logger.info(f"盘中状态，合并最新获取的数据（可能包含实时更新）: {symbol}, 缓存最新日期: {last_cached_date_only}")
-                            # 合并获取到的数据（可能包含实时更新）
-                            combined_df = pd.concat([cached_df, new_data])
-                            combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
-                            combined_df = combined_df.sort_index()
-                            
-                            # 打印合并后的数据信息
-                            print(f"\n{'='*60}")
-                            print(f"🔄 盘中数据合并 ({symbol}, {yf_interval}):")
-                            print(f"{'='*60}")
-                            print(f"缓存数据条数: {len(cached_df)}")
-                            print(f"获取数据条数: {len(new_data)}")
-                            print(f"合并后数据条数: {len(combined_df)}")
-                            print(f"最新数据时间: {combined_df.index[-1]}")
-                            print(f"最新价格: {combined_df['Close'].iloc[-1]:.2f}")
-                            print(f"{'='*60}\n")
-                            
-                            # 保存合并后的数据到缓存
-                            save_kline_to_cache(symbol, yf_interval, combined_df)
-                            final_df = combined_df
-                        else:
-                            logger.info(f"无新数据，返回缓存数据: {symbol}, 缓存最新日期: {last_cached_date_only}")
-                            final_df = cached_df.copy()
-                else:
-                    if is_trading and is_minute_interval:
-                        logger.info(f"盘中状态，获取数据为空，返回缓存数据: {symbol}")
-                    else:
-                        logger.info(f"获取最新数据为空，返回缓存数据")
-                    final_df = cached_df.copy()
-                    
-            except Exception as e:
-                logger.warning(f"增量更新失败: {e}，返回缓存数据")
-                final_df = cached_df.copy()
-        
-        # 保底检查：确保 final_df 不为 None
-        if final_df is None:
-            logger.warning(f"final_df 为 None，使用缓存数据作为备选: {symbol}, {yf_interval}")
-            final_df = cached_df
-        
-        # 盘中实时数据混入（仅在交易时间内）
-        if yf_interval in ['1m', '2m', '5m', '15m', '30m']:
-            is_trading = _is_trading_hours()
-            print(f"\n{'='*60}")
-            print(f"⏰ 交易时间检查 ({symbol}, {yf_interval}):")
-            print(f"{'='*60}")
-            print(f"是否在交易时间内: {'是' if is_trading else '否'}")
-            if is_trading:
-                try:
-                    realtime_data = _get_realtime_data(symbol, yf_interval)
-                    if realtime_data is not None and not realtime_data.empty:
-                        # 打印实时数据混入
-                        print(f"\n{'='*60}")
-                        print(f"⚡ 实时数据混入 ({symbol}, {yf_interval}):")
-                        print(f"{'='*60}")
-                        print(f"实时数据条数: {len(realtime_data)}")
-                        print(f"时间范围: {realtime_data.index[0]} 至 {realtime_data.index[-1]}")
-                        print(f"\n最新10条实时数据:")
-                        print(realtime_data.tail(10).to_string())
-                        print(f"\n实时数据统计:")
-                        print(f"  最新价格: {realtime_data['Close'].iloc[-1]:.2f}")
-                        print(f"  最高价: {realtime_data['High'].max():.2f}")
-                        print(f"  最低价: {realtime_data['Low'].min():.2f}")
-                        if 'Volume' in realtime_data.columns:
-                            print(f"  总成交量: {realtime_data['Volume'].sum():,.0f}")
-                        print(f"{'='*60}\n")
-                        
-                        # 合并实时数据到历史数据
-                        # 移除重复的时间戳，保留实时数据（keep='last'）
-                        final_df = pd.concat([final_df, realtime_data])
-                        final_df = final_df[~final_df.index.duplicated(keep='last')]
-                        final_df = final_df.sort_index()
-                        
-                        logger.info(f"盘中实时数据已混入: {symbol}, 实时数据{len(realtime_data)}条, 总计{len(final_df)}条, 最新: {final_df.index[-1]}")
-                        # 实时数据作为增量数据的一部分，会在下次增量更新时入库
-                        logger.debug(f"实时数据将在下次增量更新时入库: {symbol}, {yf_interval}")
-                    else:
-                        print(f"  实时数据为空，无法混入")
-                        print(f"{'='*60}\n")
-                except Exception as e:
-                    logger.warning(f"混入实时数据失败: {symbol}, 错误: {e}")
-                    print(f"  获取实时数据失败: {e}")
-                    print(f"{'='*60}\n")
-            else:
-                logger.debug(f"非交易时间，不混入实时数据: {symbol}, {yf_interval}")
-                print(f"  当前不在交易时间内，跳过实时数据混入")
-                print(f"{'='*60}\n")
+        # 使用缓存数据，根据duration截取
+        filtered_df = _filter_by_duration(cached_df, duration)
+        logger.info(f"使用缓存数据: {symbol}, 最新: {cached_df.index[-1].date()}, 根据duration={duration}截取: {len(filtered_df)}条交易日")
+        return _format_historical_data(filtered_df), None
         
         return _format_historical_data(final_df), None
         
@@ -1464,9 +1231,9 @@ def get_options(symbol: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_news(symbol: str, limit: int = 10) -> Optional[List[Dict[str, Any]]]:
+def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
     """
-    获取股票相关新闻
+    获取股票相关新闻（默认50条）
     """
     try:
         ticker = yf.Ticker(symbol)

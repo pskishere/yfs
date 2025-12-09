@@ -645,35 +645,39 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 if info_parts:
                     fundamental_sections.append("基本信息:\n" + "\n".join([f"   - {p}" for p in info_parts]))
             
-            # 市值和价格
+            # 市值和价格（只添加有效数据）
             price_parts = []
-            if 'MarketCap' in fundamental_data:
+            if 'MarketCap' in fundamental_data and fundamental_data['MarketCap'] is not None:
                 try:
                     mcap = float(fundamental_data['MarketCap'])
-                    if mcap >= 1e9:
-                        price_parts.append(f"市值: ${mcap/1e9:.2f}B")
-                    elif mcap >= 1e6:
-                        price_parts.append(f"市值: ${mcap/1e6:.2f}M")
-                    else:
-                        price_parts.append(f"市值: ${mcap:.2f}")
+                    if mcap > 0:  # 只添加非零市值
+                        if mcap >= 1e9:
+                            price_parts.append(f"市值: ${mcap/1e9:.2f}B")
+                        elif mcap >= 1e6:
+                            price_parts.append(f"市值: ${mcap/1e6:.2f}M")
+                        else:
+                            price_parts.append(f"市值: ${mcap:.2f}")
                 except:
-                    price_parts.append(f"市值: {fundamental_data['MarketCap']}")
+                    pass
             if 'Price' in fundamental_data and fundamental_data['Price'] is not None:
                 try:
-                    price_parts.append(f"当前价: ${float(fundamental_data['Price']):.2f}")
+                    price_val = float(fundamental_data['Price'])
+                    if price_val > 0:  # 只添加有效价格
+                        price_parts.append(f"当前价: ${price_val:.2f}")
                 except:
-                    price_parts.append(f"当前价: {fundamental_data['Price']}")
+                    pass
             if '52WeekHigh' in fundamental_data and '52WeekLow' in fundamental_data:
                 try:
                     high_val = float(fundamental_data['52WeekHigh']) if fundamental_data['52WeekHigh'] is not None else 0
                     low_val = float(fundamental_data['52WeekLow']) if fundamental_data['52WeekLow'] is not None else 0
-                    price_parts.append(f"52周区间: ${low_val:.2f} - ${high_val:.2f}")
+                    if high_val > 0 and low_val > 0:  # 只添加有效区间
+                        price_parts.append(f"52周区间: ${low_val:.2f} - ${high_val:.2f}")
                 except:
-                    price_parts.append(f"52周区间: {fundamental_data['52WeekLow']} - {fundamental_data['52WeekHigh']}")
+                    pass
             if price_parts:
                 fundamental_sections.append("市值与价格:\n" + "\n".join([f"   - {p}" for p in price_parts]))
             
-            # 财务指标
+            # 财务指标（只添加有效数据）
             financial_parts = []
             for key, label in [('RevenueTTM', '营收(TTM)'), ('NetIncomeTTM', '净利润(TTM)'), 
                               ('EBITDATTM', 'EBITDA(TTM)'), ('ProfitMargin', '利润率'), 
@@ -682,20 +686,21 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                     value = fundamental_data[key]
                     try:
                         val = float(value)
-                        if 'Margin' in key:
-                            financial_parts.append(f"{label}: {val:.2f}%")
-                        elif val >= 1e9:
-                            financial_parts.append(f"{label}: ${val/1e9:.2f}B")
-                        elif val >= 1e6:
-                            financial_parts.append(f"{label}: ${val/1e6:.2f}M")
-                        else:
-                            financial_parts.append(f"{label}: {val:.2f}")
+                        if val != 0:  # 只添加非零值
+                            if 'Margin' in key:
+                                financial_parts.append(f"{label}: {val:.2f}%")
+                            elif val >= 1e9:
+                                financial_parts.append(f"{label}: ${val/1e9:.2f}B")
+                            elif val >= 1e6:
+                                financial_parts.append(f"{label}: ${val/1e6:.2f}M")
+                            else:
+                                financial_parts.append(f"{label}: {val:.2f}")
                     except:
-                        financial_parts.append(f"{label}: {value}")
+                        pass
             if financial_parts:
                 fundamental_sections.append("财务指标:\n" + "\n".join([f"   - {p}" for p in financial_parts]))
             
-            # 每股数据
+            # 每股数据（只添加有效数据）
             per_share_parts = []
             for key, label in [('EPS', '每股收益(EPS)'), ('BookValuePerShare', '每股净资产'),
                               ('CashPerShare', '每股现金')]:
@@ -703,64 +708,70 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                     value = fundamental_data[key]
                     try:
                         val = float(value)
-                        per_share_parts.append(f"{label}: ${val:.2f}")
+                        if val != 0:  # 只添加非零值
+                            per_share_parts.append(f"{label}: ${val:.2f}")
                     except:
-                        per_share_parts.append(f"{label}: {value}")
+                        pass
             if per_share_parts:
                 fundamental_sections.append("每股数据:\n" + "\n".join([f"   - {p}" for p in per_share_parts]))
             
-            # 估值指标
+            # 估值指标（只添加有效数据）
             valuation_parts = []
             for key, label in [('PE', '市盈率(PE)'), ('PriceToBook', '市净率(PB)'), ('ROE', '净资产收益率(ROE)')]:
                 if key in fundamental_data and fundamental_data[key] is not None:
                     value = fundamental_data[key]
                     try:
                         val = float(value)
-                        if key == 'ROE':
-                            valuation_parts.append(f"{label}: {val:.2f}%")
-                        else:
-                            valuation_parts.append(f"{label}: {val:.2f}")
+                        if val != 0:  # 只添加非零值
+                            if key == 'ROE':
+                                valuation_parts.append(f"{label}: {val:.2f}%")
+                            else:
+                                valuation_parts.append(f"{label}: {val:.2f}")
                     except:
-                        valuation_parts.append(f"{label}: {value}")
+                        pass
             if valuation_parts:
                 fundamental_sections.append("估值指标:\n" + "\n".join([f"   - {p}" for p in valuation_parts]))
             
-            # 预测数据
+            # 预测数据（只添加有效数据）
             forecast_parts = []
-            if 'TargetPrice' in fundamental_data:
+            if 'TargetPrice' in fundamental_data and fundamental_data['TargetPrice'] is not None:
                 try:
                     target = float(fundamental_data['TargetPrice'])
-                    forecast_parts.append(f"目标价: ${target:.2f}")
+                    if target > 0:  # 只添加有效目标价
+                        forecast_parts.append(f"目标价: ${target:.2f}")
                 except:
-                    forecast_parts.append(f"目标价: {fundamental_data['TargetPrice']}")
-            if 'ConsensusRecommendation' in fundamental_data:
+                    pass
+            if 'ConsensusRecommendation' in fundamental_data and fundamental_data['ConsensusRecommendation'] is not None:
                 try:
                     consensus = float(fundamental_data['ConsensusRecommendation'])
-                    if consensus <= 1.5:
-                        rec = "强烈买入"
-                    elif consensus <= 2.5:
-                        rec = "买入"
-                    elif consensus <= 3.5:
-                        rec = "持有"
-                    elif consensus <= 4.5:
-                        rec = "卖出"
-                    else:
-                        rec = "强烈卖出"
-                    forecast_parts.append(f"共识评级: {rec} ({consensus:.2f})")
+                    if consensus > 0:  # 只添加有效评级
+                        if consensus <= 1.5:
+                            rec = "强烈买入"
+                        elif consensus <= 2.5:
+                            rec = "买入"
+                        elif consensus <= 3.5:
+                            rec = "持有"
+                        elif consensus <= 4.5:
+                            rec = "卖出"
+                        else:
+                            rec = "强烈卖出"
+                        forecast_parts.append(f"共识评级: {rec} ({consensus:.2f})")
                 except:
-                    forecast_parts.append(f"共识评级: {fundamental_data['ConsensusRecommendation']}")
-            if 'ProjectedEPS' in fundamental_data:
+                    pass
+            if 'ProjectedEPS' in fundamental_data and fundamental_data['ProjectedEPS'] is not None:
                 try:
                     proj_eps = float(fundamental_data['ProjectedEPS'])
-                    forecast_parts.append(f"预测EPS: ${proj_eps:.2f}")
+                    if proj_eps != 0:  # 只添加非零EPS
+                        forecast_parts.append(f"预测EPS: ${proj_eps:.2f}")
                 except:
-                    forecast_parts.append(f"预测EPS: {fundamental_data['ProjectedEPS']}")
-            if 'ProjectedGrowthRate' in fundamental_data:
+                    pass
+            if 'ProjectedGrowthRate' in fundamental_data and fundamental_data['ProjectedGrowthRate'] is not None:
                 try:
                     growth = float(fundamental_data['ProjectedGrowthRate'])
-                    forecast_parts.append(f"预测增长率: {growth:.2f}%")
+                    if growth != 0:  # 只添加非零增长率
+                        forecast_parts.append(f"预测增长率: {growth:.2f}%")
                 except:
-                    forecast_parts.append(f"预测增长率: {fundamental_data['ProjectedGrowthRate']}")
+                    pass
             if forecast_parts:
                 fundamental_sections.append("分析师预测:\n" + "\n".join([f"   - {p}" for p in forecast_parts]))
             
@@ -865,7 +876,8 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 except Exception as e:
                     logger.warning(f"格式化现金流量表失败: {e}")
             
-            fundamental_text = "\n\n".join(fundamental_sections) if fundamental_sections else "无可用数据"
+            # 只有当有有效数据时才添加基本面部分
+            fundamental_text = "\n\n".join(fundamental_sections) if fundamental_sections else None
         else:
             fundamental_text = None
         
@@ -986,20 +998,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 prompt = f"""# 分析对象
 **股票代码:** {symbol.upper()}  
 **当前价格:** ${indicators.get('current_price', 0):.2f}  
-**分析周期:** {duration} ({indicators.get('data_points', 0)}个数据点)
-
-# 系统评分结果
-**综合评分:** {signals.get('score', 0)}/100  
-**操作建议:** {signals.get('recommendation', '未知')}  
-**风险等级:** {signals.get('risk', {}).get('level', 'unknown') if signals.get('risk') else 'unknown'}  
-**风险评分:** {signals.get('risk', {}).get('score', 0) if signals.get('risk') else 0}/100
-
-**系统建议价位（参考值，需结合技术分析调整）:**
-- 当前价格: ${indicators.get('current_price', 0):.2f}
-- 系统建议止损位: {stop_loss_str}
-- 系统建议止盈位: {take_profit_str}
-- SAR止损参考: {sar_str}
-- ATR波动参考: {atr_str} ({indicators.get('atr_percent', 0):.1f}%)
+**分析周期:** {duration} ({indicators.get('data_points', 0)}个交易日)
 
 **多维度评分详情:**
 - 趋势方向维度: {dimensions.get('trend', 0):.1f}/100
@@ -1051,10 +1050,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
    - 连续下跌天数: {indicators.get('consecutive_down_days', 0)}
 - ML预测: {indicators.get('ml_trend', 'unknown')} (置信度: {indicators.get('ml_confidence', 0):.1f}%, 预期: {indicators.get('ml_prediction', 0)*100:.2f}%)
 
-# 基本面数据
-{fundamental_text if fundamental_text else '无可用数据'}
-
-# 市场数据
+{f'# 基本面数据{chr(10)}{fundamental_text}{chr(10)}' if fundamental_text else ''}# 市场数据
 {extra_text if extra_text else '无额外市场数据'}
 
 ---
@@ -1065,36 +1061,42 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 ## 一、多维度评分解读
 
-基于系统提供的多维度评分结果，详细分析：
+基于系统提供的多维度评分结果，详细分析（请结合最新新闻事件进行解读）：
 
 1. **趋势方向维度** ({dimensions.get('trend', 0):.1f}/100)
    - 解释当前趋势状态（上涨/下跌/横盘）及其强度
    - 分析MA均线排列、ADX趋势强度、SuperTrend和Ichimoku云层的综合指示
    - 判断趋势的可靠性和持续性
+   - **结合新闻分析**：评估最新新闻事件对趋势的影响，是否有重大利好/利空消息推动或改变趋势
 
 2. **动量指标维度** ({dimensions.get('momentum', 0):.1f}/100)
    - 分析RSI、MACD、KDJ等动量指标的综合信号
    - 评估当前市场动能状态（超买/超卖/中性）
    - 识别可能的反转或延续信号
+   - **结合新闻分析**：判断新闻事件是否与动量指标信号一致，是否存在消息面与技术面的共振或背离
 
 3. **成交量分析维度** ({dimensions.get('volume', 0):.1f}/100)
    - 深入分析价量关系（价涨量增/价跌量增/背离等）
    - 评估成交量的健康度和趋势确认作用
    - 分析OBV和Volume Profile显示的筹码分布情况
+   - **结合新闻分析**：分析新闻事件是否引发异常放量，市场对消息的反应是否健康
 
 4. **波动性维度** ({dimensions.get('volatility', 0):.1f}/100)
    - 评估当前波动率水平对交易的影响
    - 分析布林带位置显示的短期价格区间
    - 给出风险控制和仓位建议
+   - **结合新闻分析**：评估新闻事件是否增加了市场不确定性，是否需要调整风险控制策略
 
 5. **支撑压力维度** ({dimensions.get('support_resistance', 0):.1f}/100)
    - 识别关键支撑位和压力位
    - 评估当前价格位置的优势/劣势
    - 预测可能的突破或反弹点位
+   - **结合新闻分析**：判断新闻事件是否可能成为突破关键位的催化剂，或提供新的支撑/压力参考
 
 6. **高级指标维度** ({dimensions.get('advanced', 0):.1f}/100)
    - 综合ML预测、连续涨跌天数等高级信号
    - 评估市场情绪和极端状态
+   - **结合新闻分析**：综合新闻情绪与市场情绪指标，判断是否存在情绪极端或反转信号
 
 ## 二、技术面深度分析
 
@@ -1230,21 +1232,8 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 prompt = f"""# 分析对象
 **股票代码:** {symbol.upper()}  
 **当前价格:** ${indicators.get('current_price', 0):.2f}  
-**分析周期:** {duration} ({indicators.get('data_points', 0)}个数据点)  
+**分析周期:** {duration} ({indicators.get('data_points', 0)}个交易日)  
 **⚠️ 注意:** 无基本面数据，仅基于技术分析
-
-# 系统评分结果
-**综合评分:** {signals.get('score', 0)}/100  
-**操作建议:** {signals.get('recommendation', '未知')}  
-**风险等级:** {signals.get('risk', {}).get('level', 'unknown') if signals.get('risk') else 'unknown'}  
-**风险评分:** {signals.get('risk', {}).get('score', 0) if signals.get('risk') else 0}/100
-
-**系统建议价位（参考值，需结合技术分析调整）:**
-- 当前价格: ${indicators.get('current_price', 0):.2f}
-- 系统建议止损位: {stop_loss_str}
-- 系统建议止盈位: {take_profit_str}
-- SAR止损参考: {sar_str}
-- ATR波动参考: {atr_str} ({indicators.get('atr_percent', 0):.1f}%)
 
 **多维度评分详情:**
 - 趋势方向维度: {dimensions.get('trend', 0):.1f}/100
@@ -1306,32 +1295,42 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 ## 一、多维度评分解读
 
-基于系统提供的多维度评分结果，详细分析各维度的技术含义：
+基于系统提供的多维度评分结果，详细分析各维度的技术含义（请结合最新新闻事件进行解读）：
 
 1. **趋势方向维度** ({dimensions.get('trend', 0):.1f}/100)
    - 解释当前趋势状态及其强度
    - 分析MA均线排列、ADX、SuperTrend的综合指示
    - 判断趋势的可靠性和持续性
+   - **结合新闻分析**：评估最新新闻事件对趋势的影响，是否有重大利好/利空消息推动或改变趋势
 
 2. **动量指标维度** ({dimensions.get('momentum', 0):.1f}/100)
    - 分析RSI、MACD、KDJ等动量指标的综合信号
    - 评估当前市场动能状态
    - 识别可能的反转或延续信号
+   - **结合新闻分析**：判断新闻事件是否与动量指标信号一致，是否存在消息面与技术面的共振或背离
 
 3. **成交量分析维度** ({dimensions.get('volume', 0):.1f}/100)
    - 深入分析价量关系
    - 评估成交量的健康度和趋势确认作用
    - 分析筹码分布情况
+   - **结合新闻分析**：分析新闻事件是否引发异常放量，市场对消息的反应是否健康
 
 4. **波动性维度** ({dimensions.get('volatility', 0):.1f}/100)
    - 评估当前波动率水平对交易的影响
    - 分析布林带位置显示的短期价格区间
    - 给出风险控制建议
+   - **结合新闻分析**：评估新闻事件是否增加了市场不确定性，是否需要调整风险控制策略
 
 5. **支撑压力维度** ({dimensions.get('support_resistance', 0):.1f}/100)
    - 识别关键支撑位和压力位
    - 评估当前价格位置
    - 预测可能的突破或反弹点位
+   - **结合新闻分析**：判断新闻事件是否可能成为突破关键位的催化剂，或提供新的支撑/压力参考
+
+6. **高级指标维度** ({dimensions.get('advanced', 0):.1f}/100)
+   - 综合ML预测、连续涨跌天数等高级信号
+   - 评估市场情绪和极端状态
+   - **结合新闻分析**：综合新闻情绪与市场情绪指标，判断是否存在情绪极端或反转信号
 
 ## 二、技术面深度分析
 
@@ -1417,6 +1416,14 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 traceback.print_exc()
                 raise format_error
 
+        # 打印AI分析的完整提示词
+        print("\n" + "="*80)
+        print("🤖 AI分析提示词 (Prompt)")
+        print("="*80)
+        print(prompt)
+        print("="*80 + "\n")
+        logger.info(f"AI分析提示词长度: {len(prompt)} 字符")
+        
         # 调用Ollama（使用环境变量配置的服务地址）
         ollama_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
         try:
@@ -1431,9 +1438,14 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             }]
         )
         
-        return response['message']['content']
+        ai_result = response['message']['content']
+        
+        # 返回AI分析结果和提示词
+        return ai_result, prompt
         
     except Exception as ai_error:
         logger.error(f"AI分析失败: {ai_error}")
-        return f'AI分析不可用: {str(ai_error)}\n\n请确保Ollama已安装并运行: ollama serve'
+        error_msg = f'AI分析不可用: {str(ai_error)}\n\n请确保Ollama已安装并运行: ollama serve'
+        # 返回错误信息和空的提示词
+        return error_msg, None
 

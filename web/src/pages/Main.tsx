@@ -20,6 +20,7 @@ import {
   Tabs,
   Collapse,
   FloatButton,
+  Pagination,
 } from 'antd';
 import {
   InboxOutlined,
@@ -97,6 +98,9 @@ const MainPage: React.FC = () => {
 
   // 热门股票相关状态
   const [, setHotStocks] = useState<HotStock[]>([]);
+  
+  // 新闻分页状态
+  const [newsPage, setNewsPage] = useState<number>(1);
   const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
 
   // 防抖定时器引用
@@ -251,13 +255,14 @@ const MainPage: React.FC = () => {
     setAiAnalysisResult(null);
     setAiStatus('idle');
     setAiStatusMsg('等待AI分析');
+    setNewsPage(1); // 重置新闻页码
 
     let dataResult: any = null;
 
     // 第一步：获取数据并保存到数据库（只在此阶段显示 loading）
     try {
       const { symbol, duration, barSize, model } = values;
-      const durationValue = duration || '3 M';
+      const durationValue = duration || '5y';
       const barSizeValue = barSize || '1 day';
       const modelValue = model || 'deepseek-v3.1:671b-cloud';
 
@@ -302,7 +307,7 @@ const MainPage: React.FC = () => {
     }
 
     const formValues = analyzeForm.getFieldsValue();
-    const duration = formValues.duration || '3 M';
+    const duration = formValues.duration || '5y';
     const barSize = formValues.barSize || '1 day';
     const model = formValues.model || 'deepseek-v3.1:671b-cloud';
 
@@ -501,7 +506,7 @@ const MainPage: React.FC = () => {
               layout="inline"
               onFinish={handleAnalyze}
               initialValues={{
-                duration: '3 M',
+                duration: '5y',
                 barSize: '1 day',
                 model: 'deepseek-v3.1:671b-cloud',
               }}
@@ -585,7 +590,7 @@ const MainPage: React.FC = () => {
                             disabled={!currentSymbol || aiStatus === 'running' || !analysisResult}
                             onClick={() => {
                               const formValues = analyzeForm.getFieldsValue();
-                              const duration = formValues.duration || '3 M';
+                              const duration = formValues.duration || '5y';
                               const barSize = formValues.barSize || '1 day';
                               const model = formValues.model || 'deepseek-v3.1:671b-cloud';
                               runAiAnalysis(currentSymbol, duration, barSize, model, analysisResult);
@@ -2073,72 +2078,100 @@ const MainPage: React.FC = () => {
                               <span>最新新闻</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>({analysisResult.extra_data.news.length}条)</span> 📰
                             </span>
                           ),
-                          children: (
-                            <div style={{ padding: '8px 0' }}>
-                              {analysisResult.extra_data.news.map((item, index) => (
-                                <div 
-                                  key={index} 
-                                  style={{ 
-                                    marginBottom: 16, 
-                                    paddingBottom: 16, 
-                                    borderBottom: index < (analysisResult.extra_data?.news?.length || 0) - 1 ? '1px solid #f0f0f0' : 'none',
-                                    transition: 'all 0.3s'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#fafafa';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                  }}
-                                >
-                                  <div style={{ 
-                                    fontWeight: 600, 
-                                    marginBottom: 6,
-                                    fontSize: 14,
-                                    lineHeight: 1.5
-                                  }}>
-                                    {item.link ? (
-                                      <a 
-                                        href={item.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        style={{ 
-                                          color: '#1890ff',
-                                          textDecoration: 'none'
-                                        }}
-                                      >
-                                        <RightOutlined style={{ fontSize: 10, marginRight: 6 }} />
-                                        {item.title || item.headline || '无标题'}
-                                      </a>
-                                    ) : (
-                                      <span>
-                                        <RightOutlined style={{ fontSize: 10, marginRight: 6 }} />
-                                        {item.title || item.headline || '无标题'}
-                                      </span>
-                                    )}
+                          children: (() => {
+                            const newsPageSize = 10;
+                            const allNews = analysisResult.extra_data.news || [];
+                            const totalNews = allNews.length;
+                            const startIndex = (newsPage - 1) * newsPageSize;
+                            const endIndex = startIndex + newsPageSize;
+                            const currentNews = allNews.slice(startIndex, endIndex);
+                            
+                            return (
+                              <div style={{ padding: '8px 0' }}>
+                                {currentNews.map((item, index) => (
+                                  <div 
+                                    key={startIndex + index} 
+                                    style={{ 
+                                      marginBottom: 16, 
+                                      paddingBottom: 16, 
+                                      borderBottom: index < currentNews.length - 1 ? '1px solid #f0f0f0' : 'none',
+                                      transition: 'all 0.3s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#fafafa';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                  >
+                                    <div style={{ 
+                                      fontWeight: 600, 
+                                      marginBottom: 6,
+                                      fontSize: 14,
+                                      lineHeight: 1.5
+                                    }}>
+                                      {item.link ? (
+                                        <a 
+                                          href={item.link} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          style={{ 
+                                            color: '#1890ff',
+                                            textDecoration: 'none'
+                                          }}
+                                        >
+                                          <RightOutlined style={{ fontSize: 10, marginRight: 6 }} />
+                                          {item.title || item.headline || '无标题'}
+                                        </a>
+                                      ) : (
+                                        <span>
+                                          <RightOutlined style={{ fontSize: 10, marginRight: 6 }} />
+                                          {item.title || item.headline || '无标题'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ 
+                                      fontSize: 12, 
+                                      color: '#8c8c8c',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 8
+                                    }}>
+                                      {item.publisher && (
+                                        <Tag color="blue" style={{ margin: 0 }}>
+                                          {item.publisher}
+                                        </Tag>
+                                      )}
+                                      {item.providerPublishTime && (
+                                        <span style={{ fontSize: 12 }}>
+                                          {formatDateTime(item.providerPublishTime)}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
+                                ))}
+                                
+                                {/* 分页组件 */}
+                                {totalNews > newsPageSize && (
                                   <div style={{ 
-                                    fontSize: 12, 
-                                    color: '#8c8c8c',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8
+                                    marginTop: 16, 
+                                    display: 'flex', 
+                                    justifyContent: 'center' 
                                   }}>
-                                    {item.publisher && (
-                                      <Tag color="blue" style={{ margin: 0 }}>
-                                        {item.publisher}
-                                      </Tag>
-                                    )}
-                                    {item.providerPublishTime && (
-                                      <span style={{ fontSize: 12 }}>
-                                        {formatDateTime(item.providerPublishTime)}
-                                      </span>
-                                    )}
+                                    <Pagination
+                                      current={newsPage}
+                                      pageSize={newsPageSize}
+                                      total={totalNews}
+                                      onChange={(page) => setNewsPage(page)}
+                                      showSizeChanger={false}
+                                      showTotal={(total) => `共 ${total} 条新闻`}
+                                      size="small"
+                                    />
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          ),
+                                )}
+                              </div>
+                            );
+                          })(),
                         } : null,
                       ].filter((item): item is NonNullable<typeof item> => item !== null)}
                       style={{ marginTop: 16 }}

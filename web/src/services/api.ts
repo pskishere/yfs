@@ -159,12 +159,12 @@ export const cancelOrder = async (orderId: number): Promise<ApiResponse> => {
 /**
  * 技术分析 - 获取数据并保存到数据库（不包含AI分析）
  * @param symbol - 股票代码
- * @param duration - 数据周期，默认 '3 M'
+ * @param duration - 数据周期，默认 '5y'
  * @param barSize - K线周期，默认 '1 day'
  */
 export const analyze = async (
   symbol: string,
-  duration: string = '3 M',
+  duration: string = '5y',
   barSize: string = '1 day'
 ): Promise<AnalysisResult> => {
   try {
@@ -190,13 +190,13 @@ export const analyze = async (
  * AI分析 - 基于已保存的数据执行AI分析
  * 需要先调用 analyze 接口获取数据并保存到数据库
  * @param symbol - 股票代码
- * @param duration - 数据周期，默认 '3 M'
+ * @param duration - 数据周期，默认 '5y'
  * @param barSize - K线周期，默认 '1 day'
  * @param model - AI模型名称，默认 'deepseek-v3.1:671b-cloud'
  */
 export const aiAnalyze = async (
   symbol: string,
-  duration: string = '3 M',
+  duration: string = '5y',
   barSize: string = '1 day',
   model: string = 'deepseek-v3.1:671b-cloud'
 ): Promise<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string }> => {
@@ -267,12 +267,12 @@ export const getIndicatorInfo = async (indicator: string = ''): Promise<Indicato
 /**
  * 刷新分析 - 强制重新获取数据，不使用缓存（不包含AI分析）
  * @param symbol - 股票代码
- * @param duration - 数据周期，默认 '3 M'
+ * @param duration - 数据周期，默认 '5y'
  * @param barSize - K线周期，默认 '1 day'
  */
 export const refreshAnalyze = async (
   symbol: string,
-  duration: string = '3 M',
+  duration: string = '5y',
   barSize: string = '1 day'
 ): Promise<AnalysisResult> => {
   try {

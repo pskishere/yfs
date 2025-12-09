@@ -10,7 +10,17 @@ from typing import Dict, Tuple, Optional
 
 
 class ScoringSystem:
-    """多维度加权评分系统"""
+    """
+    多维度加权评分系统
+    
+    评分体系：
+    - 各维度内部评分：-100 到 100（负数看跌，正数看涨）
+    - 最终综合评分：0 到 100（百分制）
+    - 评分等级：
+      * 70-100分：强烈买入/买入/轻度买入
+      * 46-69分：中性观望
+      * 0-45分：轻度卖出/卖出/强烈卖出
+    """
     
     # 各维度权重配置
     WEIGHTS = {
@@ -28,7 +38,7 @@ class ScoringSystem:
     
     def _get_adaptive_weights(self, indicators: Dict) -> Dict[str, float]:
         """
-        根据股票特征动态调整权重
+        根据股票特征动态调整权重（优化版）
         
         Args:
             indicators: 技术指标字典
@@ -44,32 +54,46 @@ class ScoringSystem:
         trend_strength = indicators.get('trend_strength', 0)
         adx = indicators.get('adx', 0)
         volume_ratio = indicators.get('volume_ratio', 1.0)
+        price_change = indicators.get('price_change_pct', 0)
         
-        # 1. 高波动股票：增加风险管理权重，降低趋势权重
+        # 1. 高波动股票：增加风险管理权重，但不过度降低趋势权重
         if volatility > 4.0:
-            weights['volatility'] *= 1.5
-            weights['trend'] *= 0.8
-            weights['momentum'] *= 0.9
+            weights['volatility'] *= 1.4  # 从1.5降低
+            weights['trend'] *= 0.85      # 从0.8提高
+            weights['momentum'] *= 0.95   # 从0.9提高
         # 2. 低波动股票：增加动量权重（寻找突破机会）
         elif volatility < 1.5:
-            weights['momentum'] *= 1.3
-            weights['volatility'] *= 0.7
+            weights['momentum'] *= 1.25   # 从1.3降低，避免过度依赖
+            weights['volatility'] *= 0.75  # 从0.7提高
         
         # 3. 强趋势股票：增加趋势和动量权重
         if trend_strength > 70 or adx > 40:
-            weights['trend'] *= 1.3
-            weights['momentum'] *= 1.2
-            weights['support_resistance'] *= 0.8
-        # 4. 弱趋势/震荡股票：增加支撑压力位权重
+            weights['trend'] *= 1.25       # 从1.3降低
+            weights['momentum'] *= 1.15    # 从1.2降低
+            weights['support_resistance'] *= 0.85  # 从0.8提高
+        # 4. 弱趋势/震荡股票：增加支撑压力位和动量权重（捕捉反弹）
         elif trend_strength < 30 or adx < 20:
-            weights['support_resistance'] *= 1.4
-            weights['trend'] *= 0.7
+            weights['support_resistance'] *= 1.3  # 从1.4降低
+            weights['momentum'] *= 1.2     # 新增：震荡市更关注超买超卖
+            weights['trend'] *= 0.75       # 从0.7提高
+        # 5. 中等趋势（30-70）：均衡权重
+        else:
+            weights['trend'] *= 1.1
+            weights['momentum'] *= 1.1
         
-        # 5. 成交量异常：增加成交量权重
+        # 6. 成交量异常：增加成交量权重
         if volume_ratio > 2.0:
-            weights['volume'] *= 1.5
+            weights['volume'] *= 1.4       # 从1.5降低
         elif volume_ratio < 0.5:
-            weights['volume'] *= 0.6
+            weights['volume'] *= 0.7       # 从0.6提高
+        
+        # 7. 反弹信号：价跌量缩后价涨
+        if price_change > 0 and volume_ratio < 0.8:
+            prev_change = indicators.get('prev_price_change_pct', 0)
+            if prev_change < 0:
+                # 可能是底部反弹
+                weights['momentum'] *= 1.2
+                weights['support_resistance'] *= 1.2
         
         # 归一化权重（确保总和为1.0）
         total_weight = sum(weights.values())
@@ -89,10 +113,10 @@ class ScoringSystem:
             
         Returns:
             (综合评分, 详细评分字典)
-            评分范围: -100 到 100
+            评分范围: 0 到 100（百分制）
         """
         if not indicators:
-            return 0, {}
+            return 50, {}
         
         # 获取权重（自适应或固定）
         if use_adaptive_weights:
@@ -118,31 +142,33 @@ class ScoringSystem:
             advanced_score * weights['advanced']
         )
         
-        # 风险调整因子
+        # 风险调整因子 - 优化后减少过度惩罚
         risk_adjustment_factor = 1.0
         risk_level = indicators.get('risk_level', 'medium')
         
         if apply_risk_adjustment:
-            # 根据风险等级调整评分
+            # 根据风险等级调整评分（降低惩罚力度）
             risk_adjustment_map = {
-                'very_low': 1.15,   # 低风险加成15%
-                'low': 1.08,        # 低风险加成8%
+                'very_low': 1.12,   # 低风险加成12%
+                'low': 1.06,        # 低风险加成6%
                 'medium': 1.0,      # 中等风险不调整
-                'high': 0.85,       # 高风险惩罚15%
-                'very_high': 0.70   # 极高风险惩罚30%
+                'high': 0.90,       # 高风险惩罚10%
+                'very_high': 0.80   # 极高风险惩罚20%
             }
             risk_adjustment_factor = risk_adjustment_map.get(risk_level, 1.0)
         
         # 应用风险调整
-        total_score = base_score * risk_adjustment_factor
+        adjusted_score = base_score * risk_adjustment_factor
         
-        # 归一化到 -100 到 100 范围
-        total_score = max(-100, min(100, int(round(total_score))))
+        # 转换为 0-100 百分制（原本 -100到100 转为 0到100）
+        total_score = int(round((adjusted_score + 100) / 2))
+        total_score = max(0, min(100, total_score))
         
         # 详细评分信息
         score_details = {
             'total': total_score,
             'base_score': round(base_score, 1),
+            'adjusted_score': round(adjusted_score, 1),
             'risk_adjustment_factor': round(risk_adjustment_factor, 3),
             'risk_level': risk_level,
             'adaptive_weights_used': use_adaptive_weights,
@@ -172,7 +198,7 @@ class ScoringSystem:
         """
         score = 0.0
         
-        # 1. MA均线排列 (权重30%)
+        # 1. MA均线排列 (权重30%) - 优化后更灵活
         ma_score = 0.0
         if all(k in indicators for k in ['ma5', 'ma20', 'ma50']):
             ma5 = indicators['ma5']
@@ -181,18 +207,30 @@ class ScoringSystem:
             current_price = indicators.get('current_price', 0)
             
             if current_price > 0:
-                # 多头排列: 价格 > MA5 > MA20 > MA50
+                # 完美多头排列: 价格 > MA5 > MA20 > MA50
                 if current_price > ma5 > ma20 > ma50:
                     ma_score = 30
-                # 空头排列: 价格 < MA5 < MA20 < MA50
+                # 完美空头排列: 价格 < MA5 < MA20 < MA50
                 elif current_price < ma5 < ma20 < ma50:
                     ma_score = -30
-                # 部分多头排列
-                elif ma5 > ma20:
-                    ma_score = 15
+                # 价格在MA5上方且MA5上穿MA20（早期多头信号）
+                elif current_price > ma5 and ma5 > ma20:
+                    ma_score = 20  # 提高评分，捕捉早期机会
+                # 价格接近或站上MA20（反弹确认信号）
+                elif current_price > ma20 and ma20 > ma50:
+                    ma_score = 18  # 给予正分
+                # 价格刚站上MA5（可能是底部反弹）
+                elif current_price > ma5 and ma5 < ma20:
+                    ma_score = 12  # 早期反弹信号
+                # 价格在MA5和MA20之间盘整
+                elif ma5 < current_price < ma20 or ma20 < current_price < ma5:
+                    ma_score = 5  # 震荡整理，轻度正分
                 # 部分空头排列
-                elif ma5 < ma20:
+                elif ma5 < ma20 and current_price < ma5:
                     ma_score = -15
+                # 深度空头
+                elif current_price < ma20 < ma50:
+                    ma_score = -20
         
         score += ma_score * 0.3
         
@@ -271,14 +309,31 @@ class ScoringSystem:
         """
         score = 0.0
         
-        # 1. RSI (权重25%)
+        # 1. RSI (权重25%) - 优化为全区间评分
         rsi_score = 0.0
         if 'rsi' in indicators:
             rsi = indicators['rsi']
-            # RSI < 30: 超卖, 正分
-            # RSI > 70: 超买, 负分
+            trend_direction = indicators.get('trend_direction', 'neutral')
+            
+            # RSI超卖区域（强买入信号）
             if rsi < 30:
                 rsi_score = 25 * (30 - rsi) / 30  # 越接近0分数越高
+            # RSI从超卖恢复（35-45区间，反弹确认）
+            elif 30 <= rsi < 45:
+                rsi_score = 20  # 给予较高正分，捕捉反弹初期
+            # RSI健康上涨区间（45-60，强势但未超买）
+            elif 45 <= rsi < 60:
+                if trend_direction == 'up':
+                    rsi_score = 18  # 上涨趋势中的健康区间
+                else:
+                    rsi_score = 10  # 震荡或下跌趋势中的中性偏多
+            # RSI警戒区间（60-70，可能超买但仍可持有）
+            elif 60 <= rsi <= 70:
+                if trend_direction == 'up':
+                    rsi_score = 8  # 强趋势中可容忍
+                else:
+                    rsi_score = -5  # 震荡中需要警惕
+            # RSI超买区域（>70，卖出信号）
             elif rsi > 70:
                 rsi_score = -25 * (rsi - 70) / 30  # 越接近100分数越低
         
@@ -365,16 +420,39 @@ class ScoringSystem:
         """
         score = 0.0
         
-        # 1. 价量配合 (权重40%)
+        # 1. 价量配合 (权重40%) - 优化评分逻辑
         price_volume_score = 0.0
         if 'price_volume_confirmation' in indicators:
             confirmation = indicators['price_volume_confirmation']
+            price_change = indicators.get('price_change_pct', 0)
+            volume_ratio = indicators.get('volume_ratio', 1.0)
+            
             if confirmation == 'bullish':
-                price_volume_score = 40
+                # 价涨量增 - 根据放量程度给分
+                if volume_ratio > 2.0:
+                    price_volume_score = 40  # 大幅放量
+                elif volume_ratio > 1.5:
+                    price_volume_score = 35  # 明显放量
+                else:
+                    price_volume_score = 25  # 温和放量
             elif confirmation == 'bearish':
-                price_volume_score = -40
+                # 价跌量增 - 区分恐慌性下跌和正常调整
+                if volume_ratio > 2.0 and price_change < -5:
+                    price_volume_score = -30  # 恐慌性下跌，但可能是底部信号
+                else:
+                    price_volume_score = -40  # 正常下跌
             elif confirmation == 'divergence':
-                price_volume_score = -20
+                # 价量背离 - 区分不同情况
+                if price_change > 0:
+                    price_volume_score = -15  # 价涨量缩，上涨乏力
+                else:
+                    price_volume_score = 10   # 价跌量缩，下跌动能衰竭，可能见底
+            # 价格横盘但量能变化
+            else:
+                if volume_ratio > 1.5:
+                    price_volume_score = 10  # 盘整放量，可能变盘
+                elif volume_ratio < 0.6:
+                    price_volume_score = -10  # 盘整缩量，缺乏关注
         
         score += price_volume_score * 0.4
         
@@ -434,23 +512,47 @@ class ScoringSystem:
         """
         score = 0.0
         
-        # 1. 布林带位置 (权重50%)
+        # 1. 布林带位置 (权重50%) - 优化为全区间评分
         bb_score = 0.0
         if all(k in indicators for k in ['bb_upper', 'bb_lower', 'bb_middle', 'current_price']):
             price = indicators['current_price']
             upper = indicators['bb_upper']
             lower = indicators['bb_lower']
             middle = indicators['bb_middle']
+            trend_direction = indicators.get('trend_direction', 'neutral')
             
             if upper > lower > 0:
                 # 计算价格在布林带中的位置 (0-1)
                 band_width = upper - lower
                 position = (price - lower) / band_width if band_width > 0 else 0.5
                 
-                # 接近下轨: 正分 (可能反弹)
-                if position < 0.1:
+                # 触及或跌破下轨（强买入信号）
+                if position <= 0.1:
                     bb_score = 50 * (0.1 - position) / 0.1
-                # 接近上轨: 负分 (可能回调)
+                # 下轨附近反弹（0.1-0.25，买入确认）
+                elif 0.1 < position <= 0.25:
+                    bb_score = 35  # 反弹初期
+                # 下半区上涨（0.25-0.4，健康上涨）
+                elif 0.25 < position <= 0.4:
+                    bb_score = 25  # 从底部走强
+                # 中轨附近（0.4-0.6，中性偏多）
+                elif 0.4 < position <= 0.6:
+                    if trend_direction == 'up':
+                        bb_score = 15  # 上涨趋势中的健康回调
+                    elif price > middle:
+                        bb_score = 10  # 在中轨上方
+                    else:
+                        bb_score = 5   # 在中轨下方
+                # 上半区（0.6-0.75，涨势延续但需警惕）
+                elif 0.6 < position <= 0.75:
+                    if trend_direction == 'up':
+                        bb_score = 8   # 强势上涨可容忍
+                    else:
+                        bb_score = 0   # 震荡中需谨慎
+                # 接近上轨（0.75-0.9，警戒区）
+                elif 0.75 < position <= 0.9:
+                    bb_score = -10  # 轻度负分
+                # 触及或突破上轨（>0.9，超买信号）
                 elif position > 0.9:
                     bb_score = -50 * (position - 0.9) / 0.1
         
@@ -508,33 +610,66 @@ class ScoringSystem:
         if current_price <= 0:
             return 0.0
         
-        # 1. 支撑位距离 (权重40%)
+        # 1. 支撑位距离 (权重40%) - 优化距离区间
         support_score = 0.0
         if 'support_20d_low' in indicators:
             support = indicators['support_20d_low']
             dist_pct = ((current_price - support) / current_price) * 100
             
-            # 接近支撑位: 正分
-            if 0 < dist_pct < 2:
-                support_score = 40 * (2 - dist_pct) / 2
-            # 跌破支撑位: 负分
-            elif dist_pct < 0:
-                support_score = -40
+            # 严重跌破支撑位（-5%以下）
+            if dist_pct < -5:
+                support_score = -40  # 破位严重
+            # 轻微跌破支撑位（-2%到-5%）
+            elif -5 <= dist_pct < -2:
+                support_score = -25  # 破位但可能假突破
+            # 接近但未破支撑（-2%到0）
+            elif -2 <= dist_pct < 0:
+                support_score = 20   # 考验支撑，反弹机会
+            # 刚站稳支撑位（0-3%）
+            elif 0 <= dist_pct < 3:
+                support_score = 40   # 最佳买入区
+            # 支撑位上方（3-8%）
+            elif 3 <= dist_pct < 8:
+                support_score = 25   # 有支撑保护的安全区
+            # 中等距离（8-15%）
+            elif 8 <= dist_pct < 15:
+                support_score = 10   # 有一定上涨空间
+            # 较远距离（>15%）
+            else:
+                support_score = 0    # 支撑作用减弱
         
         score += support_score * 0.4
         
-        # 2. 压力位距离 (权重30%)
+        # 2. 压力位距离 (权重30%) - 优化距离区间
         resistance_score = 0.0
         if 'resistance_20d_high' in indicators:
             resistance = indicators['resistance_20d_high']
             dist_pct = ((resistance - current_price) / current_price) * 100
+            trend_direction = indicators.get('trend_direction', 'neutral')
             
-            # 接近压力位: 负分
-            if 0 < dist_pct < 2:
-                resistance_score = -30 * (2 - dist_pct) / 2
-            # 突破压力位: 正分
-            elif dist_pct < 0:
-                resistance_score = 30
+            # 已突破压力位（负值）
+            if dist_pct < -3:
+                resistance_score = 30   # 有效突破，强势
+            elif -3 <= dist_pct < 0:
+                resistance_score = 20   # 刚突破，确认中
+            # 非常接近压力（0-2%）
+            elif 0 <= dist_pct < 2:
+                if trend_direction == 'up':
+                    resistance_score = -5  # 上涨趋势中轻度警惕
+                else:
+                    resistance_score = -20  # 震荡中压力明显
+            # 接近压力（2-5%）
+            elif 2 <= dist_pct < 5:
+                resistance_score = -10  # 适度压力
+            # 中等距离（5-10%）
+            elif 5 <= dist_pct < 10:
+                resistance_score = 10   # 有上涨空间
+            # 较远距离（10-20%）
+            elif 10 <= dist_pct < 20:
+                resistance_score = 20   # 上涨空间较大
+            # 很远距离（>20%）
+            else:
+                resistance_score = 15   # 压力作用减弱
         
         score += resistance_score * 0.3
         
@@ -609,19 +744,38 @@ class ScoringSystem:
         
         score += trend_strength_score * 0.35  # 从0.3提升至0.35
         
-        # 3. 连续涨跌天数 (权重25%, 从20%提升)
+        # 3. 连续涨跌天数 (权重25%) - 优化为更细致的评分
         consecutive_score = 0.0
         up_days = indicators.get('consecutive_up_days', 0)
         down_days = indicators.get('consecutive_down_days', 0)
+        price_change = indicators.get('price_change_pct', 0)
         
-        # 连续下跌后可能反弹
-        if down_days >= 5:
-            consecutive_score = 25 * min(down_days / 10, 1.0)
-        # 连续上涨后可能回调
+        # 连续下跌后的反弹机会（更积极）
+        if down_days >= 7:
+            consecutive_score = 25  # 长期下跌，反弹概率大
+        elif down_days >= 5:
+            consecutive_score = 20  # 中期下跌，可能见底
+        elif down_days >= 3:
+            consecutive_score = 12  # 短期调整，可关注
+        # 下跌后开始反弹（关键信号）
+        elif down_days == 0 and price_change > 0:
+            # 检查前一天是否是下跌
+            prev_down = indicators.get('prev_consecutive_down_days', 0)
+            if prev_down >= 3:
+                consecutive_score = 18  # 下跌结束反弹，强买入信号
+        # 连续上涨（区分健康上涨和过度上涨）
+        elif up_days >= 7:
+            consecutive_score = -20  # 长期上涨，需要休息
         elif up_days >= 5:
-            consecutive_score = -25 * min(up_days / 10, 1.0)
+            consecutive_score = -10  # 中期上涨，警惕回调
+        elif up_days >= 1 and up_days <= 4:
+            # 短期上涨，健康趋势
+            if price_change > 0 and price_change < 5:
+                consecutive_score = 8  # 温和上涨，健康
+            elif price_change >= 5:
+                consecutive_score = 5  # 强势上涨，但过热
         
-        score += consecutive_score * 0.25  # 从0.2提升至0.25
+        score += consecutive_score * 0.25
         
         # 4. 威廉指标 (权重10%)
         wr_score = 0.0
@@ -638,26 +792,26 @@ class ScoringSystem:
     
     def get_recommendation(self, score: int) -> Tuple[str, str]:
         """
-        根据评分获取建议（更细粒度的阈值划分）
+        根据评分获取建议（百分制，0-100分）
         
         Args:
-            score: 综合评分 (-100 到 100)
+            score: 综合评分 (0 到 100)
             
         Returns:
             (建议文字, 操作标识)
         """
-        # 更细粒度的阈值：45/25/5/-5/-25/-45
-        if score >= 45:
+        # 百分制阈值
+        if score >= 70:
             return '🟢 强烈买入', 'strong_buy'
-        elif score >= 25:
+        elif score >= 60:
             return '🟢 买入', 'buy'
-        elif score >= 5:
+        elif score >= 54:
             return '🟢 轻度买入', 'buy_light'
-        elif score >= -5:
+        elif score >= 46:
             return '⚪ 中性观望', 'hold'
-        elif score >= -25:
+        elif score >= 40:
             return '🔴 轻度卖出', 'sell_light'
-        elif score >= -45:
+        elif score >= 30:
             return '🔴 卖出', 'sell'
         else:
             return '🔴 强烈卖出', 'strong_sell'

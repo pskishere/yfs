@@ -98,6 +98,7 @@ def init_database():
             candles TEXT NOT NULL,
             extra_data TEXT,
             ai_analysis TEXT,
+            ai_prompt TEXT,
             model TEXT,
             ai_available INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -114,12 +115,11 @@ def init_database():
             )
         ''')
         
-        # 创建K线数据表，用于缓存全量K线数据
+        # 创建K线数据表，用于缓存全量K线数据（固定1day周期）
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS kline_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
-            interval TEXT NOT NULL,
             date TEXT NOT NULL,
             open REAL NOT NULL,
             high REAL NOT NULL,
@@ -128,7 +128,7 @@ def init_database():
             volume INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(symbol, interval, date)
+            UNIQUE(symbol, date)
             )
         ''')
         
@@ -221,8 +221,8 @@ def init_database():
         ''')
         
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_kline_symbol_interval_date 
-            ON kline_data(symbol, interval, date DESC)
+            CREATE INDEX IF NOT EXISTS idx_kline_symbol_date 
+            ON kline_data(symbol, date DESC)
         ''')
         
         conn.commit()
@@ -252,7 +252,7 @@ def get_cached_analysis(symbol, duration, bar_size):
         today = date.today().isoformat()
         
         cursor.execute('''
-            SELECT indicators, signals, candles, extra_data, ai_analysis, model, ai_available
+            SELECT indicators, signals, candles, extra_data, ai_analysis, ai_prompt, model, ai_available
             FROM analysis_cache
             WHERE symbol = ? AND duration = ? AND bar_size = ? AND query_date = ?
         ''', (symbol.upper(), duration, bar_size, today))
@@ -268,8 +268,9 @@ def get_cached_analysis(symbol, duration, bar_size):
                 'signals': json.loads(row[1]),
                 'candles': json.loads(row[2]),
                 'ai_analysis': row[4],
-                'model': row[5],
-                'ai_available': bool(row[6])
+                'ai_prompt': row[5],
+                'model': row[6],
+                'ai_available': bool(row[7])
             }
             # 添加 extra_data（如果存在）
             if row[3]:
@@ -302,8 +303,8 @@ def save_analysis_cache(symbol, duration, bar_size, result):
         cursor.execute('''
             INSERT OR REPLACE INTO analysis_cache 
             (symbol, duration, bar_size, query_date, indicators, signals, candles, extra_data,
-             ai_analysis, model, ai_available)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ai_analysis, ai_prompt, model, ai_available)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             symbol.upper(),
             duration,
@@ -314,6 +315,7 @@ def save_analysis_cache(symbol, duration, bar_size, result):
             candles_json,
             extra_data_json,
             result.get('ai_analysis'),
+            result.get('ai_prompt'),
             result.get('model'),
             1 if result.get('ai_available') else 0
         ))
@@ -337,8 +339,8 @@ def save_analysis_cache(symbol, duration, bar_size, result):
                 cursor.execute('''
                     INSERT OR REPLACE INTO analysis_cache 
                     (symbol, duration, bar_size, query_date, indicators, signals, candles, 
-                     ai_analysis, model, ai_available)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ai_analysis, ai_prompt, model, ai_available)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     symbol.upper(),
                     duration,
@@ -348,6 +350,7 @@ def save_analysis_cache(symbol, duration, bar_size, result):
                     signals_json,
                     candles_json,
                     result.get('ai_analysis'),
+                    result.get('ai_prompt'),
                     result.get('model'),
                     1 if result.get('ai_available') else 0
                 ))
@@ -408,9 +411,9 @@ def get_stock_name(symbol):
         return None
 
 
-def get_kline_from_cache(symbol: str, interval: str, start_date: str = None):
+def get_kline_from_cache(symbol: str, start_date: str = None):
     """
-    从数据库获取K线数据
+    从数据库获取K线数据（固定1day周期）
     """
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -420,16 +423,16 @@ def get_kline_from_cache(symbol: str, interval: str, start_date: str = None):
             cursor.execute('''
                 SELECT date, open, high, low, close, volume
                 FROM kline_data
-                WHERE symbol = ? AND interval = ? AND date >= ?
+                WHERE symbol = ? AND date >= ?
                 ORDER BY date ASC
-            ''', (symbol, interval, start_date))
+            ''', (symbol, start_date))
         else:
             cursor.execute('''
                 SELECT date, open, high, low, close, volume
                 FROM kline_data
-                WHERE symbol = ? AND interval = ?
+                WHERE symbol = ?
                 ORDER BY date ASC
-            ''', (symbol, interval))
+            ''', (symbol,))
         
         rows = cursor.fetchall()
         conn.close()
@@ -448,9 +451,9 @@ def get_kline_from_cache(symbol: str, interval: str, start_date: str = None):
         return None
 
 
-def save_kline_to_cache(symbol: str, interval: str, df: pd.DataFrame):
+def save_kline_to_cache(symbol: str, df: pd.DataFrame):
     """
-    保存K线数据到数据库（增量更新）
+    保存K线数据到数据库（增量更新，固定1day周期）
     """
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -477,11 +480,10 @@ def save_kline_to_cache(symbol: str, interval: str, df: pd.DataFrame):
             
             cursor.execute('''
                 INSERT OR REPLACE INTO kline_data 
-                (symbol, interval, date, open, high, low, close, volume, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                (symbol, date, open, high, low, close, volume, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ''', (
                 symbol,
-                interval,
                 date_str,
                 float(row['Open']),
                 float(row['High']),

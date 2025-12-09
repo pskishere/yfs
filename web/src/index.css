@@ -25,6 +25,12 @@ input, textarea {
   user-select: text;
 }
 
+/* 允许表格文本选择 */
+.ant-table, .ant-table-cell, .ant-table-tbody > tr > td {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
