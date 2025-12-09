@@ -351,7 +351,6 @@ const MainPage: React.FC = () => {
       const result = await getHotStocks(30);
       if (result.success && result.stocks) {
         setHotStocks(result.stocks);
-        // 转换为 AutoComplete 需要的格式
         const options = result.stocks.map((stock: HotStock) => ({
           value: stock.symbol,
           label: `${stock.symbol} - ${stock.name}`,
@@ -1864,11 +1863,9 @@ const MainPage: React.FC = () => {
                                   render: (val: string) => {
                                     if (!val) return <Tag color="default">-</Tag>;
                                     
-                                    // 从Text中提取交易类型
                                     let displayText = val;
                                     let color = 'default';
                                     
-                                    // 判断交易类型并设置颜色
                                     const lowerVal = val.toLowerCase();
                                     if (lowerVal.includes('sale') || lowerVal.includes('sell')) {
                                       color = 'red';
@@ -2079,7 +2076,7 @@ const MainPage: React.FC = () => {
                             </span>
                           ),
                           children: (() => {
-                            const newsPageSize = 10;
+                            const newsPageSize = 30;
                             const allNews = analysisResult.extra_data.news || [];
                             const totalNews = allNews.length;
                             const startIndex = (newsPage - 1) * newsPageSize;

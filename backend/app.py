@@ -34,7 +34,6 @@ from .utils import (
 )
 from .stock_analyzer import create_comprehensive_analysis
 
-# 创建Flask应用
 app = Flask(__name__)
 CORS(app)
 
@@ -94,25 +93,21 @@ def _perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool
     Returns:
         (result_dict, error_response_tuple or None)
     """
-    # 如果使用缓存，先检查缓存
     if use_cache:
         cached_result = get_cached_analysis(symbol, duration, bar_size)
         if cached_result:
-            # 返回缓存数据（不包含AI分析）
             result = {
                 'success': True,
                 'indicators': cached_result.get('indicators'),
                 'signals': cached_result.get('signals'),
                 'candles': cached_result.get('candles'),
                 'extra_data': cached_result.get('extra_data'),
-                'data_saved': True  # 标记数据已保存
+                'data_saved': True
             }
             return result, None
     
-    # 获取并保存股票信息
     _save_stock_info_if_available(symbol)
     
-    # 获取历史数据和计算指标
     hist_data, _ = get_historical_data(symbol, duration, bar_size)
     indicators, ind_error = calculate_technical_indicators(symbol, duration, bar_size)
     
@@ -122,25 +117,19 @@ def _perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool
     if not indicators:
         return None, ({'success': False, 'message': '数据不足，无法计算技术指标'}, 404)
     
-    # 生成信号和格式化数据
     signals = generate_signals(indicators)
     formatted_candles = format_candle_data(hist_data)
     
-    # 获取额外数据（股息、机构持仓等）
     extra_data = _get_extra_analysis_data(symbol)
     
-    # 创建结果（不包含AI分析）
     result = create_success_response(indicators, signals, formatted_candles, None, None)
     
-    # 将额外数据添加到结果中
     if extra_data:
         result['extra_data'] = extra_data
         logger.debug(f"已将extra_data添加到结果: {symbol}, 包含模块: {list(extra_data.keys())}, news数量: {len(extra_data.get('news', []))}")
         
-        # 保存extra_data到数据库
         save_extra_data(symbol, extra_data)
         
-        # 只在调试模式下打印详细数据
         if logger.isEnabledFor(logging.DEBUG) and 'news' in extra_data:
             print(f"\n{'='*60}")
             print(f"✅ 最终返回结果中的新闻数据 ({symbol}):")
@@ -153,7 +142,6 @@ def _perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool
                     print(f"  {i}. {item.get('title', 'N/A')}")
             print(f"{'='*60}\n")
     
-    # 保存数据到数据库（不包含AI分析）
     save_analysis_cache(symbol, duration, bar_size, result)
     result['data_saved'] = True
     
@@ -173,7 +161,6 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
     Returns:
         (ai_analysis_result_dict, error_response_tuple or None)
     """
-    # 从数据库读取已保存的数据
     cached_result = get_cached_analysis(symbol, duration, bar_size)
     if not cached_result:
         return None, ({
@@ -181,7 +168,6 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
             'message': '数据不存在，请先调用 /api/analyze 接口获取数据'
         }, 404)
     
-    # 检查是否已有AI分析结果
     if cached_result.get('ai_analysis'):
         logger.info(f"返回已缓存的AI分析结果: {symbol}")
         return {
@@ -192,7 +178,6 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
             'cached': True
         }, None
     
-    # 检查Ollama是否可用
     if not check_ollama_available():
         return None, ({
             'success': False,
@@ -200,10 +185,8 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
         }, 503)
     
     try:
-        # 获取额外数据用于AI分析
         extra_data = cached_result.get('extra_data') or _get_extra_analysis_data(symbol)
         
-        # 执行AI分析
         logger.info(f"开始AI分析: {symbol}, 模型: {model}")
         ai_analysis, ai_prompt = perform_ai_analysis(
             symbol, 
@@ -214,7 +197,6 @@ def _perform_ai_analysis(symbol: str, duration: str, bar_size: str, model: str):
             extra_data
         )
         
-        # 更新缓存，保存AI分析结果和提示词
         cached_result['ai_analysis'] = ai_analysis
         cached_result['ai_prompt'] = ai_prompt
         cached_result['model'] = model
@@ -244,27 +226,22 @@ def _get_extra_analysis_data(symbol: str) -> dict:
     extra_data = {}
     
     try:
-        # 获取机构持仓
         institutional = get_institutional_holders(symbol)
         if institutional:
-            extra_data['institutional_holders'] = institutional[:20]  # 前20大机构
+            extra_data['institutional_holders'] = institutional[:20]
             
-        # 获取内部交易
         insider = get_insider_transactions(symbol)
         if insider:
-            extra_data['insider_transactions'] = insider[:15]  # 最近15笔
+            extra_data['insider_transactions'] = insider[:15]
             
-        # 获取分析师推荐
         recommendations = get_recommendations(symbol)
         if recommendations:
-            extra_data['analyst_recommendations'] = recommendations[:10]  # 最近10条
+            extra_data['analyst_recommendations'] = recommendations[:10]
             
-        # 获取收益数据
         earnings = get_earnings(symbol)
         if earnings:
             extra_data['earnings'] = earnings
             
-        # 获取新闻（用于AI分析，获取更多新闻以提供更全面的信息）
         news = get_news(symbol, limit=30)
         if news and len(news) > 0:
             extra_data['news'] = news
@@ -403,7 +380,6 @@ def get_indicator_info():
     """
     indicator_name = request.args.get('indicator', '').lower()
     
-    # 从JSON文件加载技术指标的解释和参考范围
     indicator_info = _load_indicator_info()
     
     if not indicator_info:
@@ -412,7 +388,6 @@ def get_indicator_info():
             'message': '指标信息文件加载失败'
         }), 500
     
-    # 如果指定了指标名称，只返回该指标信息
     if indicator_name:
         if indicator_name in indicator_info:
             return jsonify({
@@ -426,7 +401,6 @@ def get_indicator_info():
                 'message': f'未找到指标: {indicator_name}'
             }), 404
     
-    # 返回所有指标信息
     return jsonify({
         'success': True,
         'indicators': indicator_info
@@ -640,7 +614,6 @@ def comprehensive_analysis(symbol):
     logger.info(f"全面分析: {symbol_upper}")
     
     try:
-        # 获取所有数据
         all_data = get_all_data(
             symbol_upper, 
             include_options=include_options,
@@ -654,7 +627,6 @@ def comprehensive_analysis(symbol):
                 'message': f'无法获取 {symbol_upper} 的数据'
             }), 404
         
-        # 执行全面分析
         analysis = create_comprehensive_analysis(symbol_upper, all_data)
         
         if not analysis:
@@ -762,7 +734,6 @@ def main():
     启动API服务
     """
     try:
-        # 初始化数据库
         logger.info("正在初始化数据库...")
         init_database()
         logger.info("✅ 数据库初始化成功")
@@ -777,7 +748,6 @@ def main():
     port = 8080
     logger.info(f"🚀 API服务启动在 http://0.0.0.0:{port}")
     
-    # 启动Flask服务
     app.run(
         host='0.0.0.0',
         port=port,

@@ -10,7 +10,6 @@ import os
 from .settings import logger, OLLAMA_HOST, DEFAULT_AI_MODEL
 from .yfinance import get_historical_data, get_fundamental_data
 
-# 技术指标模块导入
 from .indicators import (
     calculate_ma, calculate_rsi, calculate_bollinger, calculate_macd,
     calculate_volume, calculate_price_change, calculate_volatility,
@@ -60,109 +59,86 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
         'data_points': int(len(closes)),
     }
     
-    # 1. 移动平均线 (MA)
     ma_data = calculate_ma(closes)
     result.update(ma_data)
         
-    # 2. RSI (相对强弱指标)
     rsi_data = calculate_rsi(closes)
     result.update(rsi_data)
             
-    # 3. 布林带 (Bollinger Bands)
     bb_data = calculate_bollinger(closes)
     result.update(bb_data)
         
-    # 4. MACD
     macd_data = calculate_macd(closes)
     result.update(macd_data)
                 
-    # 5. 成交量分析
     volume_data = calculate_volume(volumes)
     result.update(volume_data)
         
-    # 6. 价格变化
     price_change_data = calculate_price_change(closes)
     result.update(price_change_data)
         
-    # 7. 波动率
     volatility_data = calculate_volatility(closes)
     result.update(volatility_data)
         
-    # 8. 支持位和压力位
     support_resistance = calculate_support_resistance(closes, highs, lows)
     result.update(support_resistance)
     
-    # 9. KDJ指标（随机指标）
     if len(closes) >= 9:
         kdj = calculate_kdj(closes, highs, lows)
         result.update(kdj)
     
-    # 10. ATR（平均真实波幅）
     if len(closes) >= 14:
         atr = calculate_atr(closes, highs, lows)
         result['atr'] = atr
         result['atr_percent'] = float((atr / closes[-1]) * 100)
     
-    # 11. 威廉指标（Williams %R）
     if len(closes) >= 14:
         wr = calculate_williams_r(closes, highs, lows)
         result['williams_r'] = wr
     
-    # 12. OBV（能量潮指标）
     if len(volumes) >= 20:
         obv = calculate_obv(closes, volumes)
         result['obv_current'] = float(obv[-1]) if len(obv) > 0 else 0.0
         result['obv_trend'] = get_trend(obv[-10:]) if len(obv) >= 10 else 'neutral'
     
-    # 13. 趋势强度
     trend_info = analyze_trend_strength(closes, highs, lows)
     result.update(trend_info)
 
-    # 14. 斐波那契回撤位
     fibonacci_levels = calculate_fibonacci_retracement(highs, lows)
     result.update(fibonacci_levels)
 
-    # 16. CCI（顺势指标）
     if len(closes) >= 14:
         cci_data = calculate_cci(closes, highs, lows)
         result.update(cci_data)
     
-    # 17. ADX（平均趋向指标）
-    if len(closes) >= 28:  # ADX需要period*2的数据
+    if len(closes) >= 28:
         adx_data = calculate_adx(closes, highs, lows)
         result.update(adx_data)
     
-    # 18. SAR（抛物线转向指标）
     if len(closes) >= 10:
         sar_data = calculate_sar(closes, highs, lows)
         result.update(sar_data)
 
-    # 21. SuperTrend (超级趋势)
     if len(closes) >= 11:
         st_data = calculate_supertrend(closes, highs, lows)
         result.update(st_data)
         
-    # 22. StochRSI (随机相对强弱指标)
     if len(closes) >= 28:
         stoch_rsi_data = calculate_stoch_rsi(closes)
         result.update(stoch_rsi_data)
         
-    # 23. Volume Profile (成交量分布)
     if len(closes) >= 20:
         vp_data = calculate_volume_profile(closes, highs, lows, volumes)
         result.update(vp_data)
 
-    # 24. Ichimoku Cloud (一目均衡表)
     if len(closes) >= 52:
         ichimoku_data = calculate_ichimoku(closes, highs, lows)
         result.update(ichimoku_data)
 
-    # 25. ML预测（机器学习预测，包含成交量分析）
     if len(closes) >= 20 and len(valid_volumes) > 0:
         ml_data = calculate_ml_predictions(closes, highs, lows, volumes)
         result.update(ml_data)
 
-    # 26. 获取基本面数据
     try:
         fundamental_data = get_fundamental_data(symbol)
         if fundamental_data:
@@ -192,7 +168,6 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
     
     signals_list = signals['signals']
     
-    # 生成各类信号
     add_ma_signals(signals_list, indicators)
     add_rsi_signals(signals_list, indicators)
     add_bollinger_signals(signals_list, indicators)
@@ -201,14 +176,11 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
     add_trend_signals(signals_list, indicators)
     add_advanced_indicator_signals(signals_list, indicators)
     
-    # 支撑位和压力位分析
     current_price = indicators.get('current_price')
     if current_price:
-        # 检查是否接近关键支撑位
         support_keys = [k for k in indicators.keys() if 'support' in k.lower()]
         resistance_keys = [k for k in indicators.keys() if 'resistance' in k.lower()]
         
-        # 找最近的支撑位
         nearest_support = None
         nearest_support_dist = float('inf')
         for key in support_keys:
@@ -220,7 +192,6 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
                     nearest_support = support
                     nearest_support_dist = dist_pct
         
-        # 找最近的压力位
         nearest_resistance = None
         nearest_resistance_dist = float('inf')
         for key in resistance_keys:
@@ -232,25 +203,22 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
                     nearest_resistance = resistance
                     nearest_resistance_dist = dist_pct
         
-        # 根据支撑压力位置给出信号
         if nearest_support and nearest_support_dist < 2:
             signals['signals'].append(f'🟢 接近支撑位${nearest_support:.2f} (距离{nearest_support_dist:.1f}%) - 可能反弹')
         
         if nearest_resistance and nearest_resistance_dist < 2:
             signals['signals'].append(f'🔴 接近压力位${nearest_resistance:.2f} (距离{nearest_resistance_dist:.1f}%) - 可能回调')
         
-        # 突破信号
         if 'resistance_20d_high' in indicators:
             high_20 = indicators['resistance_20d_high']
-            if current_price >= high_20 * 0.99:  # 接近或突破20日高点
+            if current_price >= high_20 * 0.99:
                 signals['signals'].append(f'🚀 突破20日高点${high_20:.2f} - 强势信号')
         
         if 'support_20d_low' in indicators:
             low_20 = indicators['support_20d_low']
-            if current_price <= low_20 * 1.01:  # 接近或跌破20日低点
+            if current_price <= low_20 * 1.01:
                 signals['signals'].append(f'⚠️ 跌破20日低点${low_20:.2f} - 弱势信号')
     
-    # Volume Profile信号
     if 'vp_poc' in indicators:
         poc = indicators['vp_poc']
         current_price = indicators.get('current_price', 0)
@@ -265,7 +233,6 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
         elif vp_status == 'below_va':
             signals['signals'].append(f'📉 价格在价值区域下方(POC ${poc:.2f}) - 弱势失衡')
     
-    # 21. ML预测信号
     if 'ml_trend' in indicators:
         ml_trend = indicators['ml_trend']
         ml_confidence = indicators.get('ml_confidence', 0)
@@ -284,29 +251,24 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
             elif ml_trend == 'down':
                 signals['signals'].append(f'🤖 ML预测: 轻微看跌(置信度{ml_confidence:.1f}%) - 谨慎悲观')
             
-    # 使用新的多维度加权评分系统计算综合评分
     score, score_details = calculate_comprehensive_score(indicators)
     signals['score'] = score
-    signals['score_details'] = score_details  # 保存详细评分信息
+    signals['score_details'] = score_details
     
-    # 根据评分获取建议
     recommendation, action = get_recommendation(score)
     signals['recommendation'] = recommendation
     signals['action'] = action
     
-    # 风险评估
     risk_assessment = assess_risk(indicators)
     signals['risk'] = {
         'level': risk_assessment['level'],
         'score': risk_assessment['score'],
         'factors': risk_assessment['factors']
     }
-    # 保留顶级字段以兼容旧代码
     signals['risk_level'] = risk_assessment['level']
     signals['risk_score'] = risk_assessment['score']
     signals['risk_factors'] = risk_assessment['factors']
     
-    # 止损止盈建议（买入场景）
     stop_loss_profit = calculate_stop_loss_profit(indicators, action='buy', account_value=account_value, risk_percent=risk_percent)
     signals['stop_loss'] = stop_loss_profit.get('stop_loss')
     signals['take_profit'] = stop_loss_profit.get('take_profit')
@@ -323,7 +285,6 @@ def assess_risk(indicators: dict):
     risk_score = 0
     risk_factors = []
     
-    # 1. 波动率风险
     if 'volatility_20' in indicators:
         vol = indicators['volatility_20']
         if vol > 5:
@@ -336,14 +297,12 @@ def assess_risk(indicators: dict):
             risk_score += 10
             risk_factors.append(f'中等波动率({vol:.1f}%)')
     
-    # 2. RSI极端值
     if 'rsi' in indicators:
         rsi = indicators['rsi']
         if rsi > 85 or rsi < 15:
             risk_score += 20
             risk_factors.append(f'RSI极端值({rsi:.1f})')
     
-    # 3. 连续涨跌风险
     if 'consecutive_up_days' in indicators:
         up_days = indicators['consecutive_up_days']
         if up_days >= 7:
@@ -362,7 +321,6 @@ def assess_risk(indicators: dict):
             risk_score += 15
             risk_factors.append(f'连续下跌{down_days}天')
     
-    # 4. 距离支撑/压力位
     current_price = indicators.get('current_price')
     if current_price and 'support_20d_low' in indicators:
         support = indicators['support_20d_low']
@@ -378,14 +336,12 @@ def assess_risk(indicators: dict):
             risk_score += 15
             risk_factors.append('接近重要压力位')
     
-    # 5. 趋势不明确
     if 'trend_strength' in indicators:
         strength = indicators['trend_strength']
         if strength < 15:
             risk_score += 10
             risk_factors.append('趋势不明确')
     
-    # 6. 量价背离
     if 'obv_trend' in indicators:
         obv_trend = indicators['obv_trend']
         price_change = indicators.get('price_change_pct', 0)
@@ -394,19 +350,15 @@ def assess_risk(indicators: dict):
             risk_score += 15
             risk_factors.append('量价背离')
     
-    # 7. ADX趋势强度风险
     if 'adx' in indicators:
         adx = indicators['adx']
-        # ADX低于20表示趋势不明确，增加交易风险
         if adx < 20:
             risk_score += 10
             risk_factors.append(f'ADX({adx:.1f})趋势不明确')
-        # ADX高于60表示趋势过强，可能反转
         elif adx > 60:
             risk_score += 15
             risk_factors.append(f'ADX({adx:.1f})趋势过强可能反转')
     
-    # 判断风险等级（返回英文标识符，前端负责显示）
     if risk_score >= 70:
         level = 'very_high'
     elif risk_score >= 50:
@@ -442,8 +394,7 @@ def calculate_stop_loss_profit(indicators: dict, action: str = 'buy', account_va
     result = {}
     volatility = indicators.get('volatility_20', 2.0)
     
-    # 根据波动率动态调整ATR倍数
-    if volatility > 4:  # 高波动
+    if volatility > 4:
         atr_stop_multiplier = 2.5
         atr_profit_multiplier = 4.0
     elif volatility > 2.5:  # 中等波动
@@ -453,7 +404,6 @@ def calculate_stop_loss_profit(indicators: dict, action: str = 'buy', account_va
         atr_stop_multiplier = 1.5
         atr_profit_multiplier = 3.0
     
-    # 计算止损止盈价位
     if 'atr' in indicators:
         atr = indicators['atr']
         if action == 'buy':
@@ -479,7 +429,6 @@ def calculate_stop_loss_profit(indicators: dict, action: str = 'buy', account_va
             result['stop_loss'] = float(current_price * 1.05)
             result['take_profit'] = float(current_price * 0.90)
     
-    # 计算风险收益比
     if action == 'buy':
         risk = current_price - result['stop_loss']
         reward = result['take_profit'] - current_price
@@ -528,7 +477,6 @@ def calculate_position_sizing(indicators: dict, stop_loss_data: dict, account_va
         position_ratio = (position_value / account_value) * 100
         result['position_ratio'] = float(position_ratio)
         
-        # 根据风险等级调整仓位
         risk_level = indicators.get('risk_level', 'medium')
         risk_multiplier = {
             'very_low': 1.5,
@@ -598,13 +546,11 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         indicators = indicators or {}
         signals = signals or {}
         
-        # 预处理：将所有None值替换为0或空字符串
         def safe_indicators(d):
             """确保所有数值字段不是None"""
             result = {}
             for k, v in d.items():
                 if v is None:
-                    # 如果键名包含这些词，说明是字符串类型
                     string_fields = ['direction', 'status', 'trend', 'signal', 'action', 'recommendation']
                     is_string_field = any(word in k.lower() for word in string_fields)
                     result[k] = 'unknown' if is_string_field else 0
@@ -645,7 +591,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 if info_parts:
                     fundamental_sections.append("基本信息:\n" + "\n".join([f"   - {p}" for p in info_parts]))
             
-            # 市值和价格（只添加有效数据）
             price_parts = []
             if 'MarketCap' in fundamental_data and fundamental_data['MarketCap'] is not None:
                 try:
@@ -677,7 +622,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             if price_parts:
                 fundamental_sections.append("市值与价格:\n" + "\n".join([f"   - {p}" for p in price_parts]))
             
-            # 财务指标（只添加有效数据）
             financial_parts = []
             for key, label in [('RevenueTTM', '营收(TTM)'), ('NetIncomeTTM', '净利润(TTM)'), 
                               ('EBITDATTM', 'EBITDA(TTM)'), ('ProfitMargin', '利润率'), 
@@ -700,7 +644,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             if financial_parts:
                 fundamental_sections.append("财务指标:\n" + "\n".join([f"   - {p}" for p in financial_parts]))
             
-            # 每股数据（只添加有效数据）
             per_share_parts = []
             for key, label in [('EPS', '每股收益(EPS)'), ('BookValuePerShare', '每股净资产'),
                               ('CashPerShare', '每股现金')]:
@@ -715,7 +658,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             if per_share_parts:
                 fundamental_sections.append("每股数据:\n" + "\n".join([f"   - {p}" for p in per_share_parts]))
             
-            # 估值指标（只添加有效数据）
             valuation_parts = []
             for key, label in [('PE', '市盈率(PE)'), ('PriceToBook', '市净率(PB)'), ('ROE', '净资产收益率(ROE)')]:
                 if key in fundamental_data and fundamental_data[key] is not None:
@@ -732,7 +674,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             if valuation_parts:
                 fundamental_sections.append("估值指标:\n" + "\n".join([f"   - {p}" for p in valuation_parts]))
             
-            # 预测数据（只添加有效数据）
             forecast_parts = []
             if 'TargetPrice' in fundamental_data and fundamental_data['TargetPrice'] is not None:
                 try:
@@ -775,13 +716,12 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             if forecast_parts:
                 fundamental_sections.append("分析师预测:\n" + "\n".join([f"   - {p}" for p in forecast_parts]))
             
-            # 详细财务报表数据
             if fundamental_data.get('Financials'):
                 try:
                     financials = fundamental_data['Financials']
                     if isinstance(financials, list) and len(financials) > 0:
                         financials_text = "年度财务报表:\n"
-                        for record in financials[:5]:  # 最近5年
+                        for record in financials[:2]:  # 最近2年
                             if isinstance(record, dict):
                                 date = record.get('index', record.get('Date', 'N/A'))
                                 financials_text += f"   {date}:\n"
@@ -806,7 +746,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                     quarterly = fundamental_data['QuarterlyFinancials']
                     if isinstance(quarterly, list) and len(quarterly) > 0:
                         quarterly_text = "季度财务报表:\n"
-                        for record in quarterly[:4]:  # 最近4个季度
+                        for record in quarterly[:8]:  # 最近8个季度（2年）
                             if isinstance(record, dict):
                                 date = record.get('index', record.get('Date', 'N/A'))
                                 quarterly_text += f"   {date}:\n"
@@ -831,7 +771,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                     balance = fundamental_data['BalanceSheet']
                     if isinstance(balance, list) and len(balance) > 0:
                         balance_text = "年度资产负债表:\n"
-                        for record in balance[:3]:  # 最近3年
+                        for record in balance[:2]:  # 最近2年
                             if isinstance(record, dict):
                                 date = record.get('index', record.get('Date', 'N/A'))
                                 balance_text += f"   {date}:\n"
@@ -856,7 +796,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                     cashflow = fundamental_data['Cashflow']
                     if isinstance(cashflow, list) and len(cashflow) > 0:
                         cashflow_text = "年度现金流量表:\n"
-                        for record in cashflow[:3]:  # 最近3年
+                        for record in cashflow[:2]:  # 最近2年
                             if isinstance(record, dict):
                                 date = record.get('index', record.get('Date', 'N/A'))
                                 cashflow_text += f"   {date}:\n"
@@ -876,15 +816,12 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 except Exception as e:
                     logger.warning(f"格式化现金流量表失败: {e}")
             
-            # 只有当有有效数据时才添加基本面部分
             fundamental_text = "\n\n".join(fundamental_sections) if fundamental_sections else None
         else:
             fundamental_text = None
         
-        # 处理额外数据（机构持仓、分析师推荐等）
         extra_sections = []
         if extra_data:
-            # 机构持仓
             if extra_data.get('institutional_holders'):
                 inst = extra_data['institutional_holders']
                 inst_text = f"机构持仓 (前{min(len(inst), 10)}大机构):\n"
@@ -892,30 +829,25 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                     name = holder.get('Holder', '未知')
                     shares = holder.get('Shares', 0) or 0
                     value = holder.get('Value', 0) or 0
-                    pct = holder.get('% Out', 'N/A')
+                    pct = (holder.get('% Out') or holder.get('%Out') or holder.get('pctHeld') or 
+                           holder.get('Percent') or holder.get('% Held') or holder.get('pct_held'))
+                    if pct is not None:
+                        try:
+                            pct_val = float(pct)
+                            if pct_val < 1:
+                                pct_str = f"{(pct_val * 100):.2f}%"
+                            else:
+                                pct_str = f"{pct_val:.2f}%"
+                        except:
+                            pct_str = str(pct)
+                    else:
+                        pct_str = 'N/A'
                     inst_text += f"   {i}. {name}\n"
                     try:
-                        inst_text += f"      持股: {int(shares):,}, 市值: ${int(value):,.0f}, 占比: {pct}\n"
+                        inst_text += f"      持股: {int(shares):,}, 市值: ${int(value):,.0f}, 占比: {pct_str}\n"
                     except:
-                        inst_text += f"      持股: {shares}, 市值: ${value}, 占比: {pct}\n"
+                        inst_text += f"      持股: {shares}, 市值: ${value}, 占比: {pct_str}\n"
                 extra_sections.append(inst_text)
-            
-            # 内部交易
-            if extra_data.get('insider_transactions'):
-                insider = extra_data['insider_transactions']
-                insider_text = f"内部交易 (最近{min(len(insider), 10)}笔):\n"
-                for i, trans in enumerate(insider[:10], 1):
-                    insider_name = trans.get('Insider', '未知')
-                    trans_type = trans.get('Transaction', '未知')
-                    shares = trans.get('Shares', 0) or 0
-                    value = trans.get('Value', 0) or 0
-                    insider_text += f"   {i}. {insider_name}: {trans_type}\n"
-                    if shares and shares != 0:
-                        try:
-                            insider_text += f"      股数: {int(shares):,}, 价值: ${int(value):,.0f}\n"
-                        except:
-                            insider_text += f"      股数: {shares}, 价值: ${value}\n"
-                extra_sections.append(insider_text)
             
             # 分析师推荐
             if extra_data.get('analyst_recommendations'):
@@ -932,13 +864,12 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                         rec_text += f"   {i}. {firm}: {to_grade}\n"
                 extra_sections.append(rec_text)
             
-            # 收益数据
             if extra_data.get('earnings'):
                 earnings_data = extra_data['earnings']
                 quarterly = earnings_data.get('quarterly', [])
                 if quarterly:
-                    earn_text = f"季度收益 (最近{min(len(quarterly), 4)}个季度):\n"
-                    for q in quarterly[:4]:
+                    earn_text = f"季度收益 (最近{min(len(quarterly), 8)}个季度):\n"
+                    for q in quarterly[:8]:
                         quarter = q.get('quarter', '未知')
                         revenue = q.get('Revenue', 0) or 0
                         earnings_val = q.get('Earnings', 0) or 0
@@ -950,7 +881,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                             earn_text += f"   {quarter}: 营收 {revenue}, 盈利 {earnings_val}\n"
                     extra_sections.append(earn_text)
             
-            # 新闻标题
             if extra_data.get('news'):
                 news = extra_data['news']
                 news_text = f"最新新闻 (最近{len(news)}条标题):\n"
@@ -965,23 +895,20 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         
         extra_text = "\n\n".join(extra_sections) if extra_sections else None
         
-        # 获取评分系统详细信息
         score_details = signals.get('score_details', {})
         dimensions = score_details.get('dimensions', {}) if score_details else {}
         
-        # 确保 dimensions 是字典且有默认值
         if not isinstance(dimensions, dict):
             dimensions = {}
         dimensions = {
-            'trend': dimensions.get('trend', 0),
-            'momentum': dimensions.get('momentum', 0),
-            'volume': dimensions.get('volume', 0),
-            'volatility': dimensions.get('volatility', 0),
-            'support_resistance': dimensions.get('support_resistance', 0),
-            'advanced': dimensions.get('advanced', 0)
+            'trend': dimensions.get('trend', 50),
+            'momentum': dimensions.get('momentum', 50),
+            'volume': dimensions.get('volume', 50),
+            'volatility': dimensions.get('volatility', 50),
+            'support_resistance': dimensions.get('support_resistance', 50),
+            'advanced': dimensions.get('advanced', 50)
         }
         
-        # 格式化建议价位（处理可能为None的情况）
         stop_loss_val = signals.get('stop_loss')
         stop_loss_str = f"${stop_loss_val:.2f}" if stop_loss_val is not None else '未计算'
         take_profit_val = signals.get('take_profit')
@@ -991,9 +918,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         atr_val = indicators.get('atr')
         atr_str = f"${atr_val:.2f}" if atr_val is not None and atr_val != 0 else '未计算'
         
-        # 根据是否有基本面数据构建不同的提示词
         if has_fundamental:
-            # 有基本面数据的完整分析提示词
             try:
                 prompt = f"""# 分析对象
 **股票代码:** {symbol.upper()}  
@@ -1063,37 +988,37 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 基于系统提供的多维度评分结果，详细分析（请结合最新新闻事件进行解读）：
 
-1. **趋势方向维度** ({dimensions.get('trend', 0):.1f}/100)
+1. **趋势方向维度**
    - 解释当前趋势状态（上涨/下跌/横盘）及其强度
    - 分析MA均线排列、ADX趋势强度、SuperTrend和Ichimoku云层的综合指示
    - 判断趋势的可靠性和持续性
    - **结合新闻分析**：评估最新新闻事件对趋势的影响，是否有重大利好/利空消息推动或改变趋势
 
-2. **动量指标维度** ({dimensions.get('momentum', 0):.1f}/100)
+2. **动量指标维度**
    - 分析RSI、MACD、KDJ等动量指标的综合信号
    - 评估当前市场动能状态（超买/超卖/中性）
    - 识别可能的反转或延续信号
    - **结合新闻分析**：判断新闻事件是否与动量指标信号一致，是否存在消息面与技术面的共振或背离
 
-3. **成交量分析维度** ({dimensions.get('volume', 0):.1f}/100)
+3. **成交量分析维度**
    - 深入分析价量关系（价涨量增/价跌量增/背离等）
    - 评估成交量的健康度和趋势确认作用
    - 分析OBV和Volume Profile显示的筹码分布情况
    - **结合新闻分析**：分析新闻事件是否引发异常放量，市场对消息的反应是否健康
 
-4. **波动性维度** ({dimensions.get('volatility', 0):.1f}/100)
+4. **波动性维度**
    - 评估当前波动率水平对交易的影响
    - 分析布林带位置显示的短期价格区间
    - 给出风险控制和仓位建议
    - **结合新闻分析**：评估新闻事件是否增加了市场不确定性，是否需要调整风险控制策略
 
-5. **支撑压力维度** ({dimensions.get('support_resistance', 0):.1f}/100)
+5. **支撑压力维度**
    - 识别关键支撑位和压力位
    - 评估当前价格位置的优势/劣势
    - 预测可能的突破或反弹点位
    - **结合新闻分析**：判断新闻事件是否可能成为突破关键位的催化剂，或提供新的支撑/压力参考
 
-6. **高级指标维度** ({dimensions.get('advanced', 0):.1f}/100)
+6. **高级指标维度**
    - 综合ML预测、连续涨跌天数等高级信号
    - 评估市场情绪和极端状态
    - **结合新闻分析**：综合新闻情绪与市场情绪指标，判断是否存在情绪极端或反转信号
@@ -1149,17 +1074,12 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
    - 机构持仓变化趋势
    - 机构认可度评估
 
-2. **内部人员交易**
-   - 内部买卖比例
-   - 内部人员信心分析
-   - 潜在风险提示
-
-3. **分析师观点**
+2. **分析师观点**
    - 评级变化趋势
    - 目标价合理性
    - 市场共识判断
 
-4. **最新动态**
+3. **最新动态**
    - 重要新闻事件
    - 市场关注焦点
    - 潜在催化剂
@@ -1227,7 +1147,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 traceback.print_exc()
                 raise format_error
         else:
-            # 没有基本面数据，只进行技术分析
             try:
                 prompt = f"""# 分析对象
 **股票代码:** {symbol.upper()}  
@@ -1297,37 +1216,37 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 基于系统提供的多维度评分结果，详细分析各维度的技术含义（请结合最新新闻事件进行解读）：
 
-1. **趋势方向维度** ({dimensions.get('trend', 0):.1f}/100)
+1. **趋势方向维度**
    - 解释当前趋势状态及其强度
    - 分析MA均线排列、ADX、SuperTrend的综合指示
    - 判断趋势的可靠性和持续性
    - **结合新闻分析**：评估最新新闻事件对趋势的影响，是否有重大利好/利空消息推动或改变趋势
 
-2. **动量指标维度** ({dimensions.get('momentum', 0):.1f}/100)
+2. **动量指标维度**
    - 分析RSI、MACD、KDJ等动量指标的综合信号
    - 评估当前市场动能状态
    - 识别可能的反转或延续信号
    - **结合新闻分析**：判断新闻事件是否与动量指标信号一致，是否存在消息面与技术面的共振或背离
 
-3. **成交量分析维度** ({dimensions.get('volume', 0):.1f}/100)
+3. **成交量分析维度**
    - 深入分析价量关系
    - 评估成交量的健康度和趋势确认作用
    - 分析筹码分布情况
    - **结合新闻分析**：分析新闻事件是否引发异常放量，市场对消息的反应是否健康
 
-4. **波动性维度** ({dimensions.get('volatility', 0):.1f}/100)
+4. **波动性维度**
    - 评估当前波动率水平对交易的影响
    - 分析布林带位置显示的短期价格区间
    - 给出风险控制建议
    - **结合新闻分析**：评估新闻事件是否增加了市场不确定性，是否需要调整风险控制策略
 
-5. **支撑压力维度** ({dimensions.get('support_resistance', 0):.1f}/100)
+5. **支撑压力维度**
    - 识别关键支撑位和压力位
    - 评估当前价格位置
    - 预测可能的突破或反弹点位
    - **结合新闻分析**：判断新闻事件是否可能成为突破关键位的催化剂，或提供新的支撑/压力参考
 
-6. **高级指标维度** ({dimensions.get('advanced', 0):.1f}/100)
+6. **高级指标维度**
    - 综合ML预测、连续涨跌天数等高级信号
    - 评估市场情绪和极端状态
    - **结合新闻分析**：综合新闻情绪与市场情绪指标，判断是否存在情绪极端或反转信号
@@ -1416,7 +1335,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 traceback.print_exc()
                 raise format_error
 
-        # 打印AI分析的完整提示词
         print("\n" + "="*80)
         print("🤖 AI分析提示词 (Prompt)")
         print("="*80)
@@ -1424,7 +1342,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         print("="*80 + "\n")
         logger.info(f"AI分析提示词长度: {len(prompt)} 字符")
         
-        # 调用Ollama（使用环境变量配置的服务地址）
         ollama_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
         try:
             client = ollama.Client(host=ollama_host)
@@ -1440,12 +1357,10 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         
         ai_result = response['message']['content']
         
-        # 返回AI分析结果和提示词
         return ai_result, prompt
         
     except Exception as ai_error:
         logger.error(f"AI分析失败: {ai_error}")
         error_msg = f'AI分析不可用: {str(ai_error)}\n\n请确保Ollama已安装并运行: ollama serve'
-        # 返回错误信息和空的提示词
         return error_msg, None
 

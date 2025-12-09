@@ -52,11 +52,9 @@ def _format_financial_dataframe(df):
         return []
     
     result = []
-    # 转置DataFrame，使日期为键
     df_transposed = df.T
     
     for date in df_transposed.index:
-        # 处理日期：转换为字符串
         if hasattr(date, 'strftime'):
             date_str = date.strftime('%Y-%m-%d')
         elif isinstance(date, pd.Timestamp):
@@ -67,9 +65,7 @@ def _format_financial_dataframe(df):
         record = {'index': date_str, 'Date': date_str}
         for col in df_transposed.columns:
             value = df_transposed.loc[date, col]
-            # 处理NaN值
             if pd.notna(value):
-                # 处理 Timestamp 对象
                 if isinstance(value, pd.Timestamp):
                     record[col] = value.strftime('%Y-%m-%d')
                 elif isinstance(value, (int, float, np.number)):
@@ -92,7 +88,6 @@ def get_fundamental_data(symbol: str):
     try:
         ticker = yf.Ticker(symbol)
         
-        # 静默处理，如果获取不到info就返回None
         try:
             info = ticker.info
         except Exception as e:
@@ -103,14 +98,11 @@ def get_fundamental_data(symbol: str):
             logger.debug(f"股票信息为空: {symbol}")
             return None
         
-        # 计算每股现金（避免除零错误）
         shares_outstanding = info.get('sharesOutstanding', 0)
         total_cash = info.get('totalCash', 0)
         cash_per_share = (total_cash / shares_outstanding) if shares_outstanding and shares_outstanding > 0 else 0
         
-        # 提取基本面关键指标
         fundamental = {
-            # 公司信息
             'CompanyName': info.get('longName', info.get('shortName', symbol)),
             'ShortName': info.get('shortName', ''),
             'Exchange': info.get('exchange', ''),
@@ -121,7 +113,6 @@ def get_fundamental_data(symbol: str):
             'Employees': info.get('fullTimeEmployees', 0),
             'BusinessSummary': info.get('longBusinessSummary', ''),
             
-            # 市值与价格
             'MarketCap': info.get('marketCap', 0),
             'EnterpriseValue': info.get('enterpriseValue', 0),
             'Price': info.get('currentPrice', info.get('regularMarketPrice', 0)),
@@ -130,7 +121,6 @@ def get_fundamental_data(symbol: str):
             '52WeekLow': info.get('fiftyTwoWeekLow', 0),
             'SharesOutstanding': shares_outstanding,
             
-            # 估值指标
             'PE': info.get('trailingPE', 0),
             'ForwardPE': info.get('forwardPE', 0),
             'PriceToBook': info.get('priceToBook', 0),
@@ -139,7 +129,6 @@ def get_fundamental_data(symbol: str):
             'EVToRevenue': info.get('enterpriseToRevenue', 0),
             'EVToEBITDA': info.get('enterpriseToEbitda', 0),
             
-            # 盈利能力
             'ProfitMargin': info.get('profitMargins', 0),
             'OperatingMargin': info.get('operatingMargins', 0),
             'GrossMargin': info.get('grossMargins', 0),
@@ -147,7 +136,6 @@ def get_fundamental_data(symbol: str):
             'ROA': info.get('returnOnAssets', 0),
             'ROIC': info.get('returnOnInvestedCapital', 0),
             
-            # 财务健康
             'RevenueTTM': info.get('totalRevenue', 0),
             'RevenuePerShare': info.get('revenuePerShare', 0),
             'NetIncomeTTM': info.get('netIncomeToCommon', 0),
@@ -160,25 +148,21 @@ def get_fundamental_data(symbol: str):
             'QuickRatio': info.get('quickRatio', 0),
             'CashFlow': info.get('operatingCashflow', 0),
             
-            # 每股数据
             'EPS': info.get('trailingEps', 0),
             'ForwardEPS': info.get('forwardEps', 0),
             'BookValuePerShare': info.get('bookValue', 0),
             'DividendPerShare': info.get('dividendRate', 0),
             
-            # 股息
             'DividendRate': info.get('dividendRate', 0),
             'DividendYield': info.get('dividendYield', 0),
             'PayoutRatio': info.get('payoutRatio', 0),
             'ExDividendDate': info.get('exDividendDate', 0),
             
-            # 成长性
             'RevenueGrowth': info.get('revenueGrowth', 0),
             'EarningsGrowth': info.get('earningsGrowth', 0),
             'EarningsQuarterlyGrowth': info.get('earningsQuarterlyGrowth', 0),
             'QuarterlyRevenueGrowth': info.get('quarterlyRevenueGrowth', 0),
             
-            # 分析师预期
             'TargetPrice': info.get('targetMeanPrice', 0),
             'TargetHighPrice': info.get('targetHighPrice', 0),
             'TargetLowPrice': info.get('targetLowPrice', 0),
@@ -188,7 +172,6 @@ def get_fundamental_data(symbol: str):
             'ProjectedEPS': info.get('forwardEps', 0),
             'ProjectedGrowthRate': info.get('earningsQuarterlyGrowth', 0),
             
-            # 其他指标
             'Beta': info.get('beta', 0),
             'AverageVolume': info.get('averageVolume', 0),
             'AverageVolume10days': info.get('averageVolume10days', 0),
@@ -202,7 +185,6 @@ def get_fundamental_data(symbol: str):
                 logger.debug(f"已获取财务报表数据: {symbol}")
         except Exception as e:
             logger.debug(f"获取财务报表失败（已跳过）: {symbol}")
-            # 不添加到结果中，让前端不显示
         
         try:
             quarterly_financials = ticker.quarterly_financials
@@ -211,7 +193,6 @@ def get_fundamental_data(symbol: str):
                 logger.debug(f"已获取季度财务报表数据: {symbol}")
         except Exception as e:
             logger.debug(f"获取季度财务报表失败（已跳过）: {symbol}")
-            # 不添加到结果中
         
         try:
             balance_sheet = ticker.balance_sheet
@@ -220,7 +201,6 @@ def get_fundamental_data(symbol: str):
                 logger.debug(f"已获取资产负债表数据: {symbol}")
         except Exception as e:
             logger.debug(f"获取资产负债表失败（已跳过）: {symbol}")
-            # 不添加到结果中
         
         try:
             quarterly_balance_sheet = ticker.quarterly_balance_sheet
@@ -229,7 +209,6 @@ def get_fundamental_data(symbol: str):
                 logger.debug(f"已获取季度资产负债表数据: {symbol}")
         except Exception as e:
             logger.debug(f"获取季度资产负债表失败（已跳过）: {symbol}")
-            # 不添加到结果中
         
         try:
             cashflow = ticker.cashflow
@@ -238,7 +217,6 @@ def get_fundamental_data(symbol: str):
                 logger.debug(f"已获取现金流量表数据: {symbol}")
         except Exception as e:
             logger.debug(f"获取现金流量表失败（已跳过）: {symbol}")
-            # 不添加到结果中
         
         try:
             quarterly_cashflow = ticker.quarterly_cashflow
@@ -247,12 +225,10 @@ def get_fundamental_data(symbol: str):
                 logger.debug(f"已获取季度现金流量表数据: {symbol}")
         except Exception as e:
             logger.debug(f"获取季度现金流量表失败（已跳过）: {symbol}")
-            # 不添加到结果中
         
         return fundamental
         
     except Exception as e:
-        # 静默处理，不报错
         logger.debug(f"获取基本面数据失败（已跳过）: {symbol}")
         return None
 
@@ -274,25 +250,20 @@ def _calculate_period_from_duration(duration: str) -> str:
         duration = duration.strip().upper()
         if 'Y' in duration:
             years = int(duration.replace('Y', '').strip())
-            # 至少2年
             return f"{max(years, 2)}y"
         elif 'M' in duration:
             months = int(duration.replace('M', '').strip())
-            # 转换为年份，至少2年
             years = max((months / 12), 2)
             return f"{int(years)}y"
         elif 'W' in duration:
             weeks = int(duration.replace('W', '').strip())
-            # 转换为年份，至少2年
             years = max((weeks / 52), 2)
             return f"{int(years)}y"
         elif 'D' in duration:
             days = int(duration.replace('D', '').strip())
-            # 转换为年份，至少2年
             years = max((days / 252), 2)
             return f"{int(years)}y"
         else:
-            # 默认至少2年
             return "2y"
     except Exception as e:
         logger.warning(f"解析duration失败: {duration}, 错误: {e}，使用默认2y")
@@ -314,29 +285,21 @@ def _filter_by_duration(df: pd.DataFrame, duration: str) -> pd.DataFrame:
         return df
     
     try:
-        # 解析duration
         duration = duration.strip().upper()
         if 'M' in duration:
-            # 月份，如 '1 M', '3 M'
             months = int(duration.replace('M', '').strip())
-            # 大约每个交易日，3个月约65个交易日
-            days = months * 22  # 每月约22个交易日
+            days = months * 22
         elif 'Y' in duration:
-            # 年份，如 '1 Y', '2 Y'
             years = int(duration.replace('Y', '').strip())
-            days = years * 252  # 每年约252个交易日
+            days = years * 252
         elif 'W' in duration:
-            # 周，如 '1 W', '4 W'
             weeks = int(duration.replace('W', '').strip())
-            days = weeks * 5  # 每周约5个交易日
+            days = weeks * 5
         elif 'D' in duration:
-            # 天，如 '1 D', '30 D'
             days = int(duration.replace('D', '').strip())
         else:
-            # 默认返回全部数据
             return df
         
-        # 从最新日期往前截取
         if len(df) > days:
             return df.tail(days)
         else:
@@ -351,15 +314,13 @@ def _format_historical_data(df: pd.DataFrame):
     格式化历史数据
     """
     result = []
-    # 检查是否有 Volume 列，如果没有或为 NaN 则使用 0
     has_volume = 'Volume' in df.columns
     
     for date, row in df.iterrows():
         date_str = date.strftime('%Y%m%d')
-        if pd.notna(date.hour):  # 如果有时间
+        if pd.notna(date.hour):
             date_str = date.strftime('%Y%m%d %H:%M:%S')
         
-        # 处理成交量数据：如果不存在或为 NaN，使用 0
         volume = 0
         if has_volume and pd.notna(row.get('Volume')):
             try:
@@ -391,7 +352,6 @@ def get_historical_data(symbol: str, duration: str = '1 D',
     bar_size: K线周期，如 '1 min', '5 mins', '1 hour', '1 day'
     """
     try:
-        # 转换bar_size为yfinance格式
         interval_map = {
             '1 min': '1m',
             '2 mins': '2m',
@@ -406,23 +366,19 @@ def get_historical_data(symbol: str, duration: str = '1 D',
         
         yf_interval = interval_map.get(bar_size, '1d')
         
-        # 尝试从缓存获取数据（固定1day周期）
         cached_df = get_kline_from_cache(symbol)
         
         today = pd.Timestamp.now().normalize().tz_localize(None)
         
-        # 根据duration计算需要的数据量（至少2年）
         period = _calculate_period_from_duration(duration)
-        # 解析period，计算需要的天数（至少730天=2年）
         if period.endswith('y'):
             years = int(period.replace('y', ''))
             required_days = years * 252  # 每年约252个交易日
         else:
-            required_days = 730  # 默认2年
+            required_days = 730
         
         required_date = today - timedelta(days=required_days)
         
-        # 检查缓存数据的完整性（根据duration要求）
         need_full_refresh = False
         
         if cached_df is None or cached_df.empty:
@@ -443,7 +399,6 @@ def get_historical_data(symbol: str, duration: str = '1 D',
                 need_full_refresh = True
         
         if need_full_refresh:
-            # 根据duration计算需要的period，但至少2年
             period = _calculate_period_from_duration(duration)
             logger.info(f"从 yfinance 获取全量数据: {symbol}, {period}")
             ticker = yf.Ticker(symbol)
@@ -464,16 +419,13 @@ def get_historical_data(symbol: str, duration: str = '1 D',
             if df.index.tzinfo is not None:
                 df.index = df.index.tz_localize(None)
             
-            # 所有数据都保存到缓存（固定1day周期）
             save_kline_to_cache(symbol, df)
             logger.info(f"全量数据已缓存: {symbol}, 1day, {len(df)}条, 时间范围: {df.index[0]} - {df.index[-1]}")
             
-            # 根据duration截取数据
             filtered_df = _filter_by_duration(df, duration)
             logger.info(f"根据duration={duration}截取数据: {len(filtered_df)}条交易日")
             return _format_historical_data(filtered_df), None
         
-        # 使用缓存数据，根据duration截取
         filtered_df = _filter_by_duration(cached_df, duration)
         logger.info(f"使用缓存数据: {symbol}, 最新: {cached_df.index[-1].date()}, 根据duration={duration}截取: {len(filtered_df)}条交易日")
         return _format_historical_data(filtered_df), None
@@ -779,7 +731,6 @@ def get_recommendations(symbol: str) -> Optional[List[Dict[str, Any]]]:
     """
     try:
         ticker = yf.Ticker(symbol)
-        # 使用 upgrades_downgrades 获取具体的评级变化记录
         upgrades = ticker.upgrades_downgrades
 
         if upgrades is None or upgrades.empty:
@@ -789,13 +740,11 @@ def get_recommendations(symbol: str) -> Optional[List[Dict[str, Any]]]:
         for date, row in upgrades.iterrows():
             record = {}
             
-            # 添加日期
             if hasattr(date, 'strftime'):
                 record['Date'] = date.strftime('%Y-%m-%d')
             else:
                 record['Date'] = str(date)
             
-            # 添加其他字段
             for col in upgrades.columns:
                 value = row[col]
                 if pd.notna(value):
@@ -808,7 +757,6 @@ def get_recommendations(symbol: str) -> Optional[List[Dict[str, Any]]]:
                 else:
                     record[col] = None
             
-            # 规范化字段名（兼容前端）
             if 'ToGrade' in record:
                 record['To Grade'] = record['ToGrade']
             if 'FromGrade' in record:
@@ -895,7 +843,6 @@ def get_earnings(symbol: str) -> Optional[Dict[str, List[Dict[str, Any]]]]:
         
         result = {'yearly': [], 'quarterly': []}
         
-        # 年度收益（已废弃，静默处理）
         try:
             import warnings
             with warnings.catch_warnings():
@@ -914,7 +861,6 @@ def get_earnings(symbol: str) -> Optional[Dict[str, List[Dict[str, Any]]]]:
         except Exception as e:
             logger.debug(f"获取年度收益失败（已跳过）: {symbol}")
         
-        # 季度收益（已废弃，静默处理）
         try:
             import warnings
             with warnings.catch_warnings():
@@ -933,7 +879,6 @@ def get_earnings(symbol: str) -> Optional[Dict[str, List[Dict[str, Any]]]]:
         except Exception as e:
             logger.debug(f"获取季度收益失败（已跳过）: {symbol}")
         
-        # 如果没有任何数据，返回None而不是空字典
         if not result['yearly'] and not result['quarterly']:
             return None
         
@@ -941,7 +886,6 @@ def get_earnings(symbol: str) -> Optional[Dict[str, List[Dict[str, Any]]]]:
         return result
         
     except Exception as e:
-        # 静默处理，不报错
         logger.debug(f"获取收益数据失败（已跳过）: {symbol}")
         return None
 
@@ -980,7 +924,6 @@ def get_earnings_dates(symbol: str, limit: int = 12) -> Optional[List[Dict[str, 
         return result
         
     except Exception as e:
-        # 静默处理，不报错
         logger.debug(f"获取收益日期失败（已跳过）: {symbol}")
         return None
 
@@ -1019,7 +962,6 @@ def get_earnings_history(symbol: str) -> Optional[List[Dict[str, Any]]]:
         return result
         
     except Exception as e:
-        # 静默处理，不报错
         logger.debug(f"获取历史收益失败（已跳过）: {symbol}")
         return None
 
@@ -1161,7 +1103,6 @@ def get_options(symbol: str) -> Optional[Dict[str, Any]]:
     try:
         ticker = yf.Ticker(symbol)
         
-        # 获取所有期权到期日
         expiration_dates = ticker.options
         
         if not expiration_dates:
@@ -1173,7 +1114,6 @@ def get_options(symbol: str) -> Optional[Dict[str, Any]]:
             'chains': {}
         }
         
-        # 获取每个到期日的期权链（限制前5个日期，避免数据过大）
         for exp_date in expiration_dates[:5]:
             try:
                 opt_chain = ticker.option_chain(exp_date)
@@ -1234,22 +1174,30 @@ def get_options(symbol: str) -> Optional[Dict[str, Any]]:
 def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
     """
     获取股票相关新闻（默认50条）
+    使用ticker.get_news(count=...)来获取更多新闻，而不是ticker.news（默认只返回10条）
     """
     try:
         ticker = yf.Ticker(symbol)
-        news = ticker.news
+        if hasattr(ticker, 'get_news') and callable(getattr(ticker, 'get_news', None)):
+            try:
+                news = ticker.get_news(count=limit)
+            except Exception as e:
+                logger.warning(f"使用get_news方法失败，回退到news属性: {e}")
+                news = ticker.news
+                news = news[:limit] if news else []
+        else:
+            news = ticker.news
+            news = news[:limit] if news else []
         
         if not news:
             return []
         
         result = []
-        for idx, item in enumerate(news[:limit]):
+        for idx, item in enumerate(news):
             if not isinstance(item, dict):
                 logger.warning(f"新闻项不是字典类型: {type(item)}")
                 continue
             
-            # yfinance新版本数据结构：item = {'id': '...', 'content': {...}}
-            # 需要从 content 中提取实际数据
             if 'content' in item and isinstance(item['content'], dict):
                 content = item['content']
             else:
@@ -1257,15 +1205,12 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
             
             news_item = {}
             
-            # 调试：记录原始数据的键（仅第一条）
             if idx == 0:
                 logger.debug(f"新闻原始数据字段: {list(content.keys())}")
             
-            # 提取标题
             title = content.get('title') or content.get('headline') or content.get('summary') or ''
             news_item['title'] = str(title).strip() if title else None
             
-            # 提取发布者
             publisher = (content.get('publisher') or 
                         content.get('publisherName') or 
                         content.get('provider') or 
@@ -1273,11 +1218,9 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
                         '')
             news_item['publisher'] = str(publisher).strip() if publisher else None
             
-            # 提取链接
             link = content.get('link') or content.get('url') or content.get('canonicalUrl', {}).get('url') if isinstance(content.get('canonicalUrl'), dict) else None or ''
             news_item['link'] = str(link).strip() if link else None
             
-            # 处理发布时间
             provider_publish_time = content.get('pubDate') or content.get('providerPublishTime') or content.get('publishTime')
             if provider_publish_time:
                 if isinstance(provider_publish_time, (int, float)):
@@ -1287,20 +1230,17 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
             else:
                 news_item['providerPublishTime'] = None
             
-            # 只添加有标题或有链接的新闻
             if news_item.get('title') or news_item.get('link'):
                 result.append(news_item)
             else:
                 logger.debug(f"跳过无效新闻项: 无标题且无链接")
             
-            # 调试：记录第一条新闻的最终结构
             if len(result) == 1:
                 logger.debug(f"第一条新闻处理后的字段: {list(news_item.keys())}, title: '{news_item.get('title')}', publisher: '{news_item.get('publisher')}', link: '{news_item.get('link')}'")
         
         logger.info(f"已获取新闻: {symbol}, 共{len(result)}条有效新闻")
         if result:
             logger.debug(f"新闻数据示例: title='{result[0].get('title')}', publisher='{result[0].get('publisher')}', link='{result[0].get('link')}'")
-            # 只在调试模式下打印详细数据
             if logger.isEnabledFor(logging.DEBUG):
                 print(f"\n{'='*60}")
                 print(f"📰 新闻数据 ({symbol}): 共{len(result)}条")
