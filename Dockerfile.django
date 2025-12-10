@@ -1,0 +1,29 @@
+FROM python:3.14-slim
+
+WORKDIR /app
+
+# 更快的国内源（可按需去掉）
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+# Python 镜像源
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+    pip config set install.trusted-host mirrors.aliyun.com
+
+# 安装依赖
+COPY dj/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制项目
+COPY dj/ /app/
+
+# 环境变量
+ENV PYTHONUNBUFFERED=1 \
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
+EXPOSE 8000
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

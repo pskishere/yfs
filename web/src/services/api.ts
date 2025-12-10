@@ -11,8 +11,9 @@ import type {
   IndicatorInfoResponse,
 } from '../types/index';
 
-// API基础URL - 使用相对路径，通过Nginx反向代理
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// API基础URL - 默认指向本地Django服务 http://127.0.0.1:8000
+// 如有反向代理或远端环境，请在 .env 中设置 VITE_API_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 // 创建axios实例
 const api = axios.create({
@@ -178,6 +179,29 @@ export const analyze = async (
       {
         timeout: 60000, // 数据获取超时时间60秒
       }
+    );
+    return handleResponse<AnalysisResult>(response) as AnalysisResult;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * 查询分析状态
+ */
+export const getAnalysisStatus = async (
+  symbol: string,
+  duration: string = '5y',
+  barSize: string = '1 day'
+): Promise<AnalysisResult> => {
+  try {
+    const params = new URLSearchParams({
+      duration: duration,
+      bar_size: barSize,
+    });
+    const response = await api.get<AnalysisResult>(
+      `/api/analysis-status/${symbol.toUpperCase()}?${params.toString()}`
     );
     return handleResponse<AnalysisResult>(response) as AnalysisResult;
   } catch (error) {

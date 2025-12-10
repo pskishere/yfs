@@ -1335,11 +1335,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 traceback.print_exc()
                 raise format_error
 
-        print("\n" + "="*80)
-        print("🤖 AI分析提示词 (Prompt)")
-        print("="*80)
-        print(prompt)
-        print("="*80 + "\n")
         logger.info(f"AI分析提示词长度: {len(prompt)} 字符")
         
         ollama_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)

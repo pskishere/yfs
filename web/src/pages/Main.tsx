@@ -46,6 +46,7 @@ import {
   getHotStocks,
   getIndicatorInfo,
   refreshAnalyze,
+  getAnalysisStatus,
 } from '../services/api';
 import type {
   Position,
@@ -264,6 +265,24 @@ const MainPage: React.FC = () => {
     setNewsPage(1); // 重置新闻页码
 
     let dataResult: any = null;
+    const pollStatus = async (
+      symbol: string,
+      duration: string,
+      barSize: string,
+      maxAttempts: number = 10,
+      intervalMs: number = 1500
+    ) => {
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          const statusRes = await getAnalysisStatus(symbol, duration, barSize);
+          if (statusRes && statusRes.success) return statusRes;
+        } catch (e: any) {
+          // 忽略单次错误，继续轮询
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+      throw new Error('分析任务超时，请稍后重试');
+    };
 
     // 第一步：获取数据并保存到数据库（只在此阶段显示 loading）
     try {
@@ -283,16 +302,25 @@ const MainPage: React.FC = () => {
         }
       }
 
-      if (dataResult && dataResult.success) {
-        setAnalysisResult(dataResult);
-        setCurrentSymbol(symbol);
-        // 更新 URL 参数
-        updateUrlParams(symbol);
-      } else {
-        const errorMsg = dataResult?.message || '分析失败';
-        message.error(errorMsg, 5);
-        return;
+      if (!dataResult || !dataResult.success) {
+        // 处理排队中的情况
+        if (
+          dataResult &&
+          ['pending', 'running'].includes(String(dataResult.status || '').toLowerCase())
+        ) {
+          message.info('分析任务正在执行，稍后自动获取结果...');
+          dataResult = await pollStatus(symbol, durationValue, barSizeValue);
+        } else {
+          const errorMsg = dataResult?.message || '分析失败';
+          message.error(errorMsg, 5);
+          return;
+        }
       }
+
+      setAnalysisResult(dataResult);
+      setCurrentSymbol(symbol);
+      // 更新 URL 参数
+      updateUrlParams(symbol);
       // 数据阶段结束，关闭 loading
       setAnalysisLoading(false);
 

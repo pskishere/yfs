@@ -2,7 +2,7 @@
  * 带知识讲解的指标标签组件
  */
 import React, { useState, useEffect } from 'react';
-import { Space, Popover, Typography } from 'antd';
+import { Space, Drawer, Typography } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { IndicatorInfo } from '../types/index';
 
@@ -89,44 +89,33 @@ const createKnowledgeContent = (info: IndicatorInfo, isMobile: boolean): React.R
 export const IndicatorLabel: React.FC<IndicatorLabelProps> = ({ label, indicatorKey, indicatorInfoMap }) => {
   const info = indicatorInfoMap[indicatorKey];
   const isMobile = useIsMobile();
+  const [open, setOpen] = useState<boolean>(false);
   
   if (!info) {
     return <span>{label}</span>;
   }
 
-  // 移动端使用 bottom，桌面端使用 right
-  const placement = isMobile ? 'bottom' : 'right';
-
   return (
     <Space>
       <span>{label}</span>
-      <Popover
-        content={createKnowledgeContent(info, isMobile)}
-        title={null}
-        trigger="click"
-        placement={placement}
-        getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
-        styles={{ 
-          content: {
-            maxWidth: isMobile ? 'calc(100vw - 32px)' : '400px',
-            margin: isMobile ? '8px 16px' : undefined,
-            paddingTop: 8, 
-            paddingBottom: 12,
-            overflow: 'hidden',
-            wordWrap: 'break-word',
-            overflowWrap: 'break-word'
-          }
+      <QuestionCircleOutlined
+        style={{
+          color: '#1890ff',
+          cursor: 'pointer',
+          fontSize: 12,
         }}
-        autoAdjustOverflow
+        onClick={() => setOpen(true)}
+      />
+      <Drawer
+        title={info.name}
+        placement="left"
+        open={open}
+        onClose={() => setOpen(false)}
+        width={isMobile ? '100%' : 420}
+        destroyOnClose
       >
-        <QuestionCircleOutlined
-          style={{
-            color: '#1890ff',
-            cursor: 'pointer',
-            fontSize: 12,
-          }}
-        />
-      </Popover>
+        {createKnowledgeContent(info, isMobile)}
+      </Drawer>
     </Space>
   );
 };
