@@ -77,15 +77,32 @@
     min-height: 44px;
   }
 
-  /* 表单在移动端垂直布局 */
+  /* 表单在移动端垂直布局（除了股票分析表单） */
   .main-page .ant-form-inline {
     flex-direction: column;
     align-items: stretch !important;
   }
 
+  /* 股票分析表单在移动端也保持水平布局，按钮在输入框右侧 */
+  .main-page .fixed-top .ant-form-inline {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+  }
+
   .main-page .ant-form-inline .ant-form-item {
     margin-right: 0 !important;
     margin-bottom: 12px;
+  }
+
+  /* 股票分析表单的 Form.Item 在移动端不需要底部边距 */
+  .main-page .fixed-top .ant-form-inline .ant-form-item {
+    margin-bottom: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* PC端输入框最大宽度限制 - 选择第一个Form.Item（股票代码输入框） */
+  .main-page .fixed-top .ant-form-inline .ant-form-item:first-child {
+    max-width: 300px;
   }
 
   /* 输入框在移动端全宽 */
@@ -97,6 +114,18 @@
   /* 按钮在移动端全宽 */
   .main-page .ant-form-inline .ant-form-item .ant-btn {
     width: 100%;
+  }
+
+  /* 股票分析表单的按钮在移动端保持固定宽度 */
+  .main-page .fixed-top .ant-form-inline .ant-form-item .ant-btn {
+    width: auto !important;
+  }
+
+  /* 移动端移除输入框最大宽度限制 */
+  @media (max-width: 768px) {
+    .main-page .fixed-top .ant-form-inline .ant-form-item:first-child {
+      max-width: none !important;
+    }
   }
 
   /* 分析结果区域在移动端减少内边距 */

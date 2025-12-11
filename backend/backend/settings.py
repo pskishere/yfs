@@ -14,6 +14,15 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# 项目根目录（用于数据库等共享资源）
+# BASE_DIR 是 /Users/k/yfs/backend，所以 parent 是 /Users/k/yfs
+PROJECT_ROOT = BASE_DIR.parent
+# 数据库路径：Docker 中使用 /app/data（已挂载），本地使用项目根目录的 data
+# 检查是否在 Docker 环境中（/app/data 存在）
+if Path('/app/data').exists():
+    DB_DIR = Path('/app/data')
+else:
+    DB_DIR = PROJECT_ROOT / 'data'
 
 
 # Quick-start development settings - unsuitable for production
@@ -77,7 +86,8 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'data' / 'db.sqlite3',
+        # 使用项目根目录的 data 目录，确保本地 runserver 和 Docker 使用同一个数据库
+        'NAME': DB_DIR / 'db.sqlite3',
     }
 }
 

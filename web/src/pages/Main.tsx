@@ -20,7 +20,6 @@ import {
   Drawer,
   Tabs,
   Collapse,
-  FloatButton,
   Pagination,
 } from 'antd';
 import {
@@ -34,6 +33,17 @@ import {
   FallOutlined,
   RightOutlined,
   ShareAltOutlined,
+  DatabaseOutlined,
+  BankOutlined,
+  UserOutlined,
+  FileTextOutlined,
+  MoneyCollectOutlined,
+  ThunderboltOutlined,
+  CloudOutlined,
+  WarningOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import {
   getPositions,
@@ -68,6 +78,72 @@ interface StockOption {
   value: string;
   label: string;
 }
+
+/**
+ * 将信号文本中的 emoji 替换为 antd icon
+ */
+const renderSignalWithIcon = (signal: string): React.ReactNode => {
+  const parts: React.ReactNode[] = [];
+  let remainingText = signal;
+  let keyIndex = 0;
+
+  // 定义 emoji 到 icon 的映射
+  const emojiMap: Array<{ pattern: RegExp; icon: React.ReactElement }> = [
+    // 上升趋势图表 (看涨信号) - 红色
+    { pattern: /📈/g, icon: <RiseOutlined style={{ color: '#cf1322', marginRight: 4 }} /> },
+    // 柱状图 (看跌信号) - 蓝色
+    { pattern: /📊/g, icon: <BarChartOutlined style={{ color: '#1890ff', marginRight: 4 }} /> },
+    // 绿色圆圈 (看涨/成功)
+    { pattern: /🟢/g, icon: <CheckCircleOutlined style={{ color: '#3f8600', marginRight: 4 }} /> },
+    // 红色圆圈 (看跌/警告)
+    { pattern: /🔴/g, icon: <CloseCircleOutlined style={{ color: '#cf1322', marginRight: 4 }} /> },
+    // 黄色警告
+    { pattern: /⚠️/g, icon: <WarningOutlined style={{ color: '#faad14', marginRight: 4 }} /> },
+    // 闪电 (趋势强度)
+    { pattern: /⚡/g, icon: <ThunderboltOutlined style={{ color: '#faad14', marginRight: 4 }} /> },
+    // 云 (盘整)
+    { pattern: /☁️/g, icon: <CloudOutlined style={{ color: '#8c8c8c', marginRight: 4 }} /> },
+    // 灰色圆圈 (中性) - 使用简单的圆点
+    { pattern: /⚪|⚫|🔘/g, icon: <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> },
+  ];
+
+  // 查找所有 emoji 的位置
+  const matches: Array<{ index: number; emoji: string; icon: React.ReactElement }> = [];
+  emojiMap.forEach(({ pattern, icon }) => {
+    const regex = new RegExp(pattern.source, 'g');
+    let match;
+    while ((match = regex.exec(remainingText)) !== null) {
+      matches.push({
+        index: match.index,
+        emoji: match[0],
+        icon: React.cloneElement(icon, { key: `icon-${keyIndex++}` }),
+      });
+    }
+  });
+
+  // 按位置排序
+  matches.sort((a, b) => a.index - b.index);
+
+  // 构建结果
+  let lastIndex = 0;
+  matches.forEach((match) => {
+    // 添加 emoji 之前的文本
+    if (match.index > lastIndex) {
+      parts.push(remainingText.substring(lastIndex, match.index));
+    }
+    // 添加 icon
+    parts.push(match.icon);
+    lastIndex = match.index + match.emoji.length;
+  });
+
+  // 添加剩余文本
+  if (lastIndex < remainingText.length) {
+    parts.push(remainingText.substring(lastIndex));
+  }
+
+  // 如果没有匹配到任何 emoji，直接返回原文本
+  return parts.length > 0 ? <span>{parts}</span> : signal;
+};
 
 const MainPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -390,7 +466,7 @@ const MainPage: React.FC = () => {
       const barSizeValue = barSize || '1 day';
       const modelValue = model || 'deepseek-v3.1:671b-cloud';
 
-      console.log('🚀 开始获取数据:', symbol, durationValue, barSizeValue);
+      console.log('开始获取数据:', symbol, durationValue, barSizeValue);
       dataResult = await analyze(symbol, durationValue, barSizeValue);
 
       if (typeof dataResult === 'string') {
@@ -426,7 +502,7 @@ const MainPage: React.FC = () => {
       // 第二步：非阻塞触发AI分析（不显示转圈）
       runAiAnalysis(symbol, durationValue, barSizeValue, modelValue, dataResult);
     } catch (error: any) {
-      console.error('❌ 异常错误:', error);
+      console.error('异常错误:', error);
       message.error(error.message || '分析失败');
       setAnalysisLoading(false);
     }
@@ -710,18 +786,17 @@ const MainPage: React.FC = () => {
                 barSize: '1 day',
                 model: 'deepseek-v3.1:671b-cloud',
               }}
-              style={{ marginBottom: 0, width: '100%' }}
+              style={{ marginBottom: 0, width: '100%', display: 'flex', gap: '8px' }}
             >
               <Form.Item
-                label="股票代码"
                 name="symbol"
                 rules={[{ required: true, message: '请输入股票代码' }]}
-                style={{ marginBottom: 0, flex: 1, minWidth: 200 }}
+                style={{ marginBottom: 0, flex: 1, minWidth: 0, maxWidth: 300 }}
               >
                 <AutoComplete
                   options={stockOptions}
-                  placeholder="例如: AAPL"
-                  style={{ width: '100%', maxWidth: 350 }}
+                  placeholder="股票代号，例如: AAPL"
+                  style={{ width: '100%' }}
                   filterOption={(inputValue, option) =>
                     option?.value?.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1 ||
                     option?.label?.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
@@ -740,12 +815,12 @@ const MainPage: React.FC = () => {
                   }}
                 />
               </Form.Item>
-              <Form.Item style={{ marginBottom: 0 }}>
+              <Form.Item style={{ marginBottom: 0, flexShrink: 0 }}>
                 <Button
                   type="primary"
                   htmlType="submit"
                   loading={analysisLoading}
-                  style={{ width: '100%', minWidth: 100 }}
+                  style={{ minWidth: 100 }}
                 >
                   开始分析
                 </Button>
@@ -776,7 +851,6 @@ const MainPage: React.FC = () => {
                     <Space style={{ marginBottom: 16 }}>
                           <Button
                             type="default"
-                            size="small"
                             icon={<ReloadOutlined />}
                             onClick={handleRefreshAnalyze}
                             loading={analysisLoading}
@@ -785,7 +859,6 @@ const MainPage: React.FC = () => {
                           </Button>
                           <Button
                             type="default"
-                            size="small"
                             icon={<RobotOutlined />}
                             disabled={!currentSymbol || aiStatus === 'running' || !analysisResult}
                             onClick={() => {
@@ -800,7 +873,6 @@ const MainPage: React.FC = () => {
                           </Button>
                           <Button
                             type="default"
-                            size="small"
                             icon={<ShareAltOutlined />}
                             onClick={handleShare}
                             disabled={!currentSymbol}
@@ -1636,7 +1708,9 @@ const MainPage: React.FC = () => {
                                   children: (
                                     <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
                                       {signals.signals.map((signal: string, index: number) => (
-                                        <li key={index} style={{ marginBottom: 4, fontSize: 14 }}>{signal}</li>
+                                        <li key={index} style={{ marginBottom: 4, fontSize: 14 }}>
+                                          {renderSignalWithIcon(signal)}
+                                        </li>
                                       ))}
                                     </ul>
                                   ),
@@ -1664,8 +1738,8 @@ const MainPage: React.FC = () => {
                           key: 'fundamental',
                           label: (
                             <span>
-                              <BarChartOutlined style={{ marginRight: 8 }} />
-                              <span>基本面数据</span> 📊
+                              <DatabaseOutlined style={{ marginRight: 8 }} />
+                              <span>基本面数据</span>
                             </span>
                           ),
                           children: (
@@ -1930,8 +2004,8 @@ const MainPage: React.FC = () => {
                             key: 'financial-statements',
                             label: (
                               <span>
-                                <BarChartOutlined style={{ marginRight: 8 }} />
-                                <span>详细财务报表</span> 📈
+                                <FileTextOutlined style={{ marginRight: 8 }} />
+                                <span>详细财务报表</span>
                               </span>
                             ),
                             children: (
@@ -1986,8 +2060,8 @@ const MainPage: React.FC = () => {
                           key: 'institutional',
                           label: (
                             <span>
-                              <BarChartOutlined style={{ marginRight: 8 }} />
-                              <span>机构持仓</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(前{analysisResult.extra_data.institutional_holders.length}大)</span> 🏢
+                              <BankOutlined style={{ marginRight: 8 }} />
+                              <span>机构持仓</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(前{analysisResult.extra_data.institutional_holders.length}大)</span>
                             </span>
                           ),
                           children: (
@@ -2045,8 +2119,8 @@ const MainPage: React.FC = () => {
                           key: 'insider',
                           label: (
                             <span>
-                              <RiseOutlined style={{ marginRight: 8 }} />
-                              <span>内部交易</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(最近{analysisResult.extra_data.insider_transactions.length}笔)</span> 👔
+                              <UserOutlined style={{ marginRight: 8 }} />
+                              <span>内部交易</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(最近{analysisResult.extra_data.insider_transactions.length}笔)</span>
                             </span>
                           ),
                           children: (
@@ -2136,7 +2210,7 @@ const MainPage: React.FC = () => {
                           label: (
                             <span>
                               <BarChartOutlined style={{ marginRight: 8 }} />
-                              <span>分析师推荐</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(最近{analysisResult.extra_data.analyst_recommendations.length}条)</span> 📈
+                              <span>分析师推荐</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(最近{analysisResult.extra_data.analyst_recommendations.length}条)</span>
                             </span>
                           ),
                           children: (
@@ -2231,8 +2305,8 @@ const MainPage: React.FC = () => {
                           key: 'earnings',
                           label: (
                             <span>
-                              <BarChartOutlined style={{ marginRight: 8 }} />
-                              <span>季度收益</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>({analysisResult.extra_data.earnings.quarterly.length}个季度)</span> 💰
+                              <MoneyCollectOutlined style={{ marginRight: 8 }} />
+                              <span>季度收益</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>({analysisResult.extra_data.earnings.quarterly.length}个季度)</span>
                             </span>
                           ),
                           children: (
@@ -2281,8 +2355,8 @@ const MainPage: React.FC = () => {
                           key: 'news',
                           label: (
                             <span>
-                              <BarChartOutlined style={{ marginRight: 8 }} />
-                              <span>最新新闻</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>({analysisResult.extra_data.news.length}条)</span> 📰
+                              <FileTextOutlined style={{ marginRight: 8 }} />
+                              <span>最新新闻</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>({analysisResult.extra_data.news.length}条)</span>
                             </span>
                           ),
                           children: (() => {
@@ -2576,19 +2650,6 @@ const MainPage: React.FC = () => {
         )}
       </Drawer>
 
-      {/* AI分析拨号按钮 */}
-      {aiAnalysisResult && (
-        <FloatButton
-          icon={<RobotOutlined />}
-          type="primary"
-          tooltip="AI 分析报告"
-          onClick={() => setAiAnalysisDrawerVisible(!aiAnalysisDrawerVisible)}
-          style={{
-            right: 24,
-            bottom: 24,
-          }}
-        />
-      )}
     </div>
   );
 };
