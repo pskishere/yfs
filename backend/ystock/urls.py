@@ -20,4 +20,5 @@ urlpatterns = [
     path("options/<str:symbol>", views.options, name="ystock-options"),
     path("comprehensive/<str:symbol>", views.comprehensive, name="ystock-comprehensive"),
     path("all-data/<str:symbol>", views.all_data, name="ystock-all-data"),
+    path("stocks/<str:symbol>", views.delete_stock, name="ystock-delete-stock"),
 ]

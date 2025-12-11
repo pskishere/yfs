@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
-from .models import StockAnalysis
+from .models import StockAnalysis, StockInfo
 from .tasks import run_analysis
 from .services import (
     clean_nan_values,
@@ -487,6 +487,26 @@ def index(_: object):
                 "options": "/api/options/<symbol>",
                 "comprehensive": "/api/comprehensive/<symbol>",
                 "all_data": "/api/all-data/<symbol>",
+                "delete_stock": "/api/stocks/<symbol>",
             },
+        }
+    )
+
+
+@csrf_exempt
+@require_http_methods(["DELETE", "POST"])
+def delete_stock(request, symbol: str):
+    """
+    删除指定股票的缓存分析数据和基本信息
+    """
+    symbol = symbol.upper()
+    deleted_analysis, _ = StockAnalysis.objects.filter(symbol=symbol).delete()
+    deleted_info, _ = StockInfo.objects.filter(symbol=symbol).delete()
+    return JsonResponse(
+        {
+            "success": True,
+            "symbol": symbol,
+            "deleted_analysis": deleted_analysis,
+            "deleted_info": deleted_info,
         }
     )

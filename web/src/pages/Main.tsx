@@ -21,6 +21,7 @@ import {
   Tabs,
   Collapse,
   Pagination,
+  Modal,
 } from 'antd';
 import {
   InboxOutlined,
@@ -43,6 +44,7 @@ import {
   WarningOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import {
   getPositions,
@@ -56,6 +58,7 @@ import {
   getIndicatorInfo,
   refreshAnalyze,
   getAnalysisStatus,
+  deleteStock,
 } from '../services/api';
 import type {
   Position,
@@ -75,7 +78,8 @@ import './Main.css';
 
 interface StockOption {
   value: string;
-  label: string;
+  label: React.ReactNode;
+  searchText?: string;
 }
 
 /**
@@ -207,7 +211,7 @@ const MainPage: React.FC = () => {
     }
   };
 
-  // 热门股票相关状态
+  // 热门股票相关状态（仅用于刷新下拉列表，不单独展示）
   const [, setHotStocks] = useState<HotStock[]>([]);
   
   // 新闻分页状态
@@ -605,6 +609,76 @@ const MainPage: React.FC = () => {
   };
 
   /**
+   * 删除股票缓存并刷新下拉选项
+   */
+  const handleDeleteStock = async (symbol: string): Promise<void> => {
+    const messageKey = `delete-${symbol}`;
+    message.loading({ content: `正在删除 ${symbol}`, key: messageKey, duration: 0 });
+    try {
+      const result = await deleteStock(symbol);
+      if (!result.success) {
+        message.error(result.message || '删除失败');
+        message.destroy(messageKey);
+        return;
+      }
+      setHotStocks((prev) => prev.filter((item) => item.symbol !== symbol));
+      setStockOptions((prev) => prev.filter((item) => item.value !== symbol));
+      if (currentSymbol === symbol) {
+        setCurrentSymbol('');
+        setAnalysisResult(null);
+        setAiAnalysisResult(null);
+      }
+      message.success({ content: `已删除 ${symbol}`, key: messageKey, duration: 1.5 });
+    } catch (error: any) {
+      message.destroy(messageKey);
+      message.error(error.message || '删除失败');
+    }
+  };
+
+  /**
+   * 构建带删除按钮的下拉项
+   */
+  const renderStockOption = (stock: HotStock): React.ReactNode => {
+    const labelText = `${stock.symbol} - ${stock.name || stock.symbol}`;
+    const handleConfirm = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      Modal.confirm({
+        title: `确认删除 ${stock.symbol} 吗？`,
+        okText: '确认',
+        cancelText: '取消',
+        centered: true,
+        onOk: () => handleDeleteStock(stock.symbol),
+      });
+    };
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          width: '100%',
+        }}
+      >
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {labelText}
+        </span>
+        <Button
+          type="link"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleConfirm}
+          aria-label={`删除 ${stock.symbol}`}
+          style={{ width: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        />
+      </div>
+    );
+  };
+
+  /**
    * 加载热门股票列表
    */
   const loadHotStocks = async (): Promise<void> => {
@@ -612,10 +686,14 @@ const MainPage: React.FC = () => {
       const result = await getHotStocks(30);
       if (result.success && result.stocks) {
         setHotStocks(result.stocks);
-        const options = result.stocks.map((stock: HotStock) => ({
-          value: stock.symbol,
-          label: `${stock.symbol} - ${stock.name}`,
-        }));
+        const options = result.stocks.map((stock: HotStock) => {
+          const labelText = `${stock.symbol} - ${stock.name || stock.symbol}`;
+          return {
+            value: stock.symbol,
+            label: renderStockOption(stock),
+            searchText: labelText.toUpperCase(),
+          };
+        });
         setStockOptions(options);
       }
     } catch (error: any) {
@@ -848,10 +926,13 @@ const MainPage: React.FC = () => {
                   options={stockOptions}
                   placeholder="股票代号，例如: AAPL"
                   style={{ width: '100%' }}
-                  filterOption={(inputValue, option) =>
-                    option?.value?.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1 ||
-                    option?.label?.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
-                  }
+                  filterOption={(inputValue, option) => {
+                    const upper = inputValue.toUpperCase();
+                    const opt = option as StockOption;
+                    const valueText = (opt?.value || '').toUpperCase();
+                    const search = opt?.searchText || valueText;
+                    return search.includes(upper);
+                  }}
                   onSelect={(value) => {
                     analyzeForm.setFieldsValue({ symbol: value });
                   }}

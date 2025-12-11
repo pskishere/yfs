@@ -275,6 +275,19 @@ export const getHotStocks = async (limit: number = 20): Promise<ApiResponse<HotS
 };
 
 /**
+ * 删除股票缓存数据
+ */
+export const deleteStock = async (symbol: string): Promise<ApiResponse> => {
+  try {
+    const response = await api.delete<ApiResponse>(`/api/stocks/${symbol.toUpperCase()}`);
+    return handleResponse(response);
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
  * 获取技术指标解释和参考范围
  * @param indicator - 指标名称（可选），不提供则返回所有指标信息
  */
