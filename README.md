@@ -1,13 +1,5 @@
 # YFS
 
-<div align="center">
-
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org)
-[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
-</div>
-
 ---
 
 ## 📊 技术分析
@@ -102,36 +94,56 @@
 git clone https://github.com/yourusername/yfs.git
 cd yfs
 
-# 2. 启动所有服务
-docker-compose up -d
+# 2. 构建并启动所有服务
+docker-compose up -d --build
 
 # 3. 访问应用
 # 前端: http://localhost:8086
-# 后端API: http://localhost:8080
+# 后端API: http://localhost:8086/api/ (通过 Nginx 代理)
 
 # 查看日志
-docker-compose logs -f
+docker-compose logs -f backend    # 后端日志
+docker-compose logs -f frontend   # 前端日志
+docker-compose logs -f nginx      # Nginx 日志
 
 # 停止服务
 docker-compose down
+
+# 重新构建后端
+docker-compose build backend
+docker-compose up -d backend
 ```
+
+**服务说明：**
+- **Nginx**: 反向代理，端口 8086，转发请求到前端和后端
+- **Backend**: Django 后端，使用 gunicorn 启动，端口 8080（内部）
+- **Frontend**: React 前端，端口 80（内部）
 
 ### 本地开发部署
 
-#### 后端启动
+#### 后端启动（Django）
 
 ```bash
-# 1. 创建虚拟环境
+# 1. 进入后端目录
+cd backend
+
+# 2. 创建虚拟环境
 python3 -m venv .venv
 source .venv/bin/activate  # Mac/Linux
 # .venv\Scripts\activate   # Windows
 
-# 2. 安装依赖
-pip install -r backend/requirements.txt
+# 3. 安装依赖
+pip install -r requirements.txt
 
-# 3. 启动后端服务
-python -m backend.app
+# 4. 数据库迁移（首次运行）
+python manage.py migrate
+
+# 5. 启动开发服务器
+python manage.py runserver 0.0.0.0:8080
 # 服务运行在 http://localhost:8080
+
+# 或使用 gunicorn（生产模式）
+gunicorn --bind 0.0.0.0:8080 --workers 4 backend.wsgi:application
 ```
 
 #### 前端启动
@@ -161,17 +173,43 @@ ollama serve
 
 ### 环境变量配置
 
-```bash
-# 创建 .env 文件
-OLLAMA_HOST=http://localhost:11434
-DEFAULT_AI_MODEL=deepseek-v3.1:671b-cloud
-```
+Docker 环境变量在 `docker-compose.yml` 中已配置：
+- `OLLAMA_HOST=http://host.docker.internal:11434` - Ollama 服务地址（宿主机）
+- `PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python` - Python 3.14 兼容性设置
 
 **注意事项：**
-- 如果 Ollama 在宿主机运行：`OLLAMA_HOST=http://host.docker.internal:11434`
+- 如果 Ollama 在宿主机运行：使用 `http://host.docker.internal:11434`
 - 如果 Ollama 在 Docker 中运行：使用容器网络地址
+- 确保 Ollama 监听 `0.0.0.0:11434` 而不是 `127.0.0.1:11434`，以便 Docker 容器访问
 
----
+
+## 🔌 API 端点
+
+### 核心接口
+
+- `GET /api/health` - 健康检查
+- `GET /api/analyze/<symbol>` - 技术分析（支持缓存）
+- `POST /api/refresh-analyze/<symbol>` - 强制刷新分析
+- `POST /api/ai-analyze/<symbol>` - AI 分析（异步，支持轮询）
+- `GET /api/analysis-status/<symbol>` - 查询分析状态
+
+### 数据接口
+
+- `GET /api/fundamental/<symbol>` - 基本面数据
+- `GET /api/institutional/<symbol>` - 机构持仓
+- `GET /api/insider/<symbol>` - 内部交易
+- `GET /api/recommendations/<symbol>` - 分析师推荐
+- `GET /api/earnings/<symbol>` - 收益数据
+- `GET /api/news/<symbol>` - 新闻
+- `GET /api/options/<symbol>` - 期权数据
+- `GET /api/comprehensive/<symbol>` - 综合分析
+- `GET /api/all-data/<symbol>` - 所有原始数据
+
+### 辅助接口
+
+- `GET /api/hot-stocks` - 热门股票列表
+- `GET /api/indicator-info` - 技术指标说明
+
 
 ## 📄 许可证
 

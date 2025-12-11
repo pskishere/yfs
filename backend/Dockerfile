@@ -15,7 +15,7 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
 ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 # 安装依赖
-COPY backend/requirements.txt .
+COPY requirements.txt .
 # 先卸载可能存在的 protobuf C 扩展，然后重新安装纯 Python 版本
 RUN pip uninstall -y protobuf || true && \
     pip install --no-cache-dir --no-binary protobuf protobuf==4.25.3 && \
@@ -24,7 +24,7 @@ RUN pip uninstall -y protobuf || true && \
     find /usr/local/lib/python3.14/site-packages/google/protobuf/pyext -name "*.so" -delete 2>/dev/null || true
 
 # 复制项目
-COPY backend/ /app/
+COPY . /app/
 
 # 环境变量
 ENV PYTHONUNBUFFERED=1 \
