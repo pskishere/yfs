@@ -12,8 +12,8 @@ import statistics
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
-# 默认数据库路径，按当前项目结构计算
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "db.sqlite3"
+# 默认数据库路径：统一放在 backend/data/db.sqlite3
+DB_PATH = Path(__file__).resolve().parents[1] / "data" / "db.sqlite3"
 
 # 回测参数，可按需调整
 TAKE_PROFIT_PCT = 0.04  # 止盈阈值（4%）

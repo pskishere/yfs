@@ -14,15 +14,8 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# 项目根目录（用于数据库等共享资源）
-# BASE_DIR 是 /Users/k/yfs/backend，所以 parent 是 /Users/k/yfs
-PROJECT_ROOT = BASE_DIR.parent
-# 数据库路径：Docker 中使用 /app/data（已挂载），本地使用项目根目录的 data
-# 检查是否在 Docker 环境中（/app/data 存在）
-if Path('/app/data').exists():
-    DB_DIR = Path('/app/data')
-else:
-    DB_DIR = PROJECT_ROOT / 'data'
+# 数据库目录统一放在 backend/data（无论本地或 Docker）
+DB_DIR = BASE_DIR / 'data'
 
 
 # Quick-start development settings - unsuitable for production
