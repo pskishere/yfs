@@ -46,19 +46,21 @@ def clean_nan_values(obj: Any):
 
 def save_stock_info_if_available(symbol: str):
     """
-    获取并缓存股票名称（使用 ORM）
+    获取并缓存股票名称（使用 ORM），并返回获取到的股票信息
     """
     try:
         stock_info = get_stock_info(symbol)
         if not stock_info:
-            return
+            return None
         stock_name = extract_stock_name(stock_info)
         if stock_name and stock_name != symbol:
             StockInfo.objects.update_or_create(
                 symbol=symbol, defaults={"name": stock_name}
             )
+        return stock_info
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"获取股票信息失败: {exc}")
+        return None
 
 
 def get_extra_analysis_data(symbol: str) -> dict:
@@ -126,7 +128,7 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
             "cached": True,
         }, None
 
-    save_stock_info_if_available(symbol)
+    stock_info = save_stock_info_if_available(symbol)
 
     hist_data, hist_error = get_historical_data(symbol, duration, bar_size)
     indicators, ind_error = calculate_technical_indicators(symbol, duration, bar_size)
@@ -143,10 +145,24 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
     signals = generate_signals(indicators)
     formatted_candles = format_candle_data(hist_data)
     extra_data = get_extra_analysis_data(symbol)
+    currency_code = stock_info.get("currency") if stock_info else None
+    currency_symbol = stock_info.get("currencySymbol") if stock_info else None
+
+    payload_extra = extra_data or {}
+    if currency_code or currency_symbol:
+        payload_extra = payload_extra or {}
+        if currency_code:
+            payload_extra["currency"] = currency_code
+        if currency_symbol:
+            payload_extra["currency_symbol"] = currency_symbol
 
     result = create_success_response(indicators, signals, formatted_candles, None, None)
-    if extra_data:
-        result["extra_data"] = extra_data
+    if currency_code:
+        result["currency"] = currency_code
+    if currency_symbol:
+        result["currency_symbol"] = currency_symbol
+    if payload_extra:
+        result["extra_data"] = payload_extra
 
     with transaction.atomic():
         record.indicators = result.get("indicators")
@@ -176,6 +192,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
             404,
         )
 
+    currency_code = (record.extra_data or {}).get("currency")
+    currency_symbol = (record.extra_data or {}).get("currency_symbol") or (record.extra_data or {}).get("currencySymbol")
+
     # 如果当天已有 AI 分析结果，直接返回（即使数据是前一天的，也不需要重新分析）
     if record.ai_analysis and record.cached_at and record.cached_at.date() == timezone.now().date():
         # 如果模型相同，直接返回
@@ -187,6 +206,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
                 "model": record.model,
                 "ai_available": True,
                 "cached": True,
+                "currency": currency_code,
+                "currency_symbol": currency_symbol,
+                "extra_data": record.extra_data,
             }, None
         # 如果模型不同，但已有结果，也返回（避免重复分析相同数据）
         else:
@@ -197,6 +219,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
                 "model": record.model,
                 "ai_available": True,
                 "cached": True,
+                "currency": currency_code,
+                "currency_symbol": currency_symbol,
+                "extra_data": record.extra_data,
             }, None
 
     if not check_ollama_available():
@@ -233,6 +258,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
             "model": model,
             "ai_available": True,
             "cached": False,
+            "currency": currency_code,
+            "currency_symbol": currency_symbol,
+            "extra_data": extra_data,
         }, None
     except Exception as exc:  # noqa: BLE001
         logger.error(f"AI分析执行失败: {exc}", exc_info=True)

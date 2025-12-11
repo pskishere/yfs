@@ -1,7 +1,7 @@
 /**
  * 主页面 - 股票分析功能
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -176,6 +176,28 @@ const MainPage: React.FC = () => {
     error: 'error',
   };
 
+  const currencySymbol = useMemo(() => {
+    if (!analysisResult) return '$';
+    return (
+      (analysisResult as any)?.currency_symbol ||
+      (analysisResult as any)?.currencySymbol ||
+      (analysisResult.extra_data as any)?.currency_symbol ||
+      (analysisResult.extra_data as any)?.currencySymbol ||
+      '$'
+    );
+  }, [analysisResult]);
+
+  const formatCurrency = (value?: number, decimals: number = 2) =>
+    `${currencySymbol}${formatValue(value ?? 0, decimals)}`;
+
+  const stopAiPolling = () => {
+    aiPollTokenRef.current += 1;
+    if (aiPollTimerRef.current) {
+      clearTimeout(aiPollTimerRef.current);
+      aiPollTimerRef.current = null;
+    }
+  };
+
   // 热门股票相关状态
   const [, setHotStocks] = useState<HotStock[]>([]);
   
@@ -183,8 +205,10 @@ const MainPage: React.FC = () => {
   const [newsPage, setNewsPage] = useState<number>(1);
   const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
 
-  // 防抖定时器引用
+  // 定时器与轮询引用
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiPollTokenRef = useRef<number>(0);
   // 标记是否已从 URL 加载过
   const hasLoadedFromUrlRef = useRef<boolean>(false);
 
@@ -291,6 +315,8 @@ const MainPage: React.FC = () => {
     baseResult?: AnalysisResult | null
   ): Promise<void> => {
     if (!symbol) return;
+    stopAiPolling();
+    const pollToken = aiPollTokenRef.current;
     setAiStatus('running');
     setAiStatusMsg('AI分析中...');
     
@@ -323,6 +349,7 @@ const MainPage: React.FC = () => {
         const pollInterval = 5000; // 每 5 秒轮询一次
         
         const pollForResult = async (): Promise<void> => {
+          if (pollToken !== aiPollTokenRef.current) return;
           try {
             const statusResult = await getAnalysisStatus(symbol, duration, barSize);
             
@@ -346,7 +373,10 @@ const MainPage: React.FC = () => {
             // 继续轮询
             pollCount++;
             if (pollCount < maxPolls) {
-              setTimeout(pollForResult, pollInterval);
+              aiPollTimerRef.current = setTimeout(() => {
+                if (pollToken !== aiPollTokenRef.current) return;
+                pollForResult();
+              }, pollInterval);
             } else {
               setAiStatus('error');
               setAiStatusMsg('AI分析超时，请稍后重试');
@@ -360,7 +390,10 @@ const MainPage: React.FC = () => {
         };
         
         // 延迟 2 秒后开始第一次轮询
-        setTimeout(pollForResult, 2000);
+        aiPollTimerRef.current = setTimeout(() => {
+          if (pollToken !== aiPollTokenRef.current) return;
+          pollForResult();
+        }, 2000);
         return;
       }
       
@@ -382,6 +415,7 @@ const MainPage: React.FC = () => {
         const pollInterval = 5000;
         
         const pollForResult = async (): Promise<void> => {
+          if (pollToken !== aiPollTokenRef.current) return;
           try {
             const statusResult = await getAnalysisStatus(symbol, duration, barSize);
             if (statusResult && statusResult.success && statusResult.ai_analysis) {
@@ -401,7 +435,10 @@ const MainPage: React.FC = () => {
             }
             pollCount++;
             if (pollCount < maxPolls) {
-              setTimeout(pollForResult, pollInterval);
+              aiPollTimerRef.current = setTimeout(() => {
+                if (pollToken !== aiPollTokenRef.current) return;
+                pollForResult();
+              }, pollInterval);
             } else {
               setAiStatus('error');
               setAiStatusMsg('AI分析超时，请稍后重试');
@@ -413,7 +450,10 @@ const MainPage: React.FC = () => {
             message.warning(pollError?.message || 'AI分析失败');
           }
         };
-        setTimeout(pollForResult, 2000);
+        aiPollTimerRef.current = setTimeout(() => {
+          if (pollToken !== aiPollTokenRef.current) return;
+          pollForResult();
+        }, 2000);
       } else {
         setAiStatus('error');
         setAiStatusMsg(e?.message || 'AI分析失败');
@@ -431,6 +471,7 @@ const MainPage: React.FC = () => {
       return;
     }
 
+    stopAiPolling();
     setAnalysisLoading(true);
     setAnalysisResult(null);
     setAiAnalysisResult(null);
@@ -516,6 +557,7 @@ const MainPage: React.FC = () => {
       return;
     }
 
+    stopAiPolling();
     const formValues = analyzeForm.getFieldsValue();
     const duration = formValues.duration || '5y';
     const barSize = formValues.barSize || '1 day';
@@ -680,6 +722,7 @@ const MainPage: React.FC = () => {
    */
   useEffect(() => {
     if (hasLoadedFromUrlRef.current) return;
+    stopAiPolling();
     
     const symbolFromUrl = searchParams.get('symbol');
     if (symbolFromUrl) {
@@ -716,7 +759,7 @@ const MainPage: React.FC = () => {
     );
   };
 
-  const positionColumns = getPositionColumns();
+  const positionColumns = getPositionColumns(currencySymbol);
   const orderColumns = getOrderColumns(handleCancelOrder);
 
   return (
@@ -898,7 +941,7 @@ const MainPage: React.FC = () => {
                           span: 1,
                           children: (
                             <span style={{ fontSize: 20, fontWeight: 600 }}>
-                              ${formatValue(analysisResult.indicators.current_price)}
+                              {formatCurrency(analysisResult.indicators.current_price)}
                             </span>
                           ),
                         },
@@ -997,7 +1040,7 @@ const MainPage: React.FC = () => {
                                         fontWeight: 600,
                                         color: diff >= 0 ? '#3f8600' : '#cf1322',
                                       }}>
-                                        ${formatValue(value)}
+                                        {formatCurrency(value)}
                                       </span>
                                       <span style={{
                                         fontSize: 14,
@@ -1088,21 +1131,21 @@ const MainPage: React.FC = () => {
                             if (indicators.bb_upper) {
                               items.push({
                                 label: createIndicatorLabel('布林带上轨', 'bb'),
-                                children: `$${formatValue(indicators.bb_upper)}`,
+                                children: formatCurrency(indicators.bb_upper),
                               });
                             }
 
                             if (indicators.bb_middle) {
                               items.push({
                                 label: createIndicatorLabel('布林带中轨', 'bb'),
-                                children: `$${formatValue(indicators.bb_middle)}`,
+                                children: formatCurrency(indicators.bb_middle),
                               });
                             }
 
                             if (indicators.bb_lower) {
                               items.push({
                                 label: createIndicatorLabel('布林带下轨', 'bb'),
-                                children: `$${formatValue(indicators.bb_lower)}`,
+                                children: formatCurrency(indicators.bb_lower),
                               });
                             }
 
@@ -1149,7 +1192,7 @@ const MainPage: React.FC = () => {
                             if (indicators.atr !== undefined) {
                               items.push({
                                 label: createIndicatorLabel('ATR', 'atr'),
-                                children: `$${formatValue(indicators.atr)} (${formatValue(indicators.atr_percent, 1)}%)`,
+                                children: `${formatCurrency(indicators.atr)} (${formatValue(indicators.atr_percent, 1)}%)`,
                               });
                             }
 
@@ -1261,7 +1304,7 @@ const MainPage: React.FC = () => {
                                 label: createIndicatorLabel('SAR', 'sar'),
                                 children: (
                                   <Space>
-                                    <span style={{ fontSize: 16, fontWeight: 600 }}>${formatValue(indicators.sar)}</span>
+                                    <span style={{ fontSize: 16, fontWeight: 600 }}>{formatCurrency(indicators.sar)}</span>
                                     <Tag
                                       color={
                                         indicators.sar_signal === 'bullish' ? 'success' :
@@ -1301,10 +1344,10 @@ const MainPage: React.FC = () => {
                                       {indicators.ichimoku_tk_cross === 'bearish' && <Tag color="error">死叉</Tag>}
                                     </Space>
                                     <div style={{ fontSize: 12 }}>
-                                      转折: ${formatValue(indicators.ichimoku_tenkan_sen)} 基准: ${formatValue(indicators.ichimoku_kijun_sen)}
+                                    转折: {formatCurrency(indicators.ichimoku_tenkan_sen)} 基准: {formatCurrency(indicators.ichimoku_kijun_sen)}
                                     </div>
                                     <div style={{ fontSize: 12 }}>
-                                      云层: ${formatValue(indicators.ichimoku_cloud_bottom ?? Math.min(indicators.ichimoku_senkou_span_a || 0, indicators.ichimoku_senkou_span_b || 0))} - ${formatValue(indicators.ichimoku_cloud_top ?? Math.max(indicators.ichimoku_senkou_span_a || 0, indicators.ichimoku_senkou_span_b || 0))}
+                                    云层: {formatCurrency(indicators.ichimoku_cloud_bottom ?? Math.min(indicators.ichimoku_senkou_span_a || 0, indicators.ichimoku_senkou_span_b || 0))} - {formatCurrency(indicators.ichimoku_cloud_top ?? Math.max(indicators.ichimoku_senkou_span_a || 0, indicators.ichimoku_senkou_span_b || 0))}
                                     </div>
                                   </Space>
                                 ),
@@ -1317,7 +1360,7 @@ const MainPage: React.FC = () => {
                                 label: createIndicatorLabel('SuperTrend', 'supertrend'),
                                 children: (
                                   <Space>
-                                    <span style={{ fontSize: 16, fontWeight: 600 }}>${formatValue(indicators.supertrend)}</span>
+                                  <span style={{ fontSize: 16, fontWeight: 600 }}>{formatCurrency(indicators.supertrend)}</span>
                                     <Tag color={indicators.supertrend_direction === 'up' ? 'success' : 'error'}>
                                       {indicators.supertrend_direction === 'up' ? '看涨支撑' : '看跌阻力'}
                                     </Tag>
@@ -1355,7 +1398,7 @@ const MainPage: React.FC = () => {
                                 children: (
                                   <Space direction="vertical" size="small">
                                     <Space>
-                                      <span>POC: ${formatValue(indicators.vp_poc)}</span>
+                                      <span>POC: {formatCurrency(indicators.vp_poc)}</span>
                                       <Tag
                                         color={
                                           indicators.vp_status === 'above_va' ? 'success' :
@@ -1367,7 +1410,7 @@ const MainPage: React.FC = () => {
                                       </Tag>
                                     </Space>
                                     <span style={{ fontSize: 12 }}>
-                                      价值区: ${formatValue(indicators.vp_val)} - ${formatValue(indicators.vp_vah)}
+                                      价值区: {formatCurrency(indicators.vp_val)} - {formatCurrency(indicators.vp_vah)}
                                     </span>
                                   </Space>
                                 ),
@@ -1485,7 +1528,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('枢轴点', 'pivot'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600 }}>
-                                      ${formatValue(indicators.pivot)}
+                                      {formatCurrency(indicators.pivot)}
                                     </span>
                                   ),
                                 });
@@ -1496,7 +1539,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('压力位R1', 'pivot_r1'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>
-                                      ${formatValue(indicators.pivot_r1)}
+                                      {formatCurrency(indicators.pivot_r1)}
                                     </span>
                                   ),
                                 });
@@ -1507,7 +1550,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('压力位R2', 'pivot_r2'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>
-                                      ${formatValue(indicators.pivot_r2)}
+                                      {formatCurrency(indicators.pivot_r2)}
                                     </span>
                                   ),
                                 });
@@ -1518,7 +1561,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('压力位R3', 'pivot_r3'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>
-                                      ${formatValue(indicators.pivot_r3)}
+                                      {formatCurrency(indicators.pivot_r3)}
                                     </span>
                                   ),
                                 });
@@ -1529,7 +1572,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('支撑位S1', 'pivot_s1'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#52c41a' }}>
-                                      ${formatValue(indicators.pivot_s1)}
+                                      {formatCurrency(indicators.pivot_s1)}
                                     </span>
                                   ),
                                 });
@@ -1540,7 +1583,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('支撑位S2', 'pivot_s2'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#52c41a' }}>
-                                      ${formatValue(indicators.pivot_s2)}
+                                      {formatCurrency(indicators.pivot_s2)}
                                     </span>
                                   ),
                                 });
@@ -1551,7 +1594,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('支撑位S3', 'pivot_s3'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#52c41a' }}>
-                                      ${formatValue(indicators.pivot_s3)}
+                                      {formatCurrency(indicators.pivot_s3)}
                                     </span>
                                   ),
                                 });
@@ -1562,7 +1605,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('20日高点', 'resistance_20d_high'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>
-                                      ${formatValue(indicators.resistance_20d_high)}
+                                      {formatCurrency(indicators.resistance_20d_high)}
                                     </span>
                                   ),
                                 });
@@ -1573,7 +1616,7 @@ const MainPage: React.FC = () => {
                                   label: createIndicatorLabel('20日低点', 'support_20d_low'),
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#52c41a' }}>
-                                      ${formatValue(indicators.support_20d_low)}
+                                      {formatCurrency(indicators.support_20d_low)}
                                     </span>
                                   ),
                                 });
@@ -1664,7 +1707,7 @@ const MainPage: React.FC = () => {
                                   span: 1,
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#cf1322' }}>
-                                      ${formatValue(signals.stop_loss)}
+                                      {formatCurrency(signals.stop_loss)}
                                     </span>
                                   ),
                                 });
@@ -1676,7 +1719,7 @@ const MainPage: React.FC = () => {
                                   span: 1,
                                   children: (
                                     <span style={{ fontSize: 16, fontWeight: 600, color: '#3f8600' }}>
-                                      ${formatValue(signals.take_profit)}
+                                      {formatCurrency(signals.take_profit)}
                                     </span>
                                   ),
                                 });
@@ -1781,7 +1824,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('流通股数', 'fundamental'),
                                     span: 1,
-                                    children: formatLargeNumber(shares).replace('$', ''),
+                                    children: formatLargeNumber(shares, ''),
                                   });
                                 }
 
@@ -1789,7 +1832,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('市值', 'market_cap'),
                                     span: 1,
-                                    children: formatLargeNumber(parseFloat(String(fd.MarketCap))),
+                                    children: formatLargeNumber(parseFloat(String(fd.MarketCap)), currencySymbol),
                                   });
                                 }
 
@@ -1797,7 +1840,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('当前价', 'fundamental'),
                                     span: 1,
-                                    children: `$${formatValue(parseFloat(String(fd.Price || 0)), 2)}`,
+                                    children: formatCurrency(parseFloat(String(fd.Price || 0)), 2),
                                   });
                                 }
 
@@ -1805,7 +1848,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('52周区间', 'fundamental'),
                                     span: 2,
-                                    children: `$${formatValue(parseFloat(String(fd['52WeekLow'] || 0)), 2)} - $${formatValue(parseFloat(String(fd['52WeekHigh'] || 0)), 2)}`,
+                                    children: `${formatCurrency(parseFloat(String(fd['52WeekLow'] || 0)), 2)} - ${formatCurrency(parseFloat(String(fd['52WeekHigh'] || 0)), 2)}`,
                                   });
                                 }
 
@@ -1813,7 +1856,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('营收(TTM)', 'revenue'),
                                     span: 1,
-                                    children: formatLargeNumber(parseFloat(String(fd.RevenueTTM))),
+                                    children: formatLargeNumber(parseFloat(String(fd.RevenueTTM)), currencySymbol),
                                   });
                                 }
 
@@ -1821,7 +1864,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('净利润(TTM)', 'fundamental'),
                                     span: 1,
-                                    children: formatLargeNumber(parseFloat(String(fd.NetIncomeTTM))),
+                                    children: formatLargeNumber(parseFloat(String(fd.NetIncomeTTM)), currencySymbol),
                                   });
                                 }
 
@@ -1829,7 +1872,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('EBITDA(TTM)', 'fundamental'),
                                     span: 1,
-                                    children: formatLargeNumber(parseFloat(String(fd.EBITDATTM))),
+                                    children: formatLargeNumber(parseFloat(String(fd.EBITDATTM)), currencySymbol),
                                   });
                                 }
 
@@ -1854,7 +1897,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('每股收益(EPS)', 'eps'),
                                     span: 1,
-                                    children: `$${formatValue(parseFloat(String(fd.EPS || 0)), 2)}`,
+                                    children: formatCurrency(parseFloat(String(fd.EPS || 0)), 2),
                                   });
                                 }
 
@@ -1862,7 +1905,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('每股净资产', 'fundamental'),
                                     span: 1,
-                                    children: `$${formatValue(parseFloat(String(fd.BookValuePerShare || 0)), 2)}`,
+                                    children: formatCurrency(parseFloat(String(fd.BookValuePerShare || 0)), 2),
                                   });
                                 }
 
@@ -1870,7 +1913,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('每股现金', 'fundamental'),
                                     span: 1,
-                                    children: `$${formatValue(parseFloat(String(fd.CashPerShare || 0)), 2)}`,
+                                    children: formatCurrency(parseFloat(String(fd.CashPerShare || 0)), 2),
                                   });
                                 }
 
@@ -1878,7 +1921,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('每股股息', 'fundamental'),
                                     span: 1,
-                                    children: `$${formatValue(parseFloat(String(fd.DividendPerShare || 0)), 3)}`,
+                                    children: formatCurrency(parseFloat(String(fd.DividendPerShare || 0)), 3),
                                   });
                                 }
 
@@ -1953,7 +1996,7 @@ const MainPage: React.FC = () => {
                                     span: 1,
                                     children: (
                                       <Space>
-                                        <span>${formatValue(parseFloat(String(target)), 2)}</span>
+                                        <span>{formatCurrency(parseFloat(String(target)), 2)}</span>
                                         {upside > 0 ? (
                                           <Tag color="success">+{formatValue(upside, 1)}%</Tag>
                                         ) : (
@@ -1978,7 +2021,7 @@ const MainPage: React.FC = () => {
                                   items.push({
                                     label: createIndicatorLabel('预测EPS', 'eps'),
                                     span: 1,
-                                    children: `$${formatValue(parseFloat(String(fd.ProjectedEPS || 0)), 2)}`,
+                                    children: formatCurrency(parseFloat(String(fd.ProjectedEPS || 0)), 2),
                                   });
                                 }
 
@@ -2016,28 +2059,28 @@ const MainPage: React.FC = () => {
                                   analysisResult.indicators.fundamental_data.Financials.length > 0 ? {
                                     key: 'annual-financials',
                                     label: '年度财务报表',
-                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.Financials} />,
+                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.Financials} currencySymbol={currencySymbol} />,
                                   } : null,
                                   analysisResult.indicators.fundamental_data?.QuarterlyFinancials && 
                                   Array.isArray(analysisResult.indicators.fundamental_data.QuarterlyFinancials) &&
                                   analysisResult.indicators.fundamental_data.QuarterlyFinancials.length > 0 ? {
                                     key: 'quarterly-financials',
                                     label: '季度财务报表',
-                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.QuarterlyFinancials} />,
+                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.QuarterlyFinancials} currencySymbol={currencySymbol} />,
                                   } : null,
                                   analysisResult.indicators.fundamental_data?.BalanceSheet && 
                                   Array.isArray(analysisResult.indicators.fundamental_data.BalanceSheet) &&
                                   analysisResult.indicators.fundamental_data.BalanceSheet.length > 0 ? {
                                     key: 'balance-sheet',
                                     label: '资产负债表',
-                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.BalanceSheet} />,
+                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.BalanceSheet} currencySymbol={currencySymbol} />,
                                   } : null,
                                   analysisResult.indicators.fundamental_data?.Cashflow && 
                                   Array.isArray(analysisResult.indicators.fundamental_data.Cashflow) &&
                                   analysisResult.indicators.fundamental_data.Cashflow.length > 0 ? {
                                     key: 'cashflow',
                                     label: '现金流量表',
-                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.Cashflow} />,
+                                    children: <FinancialTable data={analysisResult.indicators.fundamental_data.Cashflow} currencySymbol={currencySymbol} />,
                                   } : null,
                                 ].filter((item): item is NonNullable<typeof item> => item !== null)}
                               />

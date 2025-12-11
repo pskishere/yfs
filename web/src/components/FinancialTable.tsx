@@ -7,6 +7,7 @@ import { translateFinancialTerm } from '../utils/formatters';
 
 interface FinancialTableProps {
   data: any[];
+  currencySymbol?: string;
 }
 
 /**
@@ -15,16 +16,16 @@ interface FinancialTableProps {
  * @param value - 财务数值
  * @returns 格式化后的字符串
  */
-const renderFinancialValue = (value: any): string => {
+const renderFinancialValue = (value: any, currencySymbol: string): string => {
   if (value === null || value === undefined || value === '') return '-';
   const num = parseFloat(value);
   if (!isNaN(num)) {
     if (Math.abs(num) >= 1e9) {
-      return `$${(num / 1e9).toFixed(2)}B`;
+      return `${currencySymbol}${(num / 1e9).toFixed(2)}B`;
     } else if (Math.abs(num) >= 1e6) {
-      return `$${(num / 1e6).toFixed(2)}M`;
+      return `${currencySymbol}${(num / 1e6).toFixed(2)}M`;
     }
-    return `$${num.toFixed(2)}`;
+    return `${currencySymbol}${num.toFixed(2)}`;
   }
   return value;
 };
@@ -35,7 +36,7 @@ const renderFinancialValue = (value: any): string => {
  * @param firstRecord - 第一条记录，用于确定列结构
  * @returns Ant Design表格列配置数组
  */
-const getColumns = (firstRecord: any) => {
+const getColumns = (firstRecord: any, currencySymbol: string) => {
   const dateCol = firstRecord.index || firstRecord.Date ? {
     title: '日期',
     dataIndex: firstRecord.index ? 'index' : 'Date',
@@ -50,7 +51,7 @@ const getColumns = (firstRecord: any) => {
       title: translateFinancialTerm(key),
       dataIndex: key,
       key: key,
-      render: renderFinancialValue,
+      render: (value: any) => renderFinancialValue(value, currencySymbol),
     }));
 
   return dateCol ? [dateCol, ...otherCols] : otherCols;
@@ -59,7 +60,7 @@ const getColumns = (firstRecord: any) => {
 /**
  * 财务报表表格组件
  */
-export const FinancialTable: React.FC<FinancialTableProps> = ({ data }) => {
+export const FinancialTable: React.FC<FinancialTableProps> = ({ data, currencySymbol = '$' }) => {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return null;
   }
@@ -74,7 +75,7 @@ export const FinancialTable: React.FC<FinancialTableProps> = ({ data }) => {
       size="small"
       bordered
       dataSource={dataSource}
-      columns={getColumns(data[0])}
+      columns={getColumns(data[0], currencySymbol)}
       scroll={{ x: 'max-content' }}
       pagination={false}
     />

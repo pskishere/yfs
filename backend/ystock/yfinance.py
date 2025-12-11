@@ -31,6 +31,53 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
+CURR_SYMBOL_MAP = {
+    "USD": "$",
+    "CNY": "¥",
+    "CNH": "¥",
+    "JPY": "¥",
+    "HKD": "HK$",
+    "EUR": "€",
+    "GBP": "£",
+    "CAD": "C$",
+    "AUD": "A$",
+    "SGD": "S$",
+    "CHF": "CHF",
+    "KRW": "₩",
+    "INR": "₹",
+}
+
+
+def _resolve_currency_code(info: dict | None, ticker: yf.Ticker) -> str:
+    """
+    根据yfinance返回的信息推断货币代码，优先info，其次fast_info。
+    """
+    if info and info.get("currency"):
+        return info["currency"]
+
+    try:
+        fast_info = ticker.fast_info
+        if hasattr(fast_info, "get"):
+            code = fast_info.get("currency")
+            if code:
+                return str(code)
+        code = getattr(fast_info, "currency", None)
+        if code:
+            return str(code)
+    except Exception:
+        logger.debug("读取 fast_info 货币失败，使用默认USD")
+
+    return "USD"
+
+
+def _resolve_currency_symbol(currency_code: str) -> str:
+    """
+    将货币代码映射成常见符号，未知时回退为代码本身。
+    """
+    if not currency_code:
+        return "$"
+    return CURR_SYMBOL_MAP.get(currency_code.upper(), currency_code.upper())
+
 
 def get_stock_info(symbol: str):
     """
@@ -43,12 +90,16 @@ def get_stock_info(symbol: str):
         if not info:
             return None
         
+        currency_code = _resolve_currency_code(info, ticker)
+        currency_symbol = _resolve_currency_symbol(currency_code)
+
         return {
             'symbol': symbol,
             'longName': info.get('longName', info.get('shortName', symbol)),
             'shortName': info.get('shortName', ''),
             'exchange': info.get('exchange', ''),
-            'currency': info.get('currency', 'USD'),
+            'currency': currency_code,
+            'currencySymbol': currency_symbol,
             'marketCap': info.get('marketCap', 0),
             'regularMarketPrice': info.get('regularMarketPrice', 0),
             'fiftyTwoWeekHigh': info.get('fiftyTwoWeekHigh', 0),
@@ -114,6 +165,8 @@ def get_fundamental_data(symbol: str):
             logger.debug(f"股票信息为空: {symbol}")
             return None
         
+        currency_code = _resolve_currency_code(info, ticker)
+        currency_symbol = _resolve_currency_symbol(currency_code)
         shares_outstanding = info.get('sharesOutstanding', 0)
         total_cash = info.get('totalCash', 0)
         cash_per_share = (total_cash / shares_outstanding) if shares_outstanding and shares_outstanding > 0 else 0
@@ -122,7 +175,8 @@ def get_fundamental_data(symbol: str):
             'CompanyName': info.get('longName', info.get('shortName', symbol)),
             'ShortName': info.get('shortName', ''),
             'Exchange': info.get('exchange', ''),
-            'Currency': info.get('currency', 'USD'),
+            'Currency': currency_code,
+            'CurrencySymbol': currency_symbol,
             'Sector': info.get('sector', ''),
             'Industry': info.get('industry', ''),
             'Website': info.get('website', ''),
@@ -1256,6 +1310,10 @@ def get_fast_info(symbol: str) -> Optional[Dict[str, Any]]:
                             result[attr] = str(value) if value is not None else None
                 except Exception:
                     continue
+
+        currency_code = result.get('currency')
+        if currency_code:
+            result['currencySymbol'] = _resolve_currency_symbol(currency_code)
         
         logger.info(f"已获取快速实时信息: {symbol}")
         return result

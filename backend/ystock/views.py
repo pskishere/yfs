@@ -52,6 +52,12 @@ def _serialize_record(record: StockAnalysis) -> dict:
     """
     将分析记录转换为响应体
     """
+    currency_code = None
+    currency_symbol = None
+    if isinstance(record.extra_data, dict):
+        currency_code = record.extra_data.get("currency")
+        currency_symbol = record.extra_data.get("currency_symbol") or record.extra_data.get("currencySymbol")
+
     return {
         "success": record.status == StockAnalysis.Status.SUCCESS,
         "symbol": record.symbol,
@@ -63,6 +69,8 @@ def _serialize_record(record: StockAnalysis) -> dict:
         "ai_analysis": record.ai_analysis,
         "ai_available": bool(record.ai_analysis),
         "model": record.model,
+        "currency": currency_code,
+        "currency_symbol": currency_symbol,
         "task_result_id": record.task_result_id,
         "cached_at": record.cached_at.isoformat() if record.cached_at else None,
         "message": record.error_message,

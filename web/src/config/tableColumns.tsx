@@ -11,7 +11,7 @@ import { statusMaps } from '../utils/formatters';
  * 
  * @returns Ant Design表格列配置数组
  */
-export const getPositionColumns = () => [
+export const getPositionColumns = (currencySymbol: string = '$') => [
   {
     title: '代码',
     dataIndex: 'symbol',
@@ -28,19 +28,19 @@ export const getPositionColumns = () => [
     title: '市价',
     dataIndex: 'marketPrice',
     key: 'marketPrice',
-    render: (value: number | undefined) => `$${value?.toFixed(2) || '0.00'}`,
+    render: (value: number | undefined) => `${currencySymbol}${value?.toFixed(2) || '0.00'}`,
   },
   {
     title: '市值',
     dataIndex: 'marketValue',
     key: 'marketValue',
-    render: (value: number | undefined) => `$${value?.toFixed(2) || '0.00'}`,
+    render: (value: number | undefined) => `${currencySymbol}${value?.toFixed(2) || '0.00'}`,
   },
   {
     title: '成本',
     dataIndex: 'averageCost',
     key: 'averageCost',
-    render: (value: number | undefined) => `$${value?.toFixed(2) || '0.00'}`,
+    render: (value: number | undefined) => `${currencySymbol}${value?.toFixed(2) || '0.00'}`,
   },
   {
     title: '盈亏',

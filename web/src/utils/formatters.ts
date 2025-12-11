@@ -20,16 +20,16 @@ export const formatValue = (value: number | undefined, decimals: number = 2): st
  * @param value - 要格式化的数值
  * @returns 格式化后的字符串，如 $1.23B、$456.78M 等
  */
-export const formatLargeNumber = (value: number): string => {
+export const formatLargeNumber = (value: number, symbol: string = '$'): string => {
   const absValue = Math.abs(value);
   if (absValue >= 1e12) {
-    return `$${(value / 1e12).toFixed(2)}T`;
+    return `${symbol}${(value / 1e12).toFixed(2)}T`;
   } else if (absValue >= 1e9) {
-    return `$${(value / 1e9).toFixed(2)}B`;
+    return `${symbol}${(value / 1e9).toFixed(2)}B`;
   } else if (absValue >= 1e6) {
-    return `$${(value / 1e6).toFixed(2)}M`;
+    return `${symbol}${(value / 1e6).toFixed(2)}M`;
   }
-  return `$${value.toFixed(2)}`;
+  return `${symbol}${value.toFixed(2)}`;
 };
 
 /**
