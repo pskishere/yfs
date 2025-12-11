@@ -546,6 +546,33 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         # 确保所有可能用于格式化的值不是None
         indicators = indicators or {}
         signals = signals or {}
+        currency_symbol = "$"
+        currency_code = None
+        if isinstance(extra_data, dict):
+            currency_code = extra_data.get("currency") or extra_data.get("currencyCode")
+            currency_symbol = (
+                extra_data.get("currency_symbol")
+                or extra_data.get("currencySymbol")
+                or currency_symbol
+            )
+        if not currency_symbol and currency_code:
+            currency_map = {
+                "USD": "$",
+                "HKD": "HK$",
+                "CNY": "¥",
+                "CNH": "¥",
+                "JPY": "¥",
+                "EUR": "€",
+                "GBP": "£",
+            }
+            currency_symbol = currency_map.get(str(currency_code).upper(), f"{currency_code} ")
+
+        def fmt_price(val):
+            """统一格式化价格，匹配实际货币单位"""
+            try:
+                return f"{currency_symbol}{float(val):.2f}"
+            except Exception:
+                return f"{currency_symbol}{val}"
         
         def safe_indicators(d):
             """确保所有数值字段不是None"""
@@ -911,19 +938,20 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         }
         
         stop_loss_val = signals.get('stop_loss')
-        stop_loss_str = f"${stop_loss_val:.2f}" if stop_loss_val is not None else '未计算'
+        stop_loss_str = fmt_price(stop_loss_val) if stop_loss_val is not None else '未计算'
         take_profit_val = signals.get('take_profit')
-        take_profit_str = f"${take_profit_val:.2f}" if take_profit_val is not None else '未计算'
+        take_profit_str = fmt_price(take_profit_val) if take_profit_val is not None else '未计算'
         sar_val = indicators.get('sar')
-        sar_str = f"${sar_val:.2f}" if sar_val is not None and sar_val != 0 else '未计算'
+        sar_str = fmt_price(sar_val) if sar_val is not None and sar_val != 0 else '未计算'
         atr_val = indicators.get('atr')
-        atr_str = f"${atr_val:.2f}" if atr_val is not None and atr_val != 0 else '未计算'
+        atr_str = fmt_price(atr_val) if atr_val is not None and atr_val != 0 else '未计算'
         
         if has_fundamental:
             try:
                 prompt = f"""# 分析对象
 **股票代码:** {symbol.upper()}  
-**当前价格:** ${indicators.get('current_price', 0):.2f}  
+**当前价格:** {fmt_price(indicators.get('current_price', 0))}  
+**货币单位:** {currency_symbol}{f" (代码: {currency_code})" if currency_code else ""}  
 **分析周期:** {duration} ({indicators.get('data_points', 0)}个交易日)
 
 **多维度评分详情:**
@@ -939,13 +967,13 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 # 技术指标数据
 
 ## 1. 趋势指标
-- 移动平均线: MA5=${indicators.get('ma5', 0):.2f}, MA20=${indicators.get('ma20', 0):.2f}, MA50=${indicators.get('ma50', 0):.2f}
+- 移动平均线: MA5={fmt_price(indicators.get('ma5', 0))}, MA20={fmt_price(indicators.get('ma20', 0))}, MA50={fmt_price(indicators.get('ma50', 0))}
    - 趋势方向: {indicators.get('trend_direction', 'neutral')}
    - 趋势强度: {indicators.get('trend_strength', 0):.0f}%
 - ADX: {indicators.get('adx', 0):.1f} (+DI={indicators.get('plus_di', 0):.1f}, -DI={indicators.get('minus_di', 0):.1f})
-- SuperTrend: ${indicators.get('supertrend', 0):.2f} (方向: {indicators.get('supertrend_direction', 'neutral')})
+- SuperTrend: {fmt_price(indicators.get('supertrend', 0))} (方向: {indicators.get('supertrend_direction', 'neutral')})
 - Ichimoku云层: {indicators.get('ichimoku_status', 'unknown')}
-- SAR止损位: ${indicators.get('sar', 0):.2f}
+- SAR止损位: {fmt_price(indicators.get('sar', 0))}
 
 ## 2. 动量指标
 - RSI(14): {indicators.get('rsi', 0):.1f}
@@ -955,21 +983,21 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 - StochRSI: K={indicators.get('stoch_rsi_k', 0):.1f}, D={indicators.get('stoch_rsi_d', 0):.1f} (状态: {indicators.get('stoch_rsi_status', 'neutral')})
 
 ## 3. 波动性指标
-- 布林带: 上轨=${indicators.get('bb_upper', 0):.2f}, 中轨=${indicators.get('bb_middle', 0):.2f}, 下轨=${indicators.get('bb_lower', 0):.2f}
-- ATR: ${indicators.get('atr', 0):.2f} ({indicators.get('atr_percent', 0):.1f}%)
+- 布林带: 上轨={fmt_price(indicators.get('bb_upper', 0))}, 中轨={fmt_price(indicators.get('bb_middle', 0))}, 下轨={fmt_price(indicators.get('bb_lower', 0))}
+- ATR: {fmt_price(indicators.get('atr', 0))} ({indicators.get('atr_percent', 0):.1f}%)
 - 20日波动率: {indicators.get('volatility_20', 0):.2f}%
 
 ## 4. 成交量分析
 - 成交量比率: {indicators.get('volume_ratio', 0):.2f}x (当前/20日均量)
 - OBV趋势: {indicators.get('obv_trend', 'neutral')}
 - 价量关系: {indicators.get('price_volume_confirmation', 'neutral')}
-- Volume Profile: POC=${indicators.get('vp_poc', 0):.2f}, 状态={indicators.get('vp_status', 'neutral')}
+- Volume Profile: POC={fmt_price(indicators.get('vp_poc', 0))}, 状态={indicators.get('vp_status', 'neutral')}
 
 ## 5. 支撑压力位
-- 20日高点: ${indicators.get('resistance_20d_high', 0):.2f}
-- 20日低点: ${indicators.get('support_20d_low', 0):.2f}
-- 枢轴点: ${indicators.get('pivot', 0):.2f}
-- 斐波那契回撤: 23.6%=${indicators.get('fib_23.6', 0):.2f}, 38.2%=${indicators.get('fib_38.2', 0):.2f}, 61.8%=${indicators.get('fib_61.8', 0):.2f}
+- 20日高点: {fmt_price(indicators.get('resistance_20d_high', 0))}
+- 20日低点: {fmt_price(indicators.get('support_20d_low', 0))}
+- 枢轴点: {fmt_price(indicators.get('pivot', 0))}
+- 斐波那契回撤: 23.6%={fmt_price(indicators.get('fib_23.6', 0))}, 38.2%={fmt_price(indicators.get('fib_38.2', 0))}, 61.8%={fmt_price(indicators.get('fib_61.8', 0))}
 
 ## 6. 其他指标
    - 连续上涨天数: {indicators.get('consecutive_up_days', 0)}
@@ -1094,24 +1122,24 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 2. **具体操作价位（必须明确给出）**
    
    **如果建议买入:**
-   - **建议买入价位:** $[具体价格或价格区间，例如: $150.50 或 $149.00-$151.00]
+   - **建议买入价位:** {currency_symbol}[具体价格或价格区间，例如: {currency_symbol}150.50 或 {currency_symbol}149.00-{currency_symbol}151.00]
      - 说明：为什么选择这个价位？基于什么技术指标？（如支撑位、均线、布林带等）
-   - **建议止损价位:** $[具体价格，例如: $147.00]
-     - 说明：基于什么计算？（SAR=${indicators.get('sar', 0):.2f}、ATR=${indicators.get('atr', 0):.2f}、支撑位等）
+   - **建议止损价位:** {currency_symbol}[具体价格，例如: {currency_symbol}147.00]
+     - 说明：基于什么计算？（SAR={fmt_price(indicators.get('sar', 0))}、ATR={fmt_price(indicators.get('atr', 0))}、支撑位等）
      - 止损百分比: [X]% （相对于买入价）
-   - **建议止盈价位:** $[具体价格，例如: $158.00]
+   - **建议止盈价位:** {currency_symbol}[具体价格，例如: {currency_symbol}158.00]
      - 说明：基于什么计算？（压力位、阻力位、目标价等）
      - 止盈百分比: [X]% （相对于买入价）
      - 风险收益比: 1:[X] （止盈空间/止损空间）
    
    **如果建议卖出:**
-   - **建议卖出价位:** $[具体价格或价格区间]
+   - **建议卖出价位:** {currency_symbol}[具体价格或价格区间]
      - 说明：为什么选择这个价位？
-   - **止损/保护价位:** $[如果卖出后可能上涨，设置保护价位]
+   - **止损/保护价位:** {currency_symbol}[如果卖出后可能上涨，设置保护价位]
    
    **如果建议观望:**
-   - **等待的买入价位:** $[如果价格达到这个价位才考虑买入]
-   - **等待的卖出价位:** $[如果价格达到这个价位才考虑卖出]
+   - **等待的买入价位:** {currency_symbol}[如果价格达到这个价位才考虑买入]
+   - **等待的卖出价位:** {currency_symbol}[如果价格达到这个价位才考虑卖出]
 
 3. **风险提示**
    - 技术风险点（高波动、趋势不明、背离等）
@@ -1151,7 +1179,8 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
             try:
                 prompt = f"""# 分析对象
 **股票代码:** {symbol.upper()}  
-**当前价格:** ${indicators.get('current_price', 0):.2f}  
+**当前价格:** {fmt_price(indicators.get('current_price', 0))}  
+**货币单位:** {currency_symbol}{f" (代码: {currency_code})" if currency_code else ""}  
 **分析周期:** {duration} ({indicators.get('data_points', 0)}个交易日)  
 **⚠️ 注意:** 无基本面数据，仅基于技术分析
 
@@ -1167,13 +1196,13 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 # 技术指标数据
 
 ## 1. 趋势指标
-- 移动平均线: MA5=${indicators.get('ma5', 0):.2f}, MA20=${indicators.get('ma20', 0):.2f}, MA50=${indicators.get('ma50', 0):.2f}
+- 移动平均线: MA5={fmt_price(indicators.get('ma5', 0))}, MA20={fmt_price(indicators.get('ma20', 0))}, MA50={fmt_price(indicators.get('ma50', 0))}
    - 趋势方向: {indicators.get('trend_direction', 'neutral')}
    - 趋势强度: {indicators.get('trend_strength', 0):.0f}%
 - ADX: {indicators.get('adx', 0):.1f} (+DI={indicators.get('plus_di', 0):.1f}, -DI={indicators.get('minus_di', 0):.1f})
-- SuperTrend: ${indicators.get('supertrend', 0):.2f} (方向: {indicators.get('supertrend_direction', 'neutral')})
+- SuperTrend: {fmt_price(indicators.get('supertrend', 0))} (方向: {indicators.get('supertrend_direction', 'neutral')})
 - Ichimoku云层: {indicators.get('ichimoku_status', 'unknown')}
-- SAR止损位: ${indicators.get('sar', 0):.2f}
+- SAR止损位: {fmt_price(indicators.get('sar', 0))}
 
 ## 2. 动量指标
 - RSI(14): {indicators.get('rsi', 0):.1f}
@@ -1184,21 +1213,21 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 - 威廉指标: {indicators.get('williams_r', 0):.1f}
 
 ## 3. 波动性指标
-- 布林带: 上轨=${indicators.get('bb_upper', 0):.2f}, 中轨=${indicators.get('bb_middle', 0):.2f}, 下轨=${indicators.get('bb_lower', 0):.2f}
-- ATR: ${indicators.get('atr', 0):.2f} ({indicators.get('atr_percent', 0):.1f}%)
+- 布林带: 上轨={fmt_price(indicators.get('bb_upper', 0))}, 中轨={fmt_price(indicators.get('bb_middle', 0))}, 下轨={fmt_price(indicators.get('bb_lower', 0))}
+- ATR: {fmt_price(indicators.get('atr', 0))} ({indicators.get('atr_percent', 0):.1f}%)
 - 20日波动率: {indicators.get('volatility_20', 0):.2f}%
 
 ## 4. 成交量分析
 - 成交量比率: {indicators.get('volume_ratio', 0):.2f}x (当前/20日均量)
 - OBV趋势: {indicators.get('obv_trend', 'neutral')}
 - 价量关系: {indicators.get('price_volume_confirmation', 'neutral')}
-- Volume Profile: POC=${indicators.get('vp_poc', 0):.2f}, 状态={indicators.get('vp_status', 'neutral')}
+- Volume Profile: POC={fmt_price(indicators.get('vp_poc', 0))}, 状态={indicators.get('vp_status', 'neutral')}
 
 ## 5. 支撑压力位
-- 20日高点: ${indicators.get('resistance_20d_high', 0):.2f}
-- 20日低点: ${indicators.get('support_20d_low', 0):.2f}
-- 枢轴点: ${indicators.get('pivot', 0):.2f}
-- 斐波那契回撤: 23.6%=${indicators.get('fib_23.6', 0):.2f}, 38.2%=${indicators.get('fib_38.2', 0):.2f}, 61.8%=${indicators.get('fib_61.8', 0):.2f}
+- 20日高点: {fmt_price(indicators.get('resistance_20d_high', 0))}
+- 20日低点: {fmt_price(indicators.get('support_20d_low', 0))}
+- 枢轴点: {fmt_price(indicators.get('pivot', 0))}
+- 斐波那契回撤: 23.6%={fmt_price(indicators.get('fib_23.6', 0))}, 38.2%={fmt_price(indicators.get('fib_38.2', 0))}, 61.8%={fmt_price(indicators.get('fib_61.8', 0))}
 
 ## 6. 其他指标
    - 连续上涨天数: {indicators.get('consecutive_up_days', 0)}

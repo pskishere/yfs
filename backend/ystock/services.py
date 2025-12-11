@@ -129,6 +129,7 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
         }, None
 
     stock_info = save_stock_info_if_available(symbol)
+    stock_name = extract_stock_name(stock_info) if stock_info else None
 
     hist_data, hist_error = get_historical_data(symbol, duration, bar_size)
     indicators, ind_error = calculate_technical_indicators(symbol, duration, bar_size)
@@ -155,12 +156,17 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
             payload_extra["currency"] = currency_code
         if currency_symbol:
             payload_extra["currency_symbol"] = currency_symbol
+    if stock_name:
+        payload_extra = payload_extra or {}
+        payload_extra["stock_name"] = stock_name
 
     result = create_success_response(indicators, signals, formatted_candles, None, None)
     if currency_code:
         result["currency"] = currency_code
     if currency_symbol:
         result["currency_symbol"] = currency_symbol
+    if stock_name:
+        result["stock_name"] = stock_name
     if payload_extra:
         result["extra_data"] = payload_extra
 

@@ -187,6 +187,15 @@ const MainPage: React.FC = () => {
     );
   }, [analysisResult]);
 
+  const stockName = useMemo(() => {
+    if (!analysisResult) return '';
+    return (
+      (analysisResult as any)?.stock_name ||
+      (analysisResult.extra_data as any)?.stock_name ||
+      ''
+    );
+  }, [analysisResult]);
+
   const formatCurrency = (value?: number, decimals: number = 2) =>
     `${currencySymbol}${formatValue(value ?? 0, decimals)}`;
 
@@ -929,6 +938,11 @@ const MainPage: React.FC = () => {
                         <span>
                           <BarChartOutlined style={{ marginRight: 8 }} />
                           价格信息
+                          {currentSymbol && (
+                            <span style={{ marginLeft: 8, color: '#595959', fontWeight: 500 }}>
+                              {currentSymbol} {stockName ? `(${stockName})` : ''}
+                            </span>
+                          )}
                         </span>
                       }
                       bordered
@@ -936,6 +950,15 @@ const MainPage: React.FC = () => {
                       size="middle"
                       layout="vertical"
                       items={[
+                        {
+                          label: '标的',
+                          span: 1,
+                          children: (
+                            <span style={{ fontSize: 16, fontWeight: 500 }}>
+                              {currentSymbol || '-'} {stockName ? `(${stockName})` : ''}
+                            </span>
+                          ),
+                        },
                         {
                           label: '当前价格',
                           span: 1,
@@ -990,7 +1013,7 @@ const MainPage: React.FC = () => {
                         alignItems: 'center',
                       }}>
                         <BarChartOutlined style={{ marginRight: 8 }} />
-                        K线图 - {currentSymbol}
+                        K线图
                       </div>
                       <div style={{ minWidth: '100%', width: '100%' }}>
                         <TradingViewChart

@@ -54,13 +54,16 @@ def _serialize_record(record: StockAnalysis) -> dict:
     """
     currency_code = None
     currency_symbol = None
+    stock_name = None
     if isinstance(record.extra_data, dict):
         currency_code = record.extra_data.get("currency")
         currency_symbol = record.extra_data.get("currency_symbol") or record.extra_data.get("currencySymbol")
+        stock_name = record.extra_data.get("stock_name")
 
     return {
         "success": record.status == StockAnalysis.Status.SUCCESS,
         "symbol": record.symbol,
+        "stock_name": stock_name,
         "status": record.status,
         "indicators": record.indicators,
         "signals": record.signals,
