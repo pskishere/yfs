@@ -951,15 +951,6 @@ const MainPage: React.FC = () => {
                       layout="vertical"
                       items={[
                         {
-                          label: '标的',
-                          span: 1,
-                          children: (
-                            <span style={{ fontSize: 16, fontWeight: 500 }}>
-                              {currentSymbol || '-'} {stockName ? `(${stockName})` : ''}
-                            </span>
-                          ),
-                        },
-                        {
                           label: '当前价格',
                           span: 1,
                           children: (
