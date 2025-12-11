@@ -43,7 +43,6 @@ import {
   WarningOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  LineChartOutlined,
 } from '@ant-design/icons';
 import {
   getPositions,
