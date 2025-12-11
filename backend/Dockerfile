@@ -26,17 +26,16 @@ RUN pip uninstall -y protobuf || true && \
 # 复制项目
 COPY . /app/
 
+# 复制启动脚本并设置执行权限
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # 环境变量
 ENV PYTHONUNBUFFERED=1 \
     PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 EXPOSE 8080
 
-# 使用 gunicorn 启动 Django 应用
-# workers: CPU核心数 * 2 + 1，这里使用 4 个 worker
-# timeout: 300秒，适合 AI 分析等长时间请求
-# bind: 监听所有接口的 8080 端口
-# access-logfile: 访问日志输出到 stdout
-# error-logfile: 错误日志输出到 stderr
-# log-level: info 级别日志
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "backend.wsgi:application"]
+# 使用启动脚本，在启动 gunicorn 之前自动运行数据库迁移
+# 使用 bash 执行，避免卷挂载导致的权限问题
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
