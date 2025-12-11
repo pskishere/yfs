@@ -9,7 +9,7 @@ services:
       - OLLAMA_HOST=http://host.docker.internal:11434
       - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
     volumes:
-      - ./dj:/app
+      - ./backend:/app
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

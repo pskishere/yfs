@@ -6,14 +6,30 @@ YFinance数据获取模块 - 从yfinance获取股票数据
 包含所有可用的yfinance功能：股票信息、历史数据、基本面、期权、分红、持股、内部交易、新闻等
 """
 
-import pandas as pd
-import numpy as np
-import pytz
+import os
 import logging
 from datetime import datetime, timedelta
-import yfinance as yf
 from typing import Dict, List, Any, Optional, Tuple
-from .settings import logger, get_kline_from_cache, save_kline_to_cache
+
+# 在 Python 3.14 下强制使用 protobuf 纯 Python 实现，避免 upb 编译问题
+# 必须在导入任何可能使用 protobuf 的模块之前设置
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
+# 尝试删除可能已加载的 protobuf C 扩展模块
+import sys
+if 'google.protobuf.pyext._message' in sys.modules:
+    del sys.modules['google.protobuf.pyext._message']
+if 'google._upb' in sys.modules:
+    del sys.modules['google._upb']
+
+import numpy as np
+import pandas as pd
+import pytz
+
+# 直接导入 yfinance，如果失败会在导入时抛出异常
+import yfinance as yf
+
+logger = logging.getLogger(__name__)
 
 
 def get_stock_info(symbol: str):
@@ -346,8 +362,7 @@ def get_historical_data(symbol: str, duration: str = '1 D',
                        bar_size: str = '5 mins', exchange: str = '', 
                        currency: str = 'USD'):
     """
-    获取历史数据，支持缓存和增量更新
-    默认缓存至少1年以上数据，保证日期连续性和最新日期为当日
+    获取历史数据（不使用本地缓存，直接调用 yfinance）
     duration: 数据周期，如 '1 D', '1 W', '1 M', '3 M', '1 Y'
     bar_size: K线周期，如 '1 min', '5 mins', '1 hour', '1 day'
     """
@@ -365,72 +380,28 @@ def get_historical_data(symbol: str, duration: str = '1 D',
         }
         
         yf_interval = interval_map.get(bar_size, '1d')
-        
-        cached_df = get_kline_from_cache(symbol)
-        
-        today = pd.Timestamp.now().normalize().tz_localize(None)
-        
         period = _calculate_period_from_duration(duration)
-        if period.endswith('y'):
-            years = int(period.replace('y', ''))
-            required_days = years * 252  # 每年约252个交易日
-        else:
-            required_days = 730
-        
-        required_date = today - timedelta(days=required_days)
-        
-        need_full_refresh = False
-        
-        if cached_df is None or cached_df.empty:
-            need_full_refresh = True
-            logger.info(f"无缓存数据，需要全量获取: {symbol}, {period}")
-        else:
-            if cached_df.index.tzinfo is not None:
-                cached_df.index = cached_df.index.tz_localize(None)
-            
-            first_date = cached_df.index[0]
-            last_date = cached_df.index[-1]
-            
-            if first_date > required_date:
-                logger.info(f"缓存数据不足{duration}（最早: {first_date}, 需要: {required_date}），需要全量刷新")
-                need_full_refresh = True
-            elif last_date.date() < (today - timedelta(days=7)).date():
-                logger.info(f"缓存数据过旧（最新: {last_date}），需要全量刷新")
-                need_full_refresh = True
-        
-        if need_full_refresh:
-            period = _calculate_period_from_duration(duration)
-            logger.info(f"从 yfinance 获取全量数据: {symbol}, {period}")
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=yf_interval)
-            
-            if df.empty:
-                logger.warning(f"无法获取历史数据: {symbol}")
-                return None, {'code': 200, 'message': f'证券 {symbol} 不存在或没有数据'}
-            
-            if 'Volume' not in df.columns:
-                logger.warning(f"警告: {symbol} 的数据中没有 Volume 列，成交量相关指标将无法计算")
-            elif df['Volume'].isna().all():
-                logger.warning(f"警告: {symbol} 的成交量数据全部为 NaN，成交量相关指标将无法计算")
-            elif df['Volume'].isna().any():
-                nan_count = df['Volume'].isna().sum()
-                logger.warning(f"警告: {symbol} 有 {nan_count} 条数据的成交量为 NaN，将使用 0 代替")
-            
-            if df.index.tzinfo is not None:
-                df.index = df.index.tz_localize(None)
-            
-            save_kline_to_cache(symbol, df)
-            logger.info(f"全量数据已缓存: {symbol}, 1day, {len(df)}条, 时间范围: {df.index[0]} - {df.index[-1]}")
-            
-            filtered_df = _filter_by_duration(df, duration)
-            logger.info(f"根据duration={duration}截取数据: {len(filtered_df)}条交易日")
-            return _format_historical_data(filtered_df), None
-        
-        filtered_df = _filter_by_duration(cached_df, duration)
-        logger.info(f"使用缓存数据: {symbol}, 最新: {cached_df.index[-1].date()}, 根据duration={duration}截取: {len(filtered_df)}条交易日")
+        ticker = yf.Ticker(symbol)
+        df = ticker.history(period=period, interval=yf_interval)
+
+        if df.empty:
+            logger.warning(f"无法获取历史数据: {symbol}")
+            return None, {'code': 200, 'message': f'证券 {symbol} 不存在或没有数据'}
+
+        if 'Volume' not in df.columns:
+            logger.warning(f"警告: {symbol} 的数据中没有 Volume 列，成交量相关指标将无法计算")
+        elif df['Volume'].isna().all():
+            logger.warning(f"警告: {symbol} 的成交量数据全部为 NaN，成交量相关指标将无法计算")
+        elif df['Volume'].isna().any():
+            nan_count = df['Volume'].isna().sum()
+            logger.warning(f"警告: {symbol} 有 {nan_count} 条数据的成交量为 NaN，将使用 0 代替")
+
+        if df.index.tzinfo is not None:
+            df.index = df.index.tz_localize(None)
+
+        filtered_df = _filter_by_duration(df, duration)
+        logger.info(f"已获取历史数据: {symbol}, {len(filtered_df)} 条")
         return _format_historical_data(filtered_df), None
-        
-        return _format_historical_data(final_df), None
         
     except Exception as e:
         logger.error(f"获取历史数据失败: {symbol}, 错误: {e}")

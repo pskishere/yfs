@@ -3,10 +3,14 @@
 import os
 import sys
 
+# 在 Python 3.14 下强制使用 protobuf 纯 Python 实现，避免 upb 编译问题
+# 必须在导入任何可能使用 protobuf 的模块之前设置
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dj.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -20,3 +24,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

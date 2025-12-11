@@ -206,7 +206,7 @@ const MainPage: React.FC = () => {
   };
 
   /**
-   * AI分析 - 使用已保存的数据执行AI分析，不阻塞页面
+   * AI分析 - 使用轮询方式获取结果，避免超时
    */
   const runAiAnalysis = async (
     symbol: string,
@@ -218,8 +218,11 @@ const MainPage: React.FC = () => {
     if (!symbol) return;
     setAiStatus('running');
     setAiStatusMsg('AI分析中...');
+    
     try {
       const aiResult = await aiAnalyze(symbol, duration, barSize, model);
+      
+      // 如果立即返回成功结果
       if (aiResult && aiResult.success && aiResult.ai_analysis) {
         const updatedResult = {
           ...(baseResult || analysisResult),
@@ -233,7 +236,61 @@ const MainPage: React.FC = () => {
         setAiStatus('success');
         setAiStatusMsg('AI分析完成');
         message.success('AI分析完成');
-      } else if (aiResult?.message) {
+        return;
+      }
+      
+      // 如果是进行中状态，开始轮询
+      if (aiResult?.status === 'running' || (aiResult as any)?.status === 'running') {
+        setAiStatusMsg('AI分析进行中，等待结果...');
+        
+        let pollCount = 0;
+        const maxPolls = 60; // 最多轮询 60 次（5分钟）
+        const pollInterval = 5000; // 每 5 秒轮询一次
+        
+        const pollForResult = async (): Promise<void> => {
+          try {
+            const statusResult = await getAnalysisStatus(symbol, duration, barSize);
+            
+            if (statusResult && statusResult.success && statusResult.ai_analysis) {
+              // AI 分析完成
+              const updatedResult = {
+                ...(baseResult || analysisResult),
+                ai_analysis: statusResult.ai_analysis,
+                model: statusResult.model,
+                ai_available: statusResult.ai_available,
+              } as AnalysisResult;
+              setAnalysisResult(updatedResult);
+              setAiAnalysisResult(updatedResult);
+              setAiAnalysisDrawerVisible(true);
+              setAiStatus('success');
+              setAiStatusMsg('AI分析完成');
+              message.success('AI分析完成');
+              return;
+            }
+            
+            // 继续轮询
+            pollCount++;
+            if (pollCount < maxPolls) {
+              setTimeout(pollForResult, pollInterval);
+            } else {
+              setAiStatus('error');
+              setAiStatusMsg('AI分析超时，请稍后重试');
+              message.warning('AI分析超时，请稍后重试');
+            }
+          } catch (pollError: any) {
+            setAiStatus('error');
+            setAiStatusMsg(pollError?.message || 'AI分析失败');
+            message.warning(pollError?.message || 'AI分析失败');
+          }
+        };
+        
+        // 延迟 2 秒后开始第一次轮询
+        setTimeout(pollForResult, 2000);
+        return;
+      }
+      
+      // 其他错误情况
+      if (aiResult?.message) {
         setAiStatus('error');
         setAiStatusMsg(aiResult.message);
         message.warning(aiResult.message);
@@ -242,9 +299,51 @@ const MainPage: React.FC = () => {
         setAiStatusMsg('AI分析不可用');
       }
     } catch (e: any) {
-      setAiStatus('error');
-      setAiStatusMsg(e?.message || 'AI分析失败');
-      message.warning(e?.message || 'AI分析失败，但数据已成功获取');
+      // 处理 202 状态码或其他错误
+      if (e?.response?.status === 202) {
+        setAiStatusMsg('AI分析已开始，等待结果...');
+        let pollCount = 0;
+        const maxPolls = 60;
+        const pollInterval = 5000;
+        
+        const pollForResult = async (): Promise<void> => {
+          try {
+            const statusResult = await getAnalysisStatus(symbol, duration, barSize);
+            if (statusResult && statusResult.success && statusResult.ai_analysis) {
+              const updatedResult = {
+                ...(baseResult || analysisResult),
+                ai_analysis: statusResult.ai_analysis,
+                model: statusResult.model,
+                ai_available: statusResult.ai_available,
+              } as AnalysisResult;
+              setAnalysisResult(updatedResult);
+              setAiAnalysisResult(updatedResult);
+              setAiAnalysisDrawerVisible(true);
+              setAiStatus('success');
+              setAiStatusMsg('AI分析完成');
+              message.success('AI分析完成');
+              return;
+            }
+            pollCount++;
+            if (pollCount < maxPolls) {
+              setTimeout(pollForResult, pollInterval);
+            } else {
+              setAiStatus('error');
+              setAiStatusMsg('AI分析超时，请稍后重试');
+              message.warning('AI分析超时，请稍后重试');
+            }
+          } catch (pollError: any) {
+            setAiStatus('error');
+            setAiStatusMsg(pollError?.message || 'AI分析失败');
+            message.warning(pollError?.message || 'AI分析失败');
+          }
+        };
+        setTimeout(pollForResult, 2000);
+      } else {
+        setAiStatus('error');
+        setAiStatusMsg(e?.message || 'AI分析失败');
+        message.warning(e?.message || 'AI分析失败，但数据已成功获取');
+      }
     }
   };
 

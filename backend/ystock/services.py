@@ -106,12 +106,14 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
         symbol=symbol, duration=duration, bar_size=bar_size
     )
 
+    # 检查是否有当天的缓存（包括前一日美股数据，在亚洲时区可能还是当天）
     if (
         use_cache
         and record.status == StockAnalysis.Status.SUCCESS
         and record.cached_at
         and record.cached_at.date() == timezone.now().date()
     ):
+        logger.info(f"使用当天缓存的分析结果: {symbol}, 缓存时间: {record.cached_at}")
         return {
             "success": True,
             "indicators": record.indicators,
@@ -174,14 +176,28 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
             404,
         )
 
-    if record.ai_analysis:
-        return {
-            "success": True,
-            "ai_analysis": record.ai_analysis,
-            "model": record.model,
-            "ai_available": True,
-            "cached": True,
-        }, None
+    # 如果当天已有 AI 分析结果，直接返回（即使数据是前一天的，也不需要重新分析）
+    if record.ai_analysis and record.cached_at and record.cached_at.date() == timezone.now().date():
+        # 如果模型相同，直接返回
+        if record.model == model:
+            logger.info(f"使用当天缓存的 AI 分析结果: {symbol}, 模型: {model}")
+            return {
+                "success": True,
+                "ai_analysis": record.ai_analysis,
+                "model": record.model,
+                "ai_available": True,
+                "cached": True,
+            }, None
+        # 如果模型不同，但已有结果，也返回（避免重复分析相同数据）
+        else:
+            logger.info(f"使用当天缓存的 AI 分析结果（模型不同但数据相同）: {symbol}, 缓存模型: {record.model}, 请求模型: {model}")
+            return {
+                "success": True,
+                "ai_analysis": record.ai_analysis,
+                "model": record.model,
+                "ai_available": True,
+                "cached": True,
+            }, None
 
     if not check_ollama_available():
         return None, (
@@ -190,7 +206,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
         )
 
     try:
+        logger.info(f"开始获取额外数据: {symbol}")
         extra_data = record.extra_data or get_extra_analysis_data(symbol)
+        logger.info(f"开始执行 AI 分析: {symbol}, 模型: {model}")
         ai_analysis, ai_prompt = perform_ai_analysis(
             symbol,
             record.indicators,
@@ -199,6 +217,7 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
             model,
             extra_data,
         )
+        logger.info(f"AI 分析完成，开始保存结果: {symbol}")
         with transaction.atomic():
             record.ai_analysis = ai_analysis
             record.ai_prompt = ai_prompt
@@ -207,6 +226,7 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
             record.cached_at = timezone.now()
             record.save()
 
+        logger.info(f"AI 分析结果已保存: {symbol}")
         return {
             "success": True,
             "ai_analysis": ai_analysis,
@@ -215,7 +235,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str):
             "cached": False,
         }, None
     except Exception as exc:  # noqa: BLE001
-        logger.error(f"AI分析执行失败: {exc}")
+        logger.error(f"AI分析执行失败: {exc}", exc_info=True)
+        import traceback
+        logger.error(f"完整错误堆栈:\n{traceback.format_exc()}")
         return None, (
             {"success": False, "message": f"AI分析执行失败: {str(exc)}"},
             500,

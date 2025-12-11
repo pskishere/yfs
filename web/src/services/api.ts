@@ -11,9 +11,10 @@ import type {
   IndicatorInfoResponse,
 } from '../types/index';
 
-// API基础URL - 默认指向本地Django服务 http://127.0.0.1:8000
-// 如有反向代理或远端环境，请在 .env 中设置 VITE_API_URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+// API基础URL - 在Docker环境中使用相对路径通过nginx反向代理
+// 开发环境可通过 .env 设置 VITE_API_URL 指向本地后端
+// 生产环境（Docker）使用相对路径，nginx会转发到后端
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // 创建axios实例
 const api = axios.create({
@@ -223,7 +224,7 @@ export const aiAnalyze = async (
   duration: string = '5y',
   barSize: string = '1 day',
   model: string = 'deepseek-v3.1:671b-cloud'
-): Promise<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string }> => {
+): Promise<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string; status?: string }> => {
   try {
     const params = new URLSearchParams({
       duration: duration,
@@ -231,15 +232,23 @@ export const aiAnalyze = async (
       model: model,
     });
 
-    const response = await api.post<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string }>(
+    const response = await api.post<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string; status?: string }>(
       `/api/ai-analyze/${symbol.toUpperCase()}?${params.toString()}`,
       {},
       {
-        timeout: 120000, // AI分析可能需要更长时间，增加到120秒
+        timeout: 10000, // 缩短超时时间，因为现在会立即返回
       }
     );
     return handleResponse(response);
-  } catch (error) {
+  } catch (error: any) {
+    // 如果是 202 状态码（Accepted），表示任务已开始，返回进行中状态
+    if (error?.response?.status === 202) {
+      return {
+        success: false,
+        message: error?.response?.data?.message || 'AI分析已开始，请稍后查询结果',
+        status: 'running',
+      };
+    }
     handleError(error);
     throw error;
   }

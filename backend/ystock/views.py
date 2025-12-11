@@ -86,7 +86,7 @@ def health(_: object):
 @require_GET
 def analyze(request, symbol: str):
     """
-    技术分析入口：先看缓存，其次检查是否已有运行中的任务，最后触发任务
+    技术分析入口：优先使用当天缓存，避免重复分析前一天的美股数据
     """
     duration = request.GET.get("duration", "5y")
     bar_size = request.GET.get("bar_size", "1 day")
@@ -94,12 +94,18 @@ def analyze(request, symbol: str):
 
     record = _analysis_record(symbol, duration, bar_size)
 
-    record.mark_running(None)
+    # perform_analysis 内部会检查当天缓存，如果有缓存直接返回
     result, error = perform_analysis(symbol, duration, bar_size, use_cache=True)
     if error:
         record.mark_failed(error[0].get("message", "分析失败"))
         return JsonResponse(clean_nan_values(error[0]), status=error[1])
-    record.mark_success(result | {"cached_at": timezone.now()})
+    
+    # 如果使用了缓存，直接返回
+    if result.get("cached"):
+        return JsonResponse(clean_nan_values(_serialize_record(record)))
+    
+    # 如果没有缓存但分析成功，更新状态（perform_analysis 内部已保存）
+    record.refresh_from_db()
     return JsonResponse(clean_nan_values(_serialize_record(record)))
 
 
@@ -127,29 +133,97 @@ def refresh_analyze(request, symbol: str):
 @require_http_methods(["POST"])
 def ai_analyze(request, symbol: str):
     """
-    AI分析：依赖已有缓存，未缓存则返回提示
+    AI分析：异步执行，立即返回状态，前端通过轮询获取结果
     """
-    duration = request.GET.get("duration", "5y")
-    bar_size = request.GET.get("bar_size", "1 day")
-    symbol = symbol.upper()
+    import logging
+    import threading
+    logger = logging.getLogger(__name__)
+    
+    try:
+        duration = request.GET.get("duration", "5y")
+        bar_size = request.GET.get("bar_size", "1 day")
+        symbol = symbol.upper()
+        model = request.GET.get("model", "deepseek-v3.1:671b-cloud")
+        
+        logger.info(f"收到 AI 分析请求: symbol={symbol}, duration={duration}, bar_size={bar_size}, model={model}")
 
-    record = _analysis_record(symbol, duration, bar_size)
-    if record.status != StockAnalysis.Status.SUCCESS:
+        record = _analysis_record(symbol, duration, bar_size)
+        if record.status != StockAnalysis.Status.SUCCESS:
+            logger.warning(f"基础分析未完成，无法进行 AI 分析: {symbol}")
+            return JsonResponse(
+                {"success": False, "message": "请先完成基础分析再请求AI分析"}, status=400
+            )
+
+        # 检查是否已有当天的 AI 分析结果（包括前一日美股数据，在亚洲时区可能还是当天）
+        if (
+            record.ai_analysis
+            and record.cached_at
+            and record.cached_at.date() == timezone.now().date()
+        ):
+            logger.info(f"使用当天缓存的 AI 分析结果: {symbol}, 模型: {record.model}")
+            payload = _serialize_record(record)
+            payload["success"] = True
+            payload["cached"] = True
+            return JsonResponse(clean_nan_values(payload))
+
+        # 如果正在分析中，返回进行中状态
+        if record.status == StockAnalysis.Status.RUNNING and not record.ai_analysis:
+            logger.info(f"AI 分析正在进行中: {symbol}")
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": "AI分析正在进行中，请稍后查询",
+                    "status": "running",
+                },
+                status=202,
+            )
+
+        # 标记为运行中，异步执行 AI 分析
+        record.mark_running()
+        logger.info(f"开始异步执行 AI 分析: {symbol}")
+
+        def run_ai_analysis():
+            """在后台线程中执行 AI 分析"""
+            try:
+                from django.db import connection
+                # 在新线程中需要关闭旧的数据库连接
+                connection.close()
+                
+                payload, error = perform_ai(symbol, duration, bar_size, model)
+                if error:
+                    logger.error(f"AI 分析执行失败: {error}")
+                    record.mark_failed(error[0].get("message", "AI分析失败"))
+                else:
+                    logger.info(f"AI 分析执行成功: {symbol}")
+                    record.ai_analysis = payload.get("ai_analysis")
+                    record.ai_prompt = payload.get("ai_prompt")
+                    record.model = payload.get("model")
+                    record.status = StockAnalysis.Status.SUCCESS
+                    record.cached_at = timezone.now()
+                    record.save(update_fields=["ai_analysis", "ai_prompt", "model", "status", "cached_at", "updated_at"])
+            except Exception as e:
+                logger.error(f"AI 分析后台执行异常: {e}", exc_info=True)
+                record.mark_failed(f"AI分析异常: {str(e)}")
+
+        # 启动后台线程执行 AI 分析
+        thread = threading.Thread(target=run_ai_analysis, daemon=True)
+        thread.start()
+
+        # 立即返回，让前端轮询获取结果
         return JsonResponse(
-            {"success": False, "message": "请先完成基础分析再请求AI分析"}, status=400
+            {
+                "success": False,
+                "message": "AI分析已开始，请稍后查询结果",
+                "status": "running",
+            },
+            status=202,
         )
-
-    model = request.GET.get("model", "deepseek-v3.1:671b-cloud")
-    payload, error = perform_ai(symbol, duration, bar_size, model)
-    if error:
-        return JsonResponse(clean_nan_values(error[0]), status=error[1])
-    record.ai_analysis = payload.get("ai_analysis")
-    record.model = payload.get("model")
-    record.status = StockAnalysis.Status.SUCCESS
-    record.cached_at = timezone.now()
-    record.save(update_fields=["ai_analysis", "model", "status", "cached_at", "updated_at"])
-
-    return JsonResponse(clean_nan_values(payload))
+    except Exception as e:
+        logger.error(f"AI 分析视图处理异常: {e}", exc_info=True)
+        return JsonResponse(
+            {"success": False, "message": f"服务器内部错误: {str(e)}"},
+            status=500
+        )
 
 
 @require_GET

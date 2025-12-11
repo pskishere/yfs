@@ -22,6 +22,13 @@ from .indicators import (
     calculate_ichimoku
 )
 from .indicators.ml_predictions import calculate_ml_predictions
+
+# 直接导入 ollama，如果失败会在导入时抛出异常
+try:
+    import ollama
+except ImportError:
+    ollama = None  # 如果未安装，设置为 None，在需要时检查
+
 logger = logging.getLogger(__name__)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 DEFAULT_AI_MODEL = os.getenv("DEFAULT_AI_MODEL", "deepseek-v3.1:671b-cloud")
@@ -503,25 +510,20 @@ def check_ollama_available():
     """
     检查 Ollama 是否可用
     """
+    if ollama is None:
+        return False
+    
+    import requests
+    
+    ollama_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
     try:
-        import ollama
-        import requests
-        
-        ollama_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
-        
-        try:
-            response = requests.get(f'{ollama_host}/api/tags', timeout=2)
-            if response.status_code == 200:
-                try:
-                    client = ollama.Client(host=ollama_host)
-                    client.list()
-                    return True
-                except Exception:
-                    return True
-            return False
-        except Exception:
-            return False
-    except ImportError:
+        # 检查服务是否可达
+        response = requests.get(f'{ollama_host}/api/tags', timeout=5)
+        if response.status_code == 200:
+            return True
+        return False
+    except Exception as e:
+        logger.debug(f"Ollama 服务不可用: {e}")
         return False
 
 
@@ -537,9 +539,10 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
     """
     执行AI分析的辅助函数
     """
+    if ollama is None:
+        raise RuntimeError("ollama 模块未安装，无法执行 AI 分析")
+    
     try:
-        import ollama
-        
         # 确保所有可能用于格式化的值不是None
         indicators = indicators or {}
         signals = signals or {}
@@ -1332,19 +1335,21 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
                 import traceback
                 traceback.print_exc()
                 raise format_error
-
+        
         ollama_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
-        try:
-            client = ollama.Client(host=ollama_host)
-        except Exception:
-            client = None
-        response = (client.chat if client else ollama.chat)(
+        ollama_timeout = int(os.getenv('OLLAMA_TIMEOUT', '240'))
+        logger.info(f"使用 Ollama 主机: {ollama_host}, 模型: {model}, 超时: {ollama_timeout}秒")
+        
+        client = ollama.Client(host=ollama_host, timeout=ollama_timeout)
+        logger.info(f"开始发送 AI 分析请求，模型: {model}")
+        response = client.chat(
             model=model,
             messages=[{
                 'role': 'user',
                 'content': prompt
             }]
         )
+        logger.info(f"Ollama AI 分析请求成功，响应长度: {len(response.get('message', {}).get('content', ''))}")
         
         ai_result = response['message']['content']
         

@@ -98,14 +98,14 @@ export const IndicatorLabel: React.FC<IndicatorLabelProps> = ({ label, indicator
   return (
     <Space>
       <span>{label}</span>
-      <QuestionCircleOutlined
-        style={{
-          color: '#1890ff',
-          cursor: 'pointer',
-          fontSize: 12,
-        }}
+        <QuestionCircleOutlined
+          style={{
+            color: '#1890ff',
+            cursor: 'pointer',
+            fontSize: 12,
+          }}
         onClick={() => setOpen(true)}
-      />
+        />
       <Drawer
         title={info.name}
         placement="left"
