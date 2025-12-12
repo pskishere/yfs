@@ -1,14 +1,25 @@
-from django.tasks import task
+"""
+后台任务模块 - 异步执行股票分析任务
+"""
 from django.utils import timezone
 
 from .models import StockAnalysis
 from .services import perform_analysis
 
 
-@task()
 def run_analysis(record_id: int, symbol: str, duration: str, bar_size: str, use_cache: bool = True) -> dict:
     """
     后台任务：执行单只股票的分析并写入数据库
+    
+    Args:
+        record_id: 分析记录ID
+        symbol: 股票代码
+        duration: 数据周期
+        bar_size: K线周期
+        use_cache: 是否使用缓存
+        
+    Returns:
+        任务执行结果字典
     """
     record = StockAnalysis.objects.get(id=record_id)
     try:

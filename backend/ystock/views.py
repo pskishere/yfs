@@ -1,6 +1,11 @@
+"""
+视图模块 - 处理 HTTP 请求和响应
+"""
 import json
-from datetime import timedelta
+import logging
+import threading
 from pathlib import Path
+from typing import Any, Dict
 
 from django.http import JsonResponse
 from django.utils import timezone
@@ -8,7 +13,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from .models import StockAnalysis, StockInfo
-from .tasks import run_analysis
 from .services import (
     clean_nan_values,
     perform_ai,
@@ -24,10 +28,15 @@ from .services import (
     fetch_comprehensive,
 )
 
+logger = logging.getLogger(__name__)
 
-def _load_indicator_info() -> dict:
+
+def _load_indicator_info() -> Dict[str, Any]:
     """
     读取本地指标说明文件，失败时返回空字典
+    
+    Returns:
+        指标信息字典
     """
     info_path = Path(__file__).resolve().parent / "indicator_info.json"
     if not info_path.exists():
@@ -48,9 +57,15 @@ def _analysis_record(symbol: str, duration: str, bar_size: str) -> StockAnalysis
     return record
 
 
-def _serialize_record(record: StockAnalysis) -> dict:
+def _serialize_record(record: StockAnalysis) -> Dict[str, Any]:
     """
     将分析记录转换为响应体
+    
+    Args:
+        record: 股票分析记录对象
+        
+    Returns:
+        序列化后的响应字典
     """
     currency_code = None
     currency_symbol = None
@@ -81,9 +96,12 @@ def _serialize_record(record: StockAnalysis) -> dict:
 
 
 @require_GET
-def health(_: object):
+def health(_: object) -> JsonResponse:
     """
-    健康检查
+    健康检查接口
+    
+    Returns:
+        JSON 响应，包含服务状态和时间戳
     """
     return JsonResponse(
         {
@@ -95,9 +113,16 @@ def health(_: object):
 
 
 @require_GET
-def analyze(request, symbol: str):
+def analyze(request, symbol: str) -> JsonResponse:
     """
     技术分析入口：优先使用当天缓存，避免重复分析前一天的美股数据
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含分析结果
     """
     duration = request.GET.get("duration", "5y")
     bar_size = request.GET.get("bar_size", "1 day")
@@ -122,9 +147,16 @@ def analyze(request, symbol: str):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def refresh_analyze(request, symbol: str):
+def refresh_analyze(request, symbol: str) -> JsonResponse:
     """
     强制刷新分析：无视缓存直接重新排队
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含分析结果
     """
     duration = request.GET.get("duration", "5y")
     bar_size = request.GET.get("bar_size", "1 day")
@@ -142,14 +174,17 @@ def refresh_analyze(request, symbol: str):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def ai_analyze(request, symbol: str):
+def ai_analyze(request, symbol: str) -> JsonResponse:
     """
     AI分析：异步执行，立即返回状态，前端通过轮询获取结果
-    """
-    import logging
-    import threading
-    logger = logging.getLogger(__name__)
     
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含分析状态或结果
+    """
     try:
         duration = request.GET.get("duration", "5y")
         bar_size = request.GET.get("bar_size", "1 day")
@@ -212,7 +247,7 @@ def ai_analyze(request, symbol: str):
                     record.status = StockAnalysis.Status.SUCCESS
                     record.cached_at = timezone.now()
                     record.save(update_fields=["ai_analysis", "ai_prompt", "model", "status", "cached_at", "updated_at"])
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"AI 分析后台执行异常: {e}", exc_info=True)
                 record.mark_failed(f"AI分析异常: {str(e)}")
 
@@ -229,7 +264,7 @@ def ai_analyze(request, symbol: str):
             },
             status=202,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"AI 分析视图处理异常: {e}", exc_info=True)
         return JsonResponse(
             {"success": False, "message": f"服务器内部错误: {str(e)}"},
@@ -238,9 +273,15 @@ def ai_analyze(request, symbol: str):
 
 
 @require_GET
-def hot_stocks(request):
+def hot_stocks(request) -> JsonResponse:
     """
     返回近期分析过的热门股票
+    
+    Args:
+        request: HTTP 请求对象
+        
+    Returns:
+        JSON 响应，包含热门股票列表
     """
     limit = int(request.GET.get("limit", 20))
     rows = (
@@ -248,8 +289,6 @@ def hot_stocks(request):
         .order_by("-updated_at")[:limit]
     )
     stocks = []
-    from .models import StockInfo  # 局部导入避免循环
-
     for r in rows:
         info = StockInfo.objects.filter(symbol=r.symbol).first()
         stocks.append(
@@ -263,9 +302,16 @@ def hot_stocks(request):
 
 
 @require_GET
-def fundamental(request, symbol: str):
+def fundamental(request, symbol: str) -> JsonResponse:
     """
     获取基本面数据
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含基本面数据
     """
     symbol = symbol.upper()
     try:
@@ -278,9 +324,16 @@ def fundamental(request, symbol: str):
 
 
 @require_GET
-def analysis_status(request, symbol: str):
+def analysis_status(request, symbol: str) -> JsonResponse:
     """
     查询分析任务状态
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含分析状态或结果
     """
     duration = request.GET.get("duration", "5y")
     bar_size = request.GET.get("bar_size", "1 day")
@@ -322,9 +375,16 @@ def analysis_status(request, symbol: str):
 
 
 @require_GET
-def institutional(request, symbol: str):
+def institutional(request, symbol: str) -> JsonResponse:
     """
     获取机构持仓
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含机构持仓数据
     """
     symbol = symbol.upper()
     try:
@@ -335,9 +395,16 @@ def institutional(request, symbol: str):
 
 
 @require_GET
-def insider(request, symbol: str):
+def insider(request, symbol: str) -> JsonResponse:
     """
     获取内部交易
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含内部交易数据
     """
     symbol = symbol.upper()
     try:
@@ -348,9 +415,16 @@ def insider(request, symbol: str):
 
 
 @require_GET
-def recommendations(request, symbol: str):
+def recommendations(request, symbol: str) -> JsonResponse:
     """
     获取分析师推荐
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含分析师推荐数据
     """
     symbol = symbol.upper()
     try:
@@ -361,9 +435,16 @@ def recommendations(request, symbol: str):
 
 
 @require_GET
-def earnings(request, symbol: str):
+def earnings(request, symbol: str) -> JsonResponse:
     """
     获取收益数据
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含收益数据
     """
     symbol = symbol.upper()
     try:
@@ -374,9 +455,16 @@ def earnings(request, symbol: str):
 
 
 @require_GET
-def news(request, symbol: str):
+def news(request, symbol: str) -> JsonResponse:
     """
     获取股票新闻
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含新闻数据
     """
     symbol = symbol.upper()
     limit = int(request.GET.get("limit", 50))
@@ -388,9 +476,16 @@ def news(request, symbol: str):
 
 
 @require_GET
-def options(request, symbol: str):
+def options(request, symbol: str) -> JsonResponse:
     """
     获取期权数据
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含期权数据
     """
     symbol = symbol.upper()
     try:
@@ -403,9 +498,16 @@ def options(request, symbol: str):
 
 
 @require_GET
-def comprehensive(request, symbol: str):
+def comprehensive(request, symbol: str) -> JsonResponse:
     """
     全面股票分析
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含综合分析结果
     """
     symbol = symbol.upper()
     include_options = request.GET.get("include_options", "false").lower() == "true"
@@ -421,9 +523,16 @@ def comprehensive(request, symbol: str):
 
 
 @require_GET
-def all_data(request, symbol: str):
+def all_data(request, symbol: str) -> JsonResponse:
     """
     获取股票所有原始数据
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含所有原始数据
     """
     symbol = symbol.upper()
     include_options = request.GET.get("include_options", "false").lower() == "true"
@@ -439,9 +548,15 @@ def all_data(request, symbol: str):
 
 
 @require_GET
-def indicator_info(request):
+def indicator_info(request) -> JsonResponse:
     """
     返回指标说明，可按名称过滤
+    
+    Args:
+        request: HTTP 请求对象
+        
+    Returns:
+        JSON 响应，包含指标说明信息
     """
     indicator_name = request.GET.get("indicator", "").lower()
     indicator_info_map = _load_indicator_info()
@@ -463,9 +578,15 @@ def indicator_info(request):
 
 
 @require_GET
-def index(_: object):
+def index(_: object) -> JsonResponse:
     """
     首页列出可用接口
+    
+    Args:
+        _: HTTP 请求对象（未使用）
+        
+    Returns:
+        JSON 响应，包含服务信息和可用接口列表
     """
     return JsonResponse(
         {
@@ -495,9 +616,16 @@ def index(_: object):
 
 @csrf_exempt
 @require_http_methods(["DELETE", "POST"])
-def delete_stock(request, symbol: str):
+def delete_stock(request, symbol: str) -> JsonResponse:
     """
     删除指定股票的缓存分析数据和基本信息
+    
+    Args:
+        request: HTTP 请求对象
+        symbol: 股票代码
+        
+    Returns:
+        JSON 响应，包含删除结果
     """
     symbol = symbol.upper()
     deleted_analysis, _ = StockAnalysis.objects.filter(symbol=symbol).delete()

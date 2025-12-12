@@ -1,4 +1,7 @@
-from django.http import HttpResponse
+"""
+CORS 中间件模块 - 处理跨域请求
+"""
+from django.http import HttpRequest, HttpResponse
 
 
 class SimpleCorsMiddleware:
@@ -7,9 +10,24 @@ class SimpleCorsMiddleware:
     """
 
     def __init__(self, get_response):
+        """
+        初始化中间件
+        
+        Args:
+            get_response: Django 的 get_response 函数
+        """
         self.get_response = get_response
 
-    def __call__(self, request):
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        """
+        处理请求，添加 CORS 头
+        
+        Args:
+            request: HTTP 请求对象
+            
+        Returns:
+            HTTP 响应对象
+        """
         if request.method == "OPTIONS":
             response = HttpResponse()
         else:

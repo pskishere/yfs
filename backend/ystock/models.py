@@ -1,3 +1,8 @@
+"""
+数据模型模块 - 定义数据库模型
+"""
+from typing import Dict, Optional
+
 from django.db import models
 
 
@@ -37,18 +42,24 @@ class StockAnalysis(models.Model):
         unique_together = ("symbol", "duration", "bar_size")
         ordering = ("-updated_at",)
 
-    def mark_running(self, task_result_id: str | None = None):
+    def mark_running(self, task_result_id: Optional[str] = None) -> None:
         """
         将记录标记为运行中，便于接口层避免重复触发
+        
+        Args:
+            task_result_id: 任务结果ID（可选）
         """
         self.status = self.Status.RUNNING
         self.task_result_id = task_result_id
         self.error_message = None
         self.save(update_fields=["status", "task_result_id", "error_message", "updated_at"])
 
-    def mark_success(self, payload: dict):
+    def mark_success(self, payload: Dict) -> None:
         """
         将分析结果落库并标记成功
+        
+        Args:
+            payload: 包含分析结果的字典
         """
         self.indicators = payload.get("indicators")
         self.signals = payload.get("signals")
@@ -61,9 +72,12 @@ class StockAnalysis(models.Model):
         self.cached_at = payload.get("cached_at")
         self.save()
 
-    def mark_failed(self, message: str):
+    def mark_failed(self, message: str) -> None:
         """
         记录错误信息并标记失败
+        
+        Args:
+            message: 错误消息
         """
         self.status = self.Status.FAILED
         self.error_message = message
