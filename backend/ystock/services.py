@@ -2,7 +2,6 @@
 服务层模块 - 处理股票分析业务逻辑
 """
 import logging
-import math
 from typing import Any, Dict, Tuple
 
 from django.db import transaction
@@ -21,6 +20,7 @@ from .utils import (
     extract_stock_name,
     create_error_response,
     create_success_response,
+    clean_nan_values,
 )
 from .yfinance import (
     get_stock_info,
@@ -36,26 +36,6 @@ from .yfinance import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def clean_nan_values(obj: Any) -> Any:
-    """
-    清洗 NaN/inf 值，保证 JSON 可序列化
-    
-    Args:
-        obj: 需要清洗的对象（可以是字典、列表、浮点数等）
-        
-    Returns:
-        清洗后的对象，NaN 和 inf 值被替换为 None
-    """
-    if isinstance(obj, dict):
-        return {k: clean_nan_values(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [clean_nan_values(i) for i in obj]
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-    return obj
 
 
 def save_stock_info_if_available(symbol: str) -> Dict[str, Any] | None:
@@ -203,10 +183,11 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
         result["extra_data"] = payload_extra
 
     with transaction.atomic():
-        record.indicators = result.get("indicators")
-        record.signals = result.get("signals")
-        record.candles = result.get("candles")
-        record.extra_data = result.get("extra_data")
+        # 清洗数据中的 NaN/inf 值，确保 JSON 字段有效
+        record.indicators = clean_nan_values(result.get("indicators"))
+        record.signals = clean_nan_values(result.get("signals"))
+        record.candles = clean_nan_values(result.get("candles"))
+        record.extra_data = clean_nan_values(result.get("extra_data"))
         record.status = StockAnalysis.Status.SUCCESS
         record.cached_at = timezone.now()
         record.error_message = None

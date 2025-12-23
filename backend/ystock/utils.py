@@ -2,10 +2,31 @@
 工具函数模块 - 通用辅助函数
 """
 import logging
+import math
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def clean_nan_values(obj: Any) -> Any:
+    """
+    清洗 NaN/inf 值，保证 JSON 可序列化
+    
+    Args:
+        obj: 需要清洗的对象（可以是字典、列表、浮点数等）
+        
+    Returns:
+        清洗后的对象，NaN 和 inf 值被替换为 None
+    """
+    if isinstance(obj, dict):
+        return {k: clean_nan_values(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [clean_nan_values(i) for i in obj]
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+    return obj
 
 
 def format_candle_data(hist_data: List[Dict]) -> List[Dict]:

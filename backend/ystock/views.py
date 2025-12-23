@@ -14,7 +14,6 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from .models import StockAnalysis, StockInfo
 from .services import (
-    clean_nan_values,
     perform_ai,
     perform_analysis,
     fetch_fundamental,
@@ -27,6 +26,7 @@ from .services import (
     fetch_all_data,
     fetch_comprehensive,
 )
+from .utils import clean_nan_values
 
 logger = logging.getLogger(__name__)
 

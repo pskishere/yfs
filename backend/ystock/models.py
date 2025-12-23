@@ -5,6 +5,8 @@ from typing import Dict, Optional
 
 from django.db import models
 
+from .utils import clean_nan_values
+
 
 class StockAnalysis(models.Model):
     """
@@ -61,10 +63,11 @@ class StockAnalysis(models.Model):
         Args:
             payload: 包含分析结果的字典
         """
-        self.indicators = payload.get("indicators")
-        self.signals = payload.get("signals")
-        self.candles = payload.get("candles")
-        self.extra_data = payload.get("extra_data")
+        # 清洗数据中的 NaN/inf 值，确保 JSON 字段有效
+        self.indicators = clean_nan_values(payload.get("indicators"))
+        self.signals = clean_nan_values(payload.get("signals"))
+        self.candles = clean_nan_values(payload.get("candles"))
+        self.extra_data = clean_nan_values(payload.get("extra_data"))
         self.ai_analysis = payload.get("ai_analysis")
         self.ai_prompt = payload.get("ai_prompt")
         self.model = payload.get("model")
