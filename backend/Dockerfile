@@ -2,6 +2,13 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
+# 配置 Debian 镜像源（使用阿里云镜像）
+RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
+    elif [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list; \
+    fi
+
 # 安装系统依赖
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential python3-dev && \
