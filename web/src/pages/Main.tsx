@@ -517,7 +517,7 @@ const MainPage: React.FC = () => {
       const { symbol, duration, barSize, model } = values;
       const durationValue = duration || '5y';
       const barSizeValue = barSize || '1 day';
-      const modelValue = model || 'deepseek-v3.1:671b-cloud';
+      const modelValue = model || 'deepseek-v3.2:cloud';
 
       console.log('开始获取数据:', symbol, durationValue, barSizeValue);
       dataResult = await analyze(symbol, durationValue, barSizeValue);
@@ -574,7 +574,7 @@ const MainPage: React.FC = () => {
     const formValues = analyzeForm.getFieldsValue();
     const duration = formValues.duration || '5y';
     const barSize = formValues.barSize || '1 day';
-    const model = formValues.model || 'deepseek-v3.1:671b-cloud';
+    const model = formValues.model || 'deepseek-v3.2:cloud';
 
     setAnalysisLoading(true);
     setAnalysisResult(null);
@@ -913,7 +913,7 @@ const MainPage: React.FC = () => {
               initialValues={{
                 duration: '5y',
                 barSize: '1 day',
-                model: 'deepseek-v3.1:671b-cloud',
+                model: 'deepseek-v3.2:cloud',
               }}
               style={{ marginBottom: 0, width: '100%', display: 'flex', gap: '8px' }}
             >
@@ -980,15 +980,91 @@ const MainPage: React.FC = () => {
                   {/* 价格概览 */}
                   <div>
                     {/* 操作按钮区域 */}
-                    <Space style={{ marginBottom: 16 }}>
+                    <div style={{ marginBottom: 16 }}>
+                      {isMobile ? (
+                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                          <Select
+                            placeholder="AI 模型"
+                            style={{ width: '100%' }}
+                            value={analyzeForm.getFieldValue('model') || 'deepseek-v3.2:cloud'}
+                            onChange={(value) => {
+                              analyzeForm.setFieldsValue({ model: value });
+                            }}
+                            options={[
+                              { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:cloud' },
+                              { label: 'Qwen3 Next 80B', value: 'qwen3-next:80b-cloud' },
+                              { label: 'GPT-OSS 20B', value: 'gpt-oss:20b' },
+                              { label: 'DeepSeek V3.2', value: 'deepseek-v3.2:cloud' },
+                              { label: 'DeepSeek V3.1', value: 'deepseek-v3.1:671b-cloud' },
+                            ]}
+                            showSearch
+                            filterOption={(input, option) =>
+                              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                            }
+                          />
+                          <Space wrap style={{ width: '100%' }}>
+                            <Button
+                              type="default"
+                              icon={<ReloadOutlined />}
+                              onClick={handleRefreshAnalyze}
+                              loading={analysisLoading}
+                            >
+                              刷新
+                            </Button>
+                            <Button
+                              type="default"
+                              icon={<RobotOutlined />}
+                              disabled={!currentSymbol || aiStatus === 'running' || !analysisResult}
+                              onClick={() => {
+                                const formValues = analyzeForm.getFieldsValue();
+                                const duration = formValues.duration || '5y';
+                                const barSize = formValues.barSize || '1 day';
+                                const model = formValues.model || 'deepseek-v3.2:cloud';
+                                runAiAnalysis(currentSymbol, duration, barSize, model, analysisResult);
+                              }}
+                            >
+                              AI分析
+                            </Button>
+                            <Button
+                              type="default"
+                              icon={<ShareAltOutlined />}
+                              onClick={handleShare}
+                              disabled={!currentSymbol}
+                            >
+                              分享
+                            </Button>
+                            <Tag color={aiStatusColorMap[aiStatus]}>{aiStatusMsg}</Tag>
+                          </Space>
+                        </Space>
+                      ) : (
+                        <Space wrap style={{ marginBottom: 0 }}>
                           <Button
                             type="default"
                             icon={<ReloadOutlined />}
                             onClick={handleRefreshAnalyze}
                             loading={analysisLoading}
                           >
-                        刷新
+                            刷新
                           </Button>
+                          <Select
+                            placeholder="AI 模型"
+                            style={{ width: 200 }}
+                            value={analyzeForm.getFieldValue('model') || 'deepseek-v3.2:cloud'}
+                            onChange={(value) => {
+                              analyzeForm.setFieldsValue({ model: value });
+                            }}
+                            options={[
+                              { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:cloud' },
+                              { label: 'Qwen3 Next 80B', value: 'qwen3-next:80b-cloud' },
+                              { label: 'GPT-OSS 20B', value: 'gpt-oss:20b' },
+                              { label: 'DeepSeek V3.2', value: 'deepseek-v3.2:cloud' },
+                              { label: 'DeepSeek V3.1', value: 'deepseek-v3.1:671b-cloud' },
+                            ]}
+                            showSearch
+                            filterOption={(input, option) =>
+                              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                            }
+                          />
                           <Button
                             type="default"
                             icon={<RobotOutlined />}
@@ -997,7 +1073,7 @@ const MainPage: React.FC = () => {
                               const formValues = analyzeForm.getFieldsValue();
                               const duration = formValues.duration || '5y';
                               const barSize = formValues.barSize || '1 day';
-                              const model = formValues.model || 'deepseek-v3.1:671b-cloud';
+                              const model = formValues.model || 'deepseek-v3.2:cloud';
                               runAiAnalysis(currentSymbol, duration, barSize, model, analysisResult);
                             }}
                           >
@@ -1012,7 +1088,9 @@ const MainPage: React.FC = () => {
                             分享
                           </Button>
                           <Tag color={aiStatusColorMap[aiStatus]}>{aiStatusMsg}</Tag>
-                    </Space>
+                        </Space>
+                      )}
+                    </div>
                     
                     <Descriptions
                       title={
@@ -2764,6 +2842,11 @@ const MainPage: React.FC = () => {
           <span>
             <RobotOutlined style={{ marginRight: 8 }} />
             AI 分析报告
+            {aiAnalysisResult?.model && (
+              <span style={{ marginLeft: 12, fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
+                ({aiAnalysisResult.model})
+              </span>
+            )}
           </span>
         }
         placement="right"

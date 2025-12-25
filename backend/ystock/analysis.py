@@ -31,7 +31,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-DEFAULT_AI_MODEL = os.getenv("DEFAULT_AI_MODEL", "deepseek-v3.1:671b-cloud")
+DEFAULT_AI_MODEL = os.getenv("DEFAULT_AI_MODEL", "deepseek-v3.2:cloud")
 
 
 def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size: str = '1 day'):

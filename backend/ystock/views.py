@@ -189,7 +189,7 @@ def ai_analyze(request, symbol: str) -> JsonResponse:
         duration = request.GET.get("duration", "5y")
         bar_size = request.GET.get("bar_size", "1 day")
         symbol = symbol.upper()
-        model = request.GET.get("model", "deepseek-v3.1:671b-cloud")
+        model = request.GET.get("model", "deepseek-v3.2:cloud")
         
         logger.info(f"收到 AI 分析请求: symbol={symbol}, duration={duration}, bar_size={bar_size}, model={model}")
 
@@ -201,10 +201,12 @@ def ai_analyze(request, symbol: str) -> JsonResponse:
             )
 
         # 检查是否已有当天的 AI 分析结果（包括前一日美股数据，在亚洲时区可能还是当天）
+        # 只有当模型匹配时才使用缓存
         if (
             record.ai_analysis
             and record.cached_at
             and record.cached_at.date() == timezone.now().date()
+            and record.model == model
         ):
             logger.info(f"使用当天缓存的 AI 分析结果: {symbol}, 模型: {record.model}")
             payload = _serialize_record(record)
