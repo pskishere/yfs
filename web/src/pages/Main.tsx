@@ -994,6 +994,7 @@ const MainPage: React.FC = () => {
                               { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:cloud' },
                               { label: 'Qwen3 Next 80B', value: 'qwen3-next:80b-cloud' },
                               { label: 'GPT-OSS 20B', value: 'gpt-oss:20b' },
+                              { label: 'GPT-OSS 120B', value: 'gpt-oss:120b-cloud' },
                               { label: 'DeepSeek V3.2', value: 'deepseek-v3.2:cloud' },
                               { label: 'DeepSeek V3.1', value: 'deepseek-v3.1:671b-cloud' },
                             ]}
@@ -1057,6 +1058,7 @@ const MainPage: React.FC = () => {
                               { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:cloud' },
                               { label: 'Qwen3 Next 80B', value: 'qwen3-next:80b-cloud' },
                               { label: 'GPT-OSS 20B', value: 'gpt-oss:20b' },
+                              { label: 'GPT-OSS 120B', value: 'gpt-oss:120b-cloud' },
                               { label: 'DeepSeek V3.2', value: 'deepseek-v3.2:cloud' },
                               { label: 'DeepSeek V3.1', value: 'deepseek-v3.1:671b-cloud' },
                             ]}
