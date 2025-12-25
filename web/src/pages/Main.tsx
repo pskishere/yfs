@@ -514,9 +514,10 @@ const MainPage: React.FC = () => {
 
     // 第一步：获取数据并保存到数据库（只在此阶段显示 loading）
     try {
-      const { symbol, duration, barSize } = values;
+      const { symbol, duration, barSize, model } = values;
       const durationValue = duration || '5y';
       const barSizeValue = barSize || '1 day';
+      const modelValue = model || 'deepseek-v3.2:cloud';
 
       console.log('开始获取数据:', symbol, durationValue, barSizeValue);
       dataResult = await analyze(symbol, durationValue, barSizeValue);
@@ -550,6 +551,9 @@ const MainPage: React.FC = () => {
       updateUrlParams(symbol);
       // 数据阶段结束，关闭 loading
       setAnalysisLoading(false);
+
+      // 第二步：非阻塞触发AI分析（不显示转圈）
+      runAiAnalysis(symbol, durationValue, barSizeValue, modelValue, dataResult);
     } catch (error: any) {
       console.error('异常错误:', error);
       message.error(error.message || '分析失败');
@@ -570,6 +574,7 @@ const MainPage: React.FC = () => {
     const formValues = analyzeForm.getFieldsValue();
     const duration = formValues.duration || '5y';
     const barSize = formValues.barSize || '1 day';
+    const model = formValues.model || 'deepseek-v3.2:cloud';
 
     setAnalysisLoading(true);
     setAnalysisResult(null);
@@ -584,6 +589,9 @@ const MainPage: React.FC = () => {
       if (result && result.success) {
         setAnalysisResult(result);
         setAnalysisLoading(false);
+
+        // 第二步：自动触发AI分析（不显示转圈）
+        runAiAnalysis(currentSymbol, duration, barSize, model, result);
       } else {
         setAnalysisLoading(false);
         let errorMsg = result?.message || '刷新失败';
