@@ -171,7 +171,7 @@ const MainPage: React.FC = () => {
   const [aiAnalysisDrawerVisible, setAiAnalysisDrawerVisible] = useState<boolean>(false);
   const [currentSymbol, setCurrentSymbol] = useState<string>('');
   const [aiStatus, setAiStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
-  const [aiStatusMsg, setAiStatusMsg] = useState<string>('等待AI分析');
+  const [aiStatusMsg, setAiStatusMsg] = useState<string>('点击AI分析');
 
   const aiStatusColorMap: Record<typeof aiStatus, 'default' | 'processing' | 'success' | 'error'> = {
     idle: 'default',
@@ -486,11 +486,11 @@ const MainPage: React.FC = () => {
 
     stopAiPolling();
     setAnalysisLoading(true);
-    setAnalysisResult(null);
-    setAiAnalysisResult(null);
-    setAiStatus('idle');
-    setAiStatusMsg('等待AI分析');
-    setNewsPage(1); // 重置新闻页码
+      setAnalysisResult(null);
+      setAiAnalysisResult(null);
+      setAiStatus('idle');
+      setAiStatusMsg('点击AI分析');
+      setNewsPage(1); // 重置新闻页码
 
     let dataResult: any = null;
     const pollStatus = async (
@@ -514,10 +514,9 @@ const MainPage: React.FC = () => {
 
     // 第一步：获取数据并保存到数据库（只在此阶段显示 loading）
     try {
-      const { symbol, duration, barSize, model } = values;
+      const { symbol, duration, barSize } = values;
       const durationValue = duration || '5y';
       const barSizeValue = barSize || '1 day';
-      const modelValue = model || 'deepseek-v3.2:cloud';
 
       console.log('开始获取数据:', symbol, durationValue, barSizeValue);
       dataResult = await analyze(symbol, durationValue, barSizeValue);
@@ -551,9 +550,7 @@ const MainPage: React.FC = () => {
       updateUrlParams(symbol);
       // 数据阶段结束，关闭 loading
       setAnalysisLoading(false);
-
-      // 第二步：非阻塞触发AI分析（不显示转圈）
-      runAiAnalysis(symbol, durationValue, barSizeValue, modelValue, dataResult);
+      // 开始分析时不自动触发AI分析，需要用户手动点击AI分析按钮
     } catch (error: any) {
       console.error('异常错误:', error);
       message.error(error.message || '分析失败');
@@ -579,7 +576,7 @@ const MainPage: React.FC = () => {
     setAnalysisResult(null);
     setAiAnalysisResult(null);
     setAiStatus('idle');
-    setAiStatusMsg('等待AI分析');
+    setAiStatusMsg('点击AI分析');
 
     // 第一步：刷新数据（只在此阶段显示 loading）
     try {
