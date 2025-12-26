@@ -137,6 +137,65 @@ export interface Indicators {
   fundamental_data?: FundamentalData;
   resistance_20d_high?: number;
   support_20d_low?: number;
+  // 周期分析
+  dominant_cycle?: number;
+  cycle_strength?: number;
+  cycle_quality?: 'strong' | 'moderate' | 'weak' | 'none';
+  cycle_position?: number;
+  cycle_phase?: 'early_rise' | 'mid_rise' | 'late_rise' | 'decline';
+  cycle_phase_desc?: string;
+  cycle_suggestion?: string;
+  avg_cycle_length?: number;
+  std_cycle_length?: number;
+  cycle_consistency?: number;
+  cycle_stability?: 'high' | 'medium' | 'low' | 'very_low';
+  cycle_stability_desc?: string;
+  avg_peak_period?: number;
+  avg_trough_period?: number;
+  std_peak_period?: number;
+  std_trough_period?: number;
+  overall_cycle_strength?: number;
+  peak_count?: number;
+  trough_count?: number;
+  fft_cycle?: number;
+  fft_power?: number;
+  avg_autocorrelation?: number;
+  max_autocorrelation?: number;
+  // 多周期检测
+  short_cycles?: number[];
+  short_cycle_strength?: number;
+  medium_cycles?: number[];
+  medium_cycle_strength?: number;
+  long_cycles?: number[];
+  long_cycle_strength?: number;
+  // 周期预测
+  days_from_last_trough?: number;
+  days_to_next_peak?: number;
+  days_to_next_trough?: number;
+  next_turn_type?: 'peak' | 'trough';
+  next_turn_days?: number;
+  next_turn_desc?: string;
+  // 周期振幅
+  avg_cycle_amplitude?: number;
+  max_cycle_amplitude?: number;
+  min_cycle_amplitude?: number;
+  // 周期总结
+  cycle_summary?: string;
+  // 周期时间段详情
+  cycle_periods?: Array<{
+    period_index: number;
+    cycle_type?: 'rise' | 'decline';
+    cycle_type_desc?: string;
+    start_time?: string;
+    end_time?: string;
+    start_index: number;
+    end_index: number;
+    duration: number;
+    high_price: number;
+    high_time?: string;
+    low_price: number;
+    low_time?: string;
+  }>;
   [key: string]: any;
 }
 

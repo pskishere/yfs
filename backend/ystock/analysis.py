@@ -19,7 +19,7 @@ from .indicators import (
     calculate_fibonacci_retracement, get_trend,
     calculate_cci, calculate_adx, calculate_sar,
     calculate_supertrend, calculate_stoch_rsi, calculate_volume_profile,
-    calculate_ichimoku
+    calculate_ichimoku, calculate_cycle_analysis
 )
 from .indicators.ml_predictions import calculate_ml_predictions
 
@@ -139,6 +139,32 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
     if len(closes) >= 52:
         ichimoku_data = calculate_ichimoku(closes, highs, lows)
         result.update(ichimoku_data)
+
+    if len(closes) >= 30:
+        # 获取时间戳信息用于周期分析
+        # 从hist_data中获取date字段，如果没有则从formatted_candles中获取time字段
+        timestamps = []
+        if hist_data:
+            for bar in hist_data:
+                date_str = bar.get('date', '')
+                if date_str:
+                    try:
+                        if len(date_str) == 8:
+                            from datetime import datetime
+                            dt = datetime.strptime(date_str, '%Y%m%d')
+                            timestamps.append(dt.strftime('%Y-%m-%d'))
+                        elif ' ' in date_str:
+                            from datetime import datetime
+                            dt = datetime.strptime(date_str, '%Y%m%d %H:%M:%S')
+                            timestamps.append(dt.strftime('%Y-%m-%d %H:%M:%S'))
+                        else:
+                            timestamps.append(date_str)
+                    except Exception:
+                        timestamps.append(date_str)
+                else:
+                    timestamps.append(None)
+        cycle_data = calculate_cycle_analysis(closes, highs, lows, timestamps if timestamps else None)
+        result.update(cycle_data)
 
     if len(closes) >= 20 and len(valid_volumes) > 0:
         ml_data = calculate_ml_predictions(closes, highs, lows, volumes)

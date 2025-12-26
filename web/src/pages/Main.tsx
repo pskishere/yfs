@@ -574,7 +574,6 @@ const MainPage: React.FC = () => {
     const formValues = analyzeForm.getFieldsValue();
     const duration = formValues.duration || '5y';
     const barSize = formValues.barSize || '1 day';
-    const model = formValues.model || 'deepseek-v3.2:cloud';
 
     setAnalysisLoading(true);
     setAnalysisResult(null);
@@ -589,9 +588,7 @@ const MainPage: React.FC = () => {
       if (result && result.success) {
         setAnalysisResult(result);
         setAnalysisLoading(false);
-
-        // 第二步：自动触发AI分析（不显示转圈）
-        runAiAnalysis(currentSymbol, duration, barSize, model, result);
+        // 刷新时不自动触发AI分析，需要用户手动点击AI分析按钮
       } else {
         setAnalysisLoading(false);
         let errorMsg = result?.message || '刷新失败';
@@ -1021,6 +1018,7 @@ const MainPage: React.FC = () => {
                               const duration = formValues.duration || '5y';
                               const barSize = formValues.barSize || '1 day';
                               const model = formValues.model || 'deepseek-v3.2:cloud';
+                              console.log('手动触发AI分析，使用模型:', model);
                               runAiAnalysis(currentSymbol, duration, barSize, model, analysisResult);
                             }}
                           >
@@ -1605,6 +1603,7 @@ const MainPage: React.FC = () => {
                               });
                             }
 
+
                             return items;
                           })()}
                         />
@@ -1617,6 +1616,397 @@ const MainPage: React.FC = () => {
 
 
 
+
+                  {/* 周期分析 - 详细版 */}
+                  {(analysisResult.indicators.dominant_cycle !== undefined || analysisResult.indicators.avg_cycle_length !== undefined) && (
+                    <Collapse
+                      ghost
+                      defaultActiveKey={['cycle']}
+                      items={[{
+                        key: 'cycle',
+                        label: (
+                          <span>
+                            <BarChartOutlined style={{ marginRight: 8 }} />
+                            周期分析
+                            {analysisResult.indicators.cycle_summary && (
+                              <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
+                                {analysisResult.indicators.cycle_summary}
+                              </span>
+                            )}
+                          </span>
+                        ),
+                        children: (
+                          <div>
+                            {(() => {
+                              const indicators = analysisResult.indicators;
+                              return (
+                                <>
+                            <Descriptions
+                              bordered
+                              column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
+                              size="small"
+                              layout="horizontal"
+                              items={(() => {
+                                const items = [];
+
+                                // 主要周期信息
+                                if (indicators.dominant_cycle !== undefined) {
+                                  items.push({
+                                    label: '主要周期',
+                                    span: 1,
+                                    children: (
+                                      <Space size="small">
+                                        <span style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>
+                                          {indicators.dominant_cycle}天
+                                        </span>
+                                        {indicators.cycle_strength !== undefined && (
+                                          <Tag
+                                            color={
+                                              indicators.cycle_strength >= 0.6 ? 'success' :
+                                                indicators.cycle_strength >= 0.4 ? 'default' :
+                                                  indicators.cycle_strength >= 0.2 ? 'warning' : 'error'
+                                            }
+                                            style={{ fontSize: 11 }}
+                                          >
+                                            {(indicators.cycle_strength * 100).toFixed(0)}%
+                                          </Tag>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 平均周期
+                                if (indicators.avg_cycle_length !== undefined) {
+                                  items.push({
+                                    label: '平均周期',
+                                    span: 1,
+                                    children: (
+                                      <span style={{ fontSize: 14, fontWeight: 500 }}>
+                                        {indicators.avg_cycle_length.toFixed(1)}天
+                                      </span>
+                                    ),
+                                  });
+                                }
+
+                                // 周期质量
+                                if (indicators.cycle_quality) {
+                                  items.push({
+                                    label: '周期质量',
+                                    span: 1,
+                                    children: (
+                                      <Tag
+                                        color={
+                                          indicators.cycle_quality === 'strong' ? 'success' :
+                                            indicators.cycle_quality === 'moderate' ? 'default' :
+                                              indicators.cycle_quality === 'weak' ? 'warning' : 'error'
+                                        }
+                                        style={{ fontSize: 12 }}
+                                      >
+                                        {indicators.cycle_quality === 'strong' ? '强' :
+                                          indicators.cycle_quality === 'moderate' ? '中等' :
+                                            indicators.cycle_quality === 'weak' ? '弱' : '无'}
+                                      </Tag>
+                                    ),
+                                  });
+                                }
+
+                                // 当前阶段
+                                if (indicators.cycle_phase) {
+                                  items.push({
+                                    label: '当前阶段',
+                                    span: 1,
+                                    children: (
+                                      <Space size="small" direction="vertical">
+                                        <Tag
+                                          color={
+                                            indicators.cycle_phase === 'early_rise' ? 'success' :
+                                              indicators.cycle_phase === 'mid_rise' ? 'default' :
+                                                indicators.cycle_phase === 'late_rise' ? 'warning' : 'error'
+                                          }
+                                          style={{ fontSize: 12 }}
+                                        >
+                                          {indicators.cycle_phase === 'early_rise' ? '早期上涨' :
+                                            indicators.cycle_phase === 'mid_rise' ? '中期上涨' :
+                                              indicators.cycle_phase === 'late_rise' ? '后期上涨' : '下跌'}
+                                        </Tag>
+                                        {indicators.cycle_position !== undefined && (
+                                          <div style={{ fontSize: 11, color: '#999' }}>
+                                            周期进度: {(indicators.cycle_position * 100).toFixed(0)}%
+                                            {indicators.days_from_last_trough !== undefined && (
+                                              <span style={{ marginLeft: 4 }}>
+                                                (距低点{indicators.days_from_last_trough}天)
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 多周期检测
+                                if (indicators.short_cycles || indicators.medium_cycles || indicators.long_cycles) {
+                                  items.push({
+                                    label: '多周期检测',
+                                    span: 3,
+                                    children: (
+                                      <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                                        {indicators.short_cycles && indicators.short_cycles.length > 0 && (
+                                          <div>
+                                            <span style={{ fontSize: 13, fontWeight: 500 }}>短周期: </span>
+                                            {indicators.short_cycles.map((cycle, idx) => (
+                                              <Tag key={idx} style={{ marginRight: 4 }}>
+                                                {cycle}天
+                                              </Tag>
+                                            ))}
+                                            {indicators.short_cycle_strength !== undefined && (
+                                              <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
+                                                强度: {(indicators.short_cycle_strength * 100).toFixed(0)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        {indicators.medium_cycles && indicators.medium_cycles.length > 0 && (
+                                          <div>
+                                            <span style={{ fontSize: 13, fontWeight: 500 }}>中周期: </span>
+                                            {indicators.medium_cycles.map((cycle, idx) => (
+                                              <Tag key={idx} color="blue" style={{ marginRight: 4 }}>
+                                                {cycle}天
+                                              </Tag>
+                                            ))}
+                                            {indicators.medium_cycle_strength !== undefined && (
+                                              <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
+                                                强度: {(indicators.medium_cycle_strength * 100).toFixed(0)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        {indicators.long_cycles && indicators.long_cycles.length > 0 && (
+                                          <div>
+                                            <span style={{ fontSize: 13, fontWeight: 500 }}>长周期: </span>
+                                            {indicators.long_cycles.map((cycle, idx) => (
+                                              <Tag key={idx} color="purple" style={{ marginRight: 4 }}>
+                                                {cycle}天
+                                              </Tag>
+                                            ))}
+                                            {indicators.long_cycle_strength !== undefined && (
+                                              <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
+                                                强度: {(indicators.long_cycle_strength * 100).toFixed(0)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 周期振幅
+                                if (indicators.avg_cycle_amplitude !== undefined) {
+                                  items.push({
+                                    label: '周期振幅',
+                                    span: 1,
+                                    children: (
+                                      <Space direction="vertical" size="small">
+                                        <span style={{ fontSize: 14, fontWeight: 500 }}>
+                                          平均: {indicators.avg_cycle_amplitude.toFixed(2)}%
+                                        </span>
+                                        {indicators.max_cycle_amplitude !== undefined && indicators.min_cycle_amplitude !== undefined && (
+                                          <span style={{ fontSize: 12, color: '#999' }}>
+                                            范围: {indicators.min_cycle_amplitude.toFixed(2)}% - {indicators.max_cycle_amplitude.toFixed(2)}%
+                                          </span>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 统计信息
+                                if (indicators.peak_count !== undefined || indicators.trough_count !== undefined) {
+                                  items.push({
+                                    label: '统计信息',
+                                    span: 1,
+                                    children: (
+                                      <Space direction="vertical" size="small">
+                                        <span style={{ fontSize: 13 }}>
+                                          高点: <strong>{indicators.peak_count || 0}</strong>个
+                                        </span>
+                                        <span style={{ fontSize: 13 }}>
+                                          低点: <strong>{indicators.trough_count || 0}</strong>个
+                                        </span>
+                                        {indicators.avg_peak_period !== undefined && (
+                                          <span style={{ fontSize: 12, color: '#999' }}>
+                                            高点平均周期: {indicators.avg_peak_period.toFixed(1)}天
+                                          </span>
+                                        )}
+                                        {indicators.avg_trough_period !== undefined && (
+                                          <span style={{ fontSize: 12, color: '#999' }}>
+                                            低点平均周期: {indicators.avg_trough_period.toFixed(1)}天
+                                          </span>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                return items;
+                              })()}
+                            />
+                            
+                            {/* 周期时间段表格 */}
+                            {indicators.cycle_periods && indicators.cycle_periods.length > 0 ? (
+                              <div style={{ marginTop: 16 }}>
+                                <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>
+                                  周期时间段分析 ({indicators.cycle_periods.length}个周期)
+                                </div>
+                                <Table
+                                  dataSource={indicators.cycle_periods.slice().reverse()}
+                                  columns={[
+                                    {
+                                      title: '周期类型',
+                                      key: 'cycle_type',
+                                      width: 80,
+                                      align: 'center' as const,
+                                      render: (_: any, record: any) => {
+                                        const isRise = record.cycle_type === 'rise';
+                                        return (
+                                          <Tag
+                                            color={isRise ? 'success' : 'error'}
+                                            style={{ fontSize: 12, fontWeight: 500 }}
+                                          >
+                                            {record.cycle_type_desc || (isRise ? '上涨' : '下跌')}
+                                          </Tag>
+                                        );
+                                      },
+                                    },
+                                    {
+                                      title: '起始日期',
+                                      key: 'start_time',
+                                      width: 120,
+                                      render: (_: any, record: any) => {
+                                        const timeStr = record.start_time;
+                                        if (timeStr) {
+                                          return timeStr.split('T')[0].split(' ')[0];
+                                        }
+                                        if (analysisResult.candles && record.start_index < analysisResult.candles.length) {
+                                          const candle = analysisResult.candles[record.start_index];
+                                          if (candle && candle.time) {
+                                            return candle.time.split('T')[0].split(' ')[0];
+                                          }
+                                        }
+                                        return '-';
+                                      },
+                                    },
+                                    {
+                                      title: '起始价格',
+                                      key: 'start_price',
+                                      width: 120,
+                                      render: (_: any, record: any) => {
+                                        const isRise = record.cycle_type === 'rise';
+                                        const startPrice = isRise ? record.low_price : record.high_price;
+                                        return (
+                                          <span style={{ 
+                                            fontWeight: 500, 
+                                            color: isRise ? '#3f8600' : '#cf1322' 
+                                          }}>
+                                            {formatCurrency(startPrice)}
+                                          </span>
+                                        );
+                                      },
+                                    },
+                                    {
+                                      title: '结束日期',
+                                      key: 'end_time',
+                                      width: 120,
+                                      render: (_: any, record: any) => {
+                                        const timeStr = record.end_time;
+                                        if (timeStr) {
+                                          return timeStr.split('T')[0].split(' ')[0];
+                                        }
+                                        if (analysisResult.candles && record.end_index < analysisResult.candles.length) {
+                                          const candle = analysisResult.candles[record.end_index];
+                                          if (candle && candle.time) {
+                                            return candle.time.split('T')[0].split(' ')[0];
+                                          }
+                                        }
+                                        return '-';
+                                      },
+                                    },
+                                    {
+                                      title: '结束价格',
+                                      key: 'end_price',
+                                      width: 120,
+                                      render: (_: any, record: any) => {
+                                        const isRise = record.cycle_type === 'rise';
+                                        const endPrice = isRise ? record.high_price : record.low_price;
+                                        return (
+                                          <span style={{ 
+                                            fontWeight: 500, 
+                                            color: isRise ? '#cf1322' : '#3f8600' 
+                                          }}>
+                                            {formatCurrency(endPrice)}
+                                          </span>
+                                        );
+                                      },
+                                    },
+                                    {
+                                      title: '持续天数',
+                                      dataIndex: 'duration',
+                                      key: 'duration',
+                                      width: 80,
+                                      align: 'center' as const,
+                                      render: (val: number) => `${val}天`,
+                                    },
+                                    {
+                                      title: '振幅',
+                                      key: 'amplitude',
+                                      width: 100,
+                                      align: 'right' as const,
+                                      render: (_: any, record: any) => {
+                                        const isRise = record.cycle_type === 'rise';
+                                        const startPrice = isRise ? record.low_price : record.high_price;
+                                        const endPrice = isRise ? record.high_price : record.low_price;
+                                        // 下跌周期振幅为负数，上涨周期振幅为正数
+                                        const amplitude = ((endPrice - startPrice) / startPrice) * 100;
+                                        return (
+                                          <span style={{ 
+                                            fontSize: 12, 
+                                            color: amplitude >= 0 ? '#cf1322' : '#3f8600' 
+                                          }}>
+                                            {amplitude >= 0 ? '+' : ''}{amplitude.toFixed(2)}%
+                                          </span>
+                                        );
+                                      },
+                                    },
+                                  ]}
+                                  pagination={{
+                                    pageSize: 10,
+                                    showSizeChanger: true,
+                                    showQuickJumper: true,
+                                    showTotal: (total) => `共 ${total} 个周期`,
+                                    pageSizeOptions: ['10', '20', '30', '50'],
+                                    locale: {
+                                      items_per_page: '条/页',
+                                      jump_to: '跳至',
+                                      page: '页',
+                                    },
+                                  }}
+                                  size="small"
+                                  style={{ fontSize: 12 }}
+                                  rowKey={(record, index) => `period-${record.period_index || index}`}
+                                />
+                              </div>
+                            ) : null}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        ),
+                      }]}
+                      style={{ marginTop: 24 }}
+                    />
+                  )}
 
                   {/* 关键价位 */}
                   {(analysisResult.indicators.pivot || analysisResult.indicators.pivot_r1 || analysisResult.indicators.resistance_20d_high) && (

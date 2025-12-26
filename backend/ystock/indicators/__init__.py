@@ -25,6 +25,7 @@ from .supertrend import calculate_supertrend
 from .stoch_rsi import calculate_stoch_rsi
 from .volume_profile import calculate_volume_profile
 from .ichimoku import calculate_ichimoku
+from .cycle import calculate_cycle_analysis
 
 __all__ = [
     'calculate_ma',
@@ -49,5 +50,6 @@ __all__ = [
     'calculate_stoch_rsi',
     'calculate_volume_profile',
     'calculate_ichimoku',
+    'calculate_cycle_analysis',
 ]
 

@@ -78,11 +78,22 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // 创建图表 - TradingView 风格配置
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: height,
-      layout: {
+    const initChart = () => {
+      if (!chartContainerRef.current) return;
+
+      // 确保容器有宽度
+      const containerWidth = chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800;
+      if (containerWidth === 0) {
+        // 如果宽度为0，等待容器渲染完成
+        setTimeout(initChart, 50);
+        return;
+      }
+
+      // 创建图表 - TradingView 风格配置
+      const chart = createChart(chartContainerRef.current, {
+        width: containerWidth,
+        height: height,
+        layout: {
         background: { type: ColorType.Solid, color: theme === 'light' ? '#ffffff' : '#131722' },
         textColor: theme === 'light' ? '#191919' : '#d1d4dc',
         fontSize: 12,
@@ -151,9 +162,9 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
         mouse: true,
         touch: true,
       },
-    });
+      });
 
-    chartRef.current = chart;
+      chartRef.current = chart;
 
     // 设置时间格式化 - 只显示日期，格式为 YYYY-MM-DD
     chart.applyOptions({
@@ -215,22 +226,41 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
       autoScale: true,
     });
 
-    // 响应式调整
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
-      }
+      // 响应式调整
+      const handleResize = () => {
+        if (chartContainerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800,
+          });
+        }
+      };
+
+      window.addEventListener('resize', handleResize);
+
     };
 
-    window.addEventListener('resize', handleResize);
+    initChart();
 
     return () => {
+      const handleResize = () => {
+        if (chartContainerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800,
+          });
+        }
+      };
       window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch (e) {
+          // 忽略清理错误
+        }
         chartRef.current = null;
+        candleSeriesRef.current = null;
+        volumeSeriesRef.current = null;
+        maSeriesRefs.current.clear();
+        bbSeriesRefs.current.clear();
       }
     };
   }, [height, theme]);
@@ -239,36 +269,95 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
    * 更新K线数据
    */
   useEffect(() => {
-    if (!candleSeriesRef.current || !candles || candles.length === 0) return;
-
-    const formattedData = candles.map(candle => ({
-      time: parseTime(candle.time),
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-    }));
-
-    candleSeriesRef.current.setData(formattedData);
-
-    // 更新成交量数据
-    if (volumeSeriesRef.current && candles.length > 0) {
-      const volumeData = candles.map(candle => ({
-        time: parseTime(candle.time),
-        value: candle.volume || 0, // 确保有值
-        color: candle.close >= candle.open 
-          ? '#26a69a80' // 上涨时使用半透明绿色
-          : '#ef535080', // 下跌时使用半透明红色
-      }));
-      volumeSeriesRef.current.setData(volumeData);
+    if (!candles || candles.length === 0) {
+      // 如果没有数据，清空图表
+      if (candleSeriesRef.current) {
+        try {
+          candleSeriesRef.current.setData([]);
+        } catch (e) {
+          console.warn('清空K线数据失败:', e);
+        }
+      }
+      if (volumeSeriesRef.current) {
+        try {
+          volumeSeriesRef.current.setData([]);
+        } catch (e) {
+          console.warn('清空成交量数据失败:', e);
+        }
+      }
+      return;
     }
 
-    // 自动调整显示范围以适应数据
-    if (chartRef.current && formattedData.length > 0) {
-      setTimeout(() => {
-        chartRef.current?.timeScale().fitContent();
-      }, 100);
-    }
+    // 等待图表和系列初始化完成
+    let retryCount = 0;
+    const maxRetries = 20; // 最多重试2秒
+
+    const updateData = () => {
+      if (!candleSeriesRef.current || !chartRef.current) {
+        // 如果还没初始化，延迟重试
+        retryCount++;
+        if (retryCount < maxRetries) {
+          setTimeout(updateData, 100);
+        } else {
+          console.warn('图表初始化超时，无法更新K线数据');
+        }
+        return;
+      }
+
+      try {
+        // 验证数据格式
+        const validCandles = candles.filter(c => 
+          c && 
+          typeof c.time === 'string' && 
+          typeof c.open === 'number' && 
+          typeof c.high === 'number' && 
+          typeof c.low === 'number' && 
+          typeof c.close === 'number'
+        );
+
+        if (validCandles.length === 0) {
+          console.warn('没有有效的K线数据');
+          return;
+        }
+
+        const formattedData = validCandles.map(candle => ({
+          time: parseTime(candle.time),
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+        }));
+
+        candleSeriesRef.current.setData(formattedData);
+
+        // 更新成交量数据
+        if (volumeSeriesRef.current) {
+          const volumeData = validCandles.map(candle => ({
+            time: parseTime(candle.time),
+            value: candle.volume || 0,
+            color: candle.close >= candle.open 
+              ? '#26a69a80'
+              : '#ef535080',
+          }));
+          volumeSeriesRef.current.setData(volumeData);
+        }
+
+        // 自动调整显示范围以适应数据
+        if (formattedData.length > 0) {
+          setTimeout(() => {
+            try {
+              chartRef.current?.timeScale().fitContent();
+            } catch (e) {
+              console.warn('调整图表显示范围失败:', e);
+            }
+          }, 150);
+        }
+      } catch (error) {
+        console.error('更新K线数据失败:', error);
+      }
+    };
+
+    updateData();
   }, [candles]);
 
   /**
