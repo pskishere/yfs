@@ -313,6 +313,109 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                 cycle_periods.append(period_info)
                 period_index += 1
         
+        # 添加当前周期（从最后一个转折点到最新交易日）
+        if len(all_turning_points) >= 1:
+            last_point = all_turning_points[-1]
+            last_idx = last_point['index']
+            current_idx = len(prices) - 1  # 最新交易日的索引
+            
+            # 如果最后一个转折点不是最新交易日，添加当前周期
+            if last_idx < current_idx:
+                start_idx = last_idx
+                start_price = float(prices[start_idx])
+                current_price = float(prices[current_idx])
+                
+                # 当前周期内的价格范围
+                current_period_prices = prices[start_idx:current_idx + 1]
+                current_period_highs = highs[start_idx:current_idx + 1] if start_idx < len(highs) else current_period_prices
+                current_period_lows = lows[start_idx:current_idx + 1] if start_idx < len(lows) else current_period_prices
+                
+                # 找到当前周期内的最高价和最低价
+                max_price_in_current = float(np.max(current_period_highs))
+                min_price_in_current = float(np.min(current_period_lows))
+                max_idx_in_current = start_idx + int(np.argmax(current_period_highs))
+                min_idx_in_current = start_idx + int(np.argmin(current_period_lows))
+                
+                # 判断当前周期的类型
+                if last_point['type'] == 'trough':
+                    # 从低点开始，可能是上涨或横盘
+                    amplitude = ((max_price_in_current - start_price) / start_price) * 100 if start_price > 0 else 0
+                    amplitude_abs = abs(amplitude)
+                    
+                    # 计算基于最新价格的振幅
+                    amplitude_from_current = ((current_price - start_price) / start_price) * 100 if start_price > 0 else 0
+                    
+                    if amplitude_abs < 5.0:
+                        cycle_type = 'sideways'
+                        cycle_type_desc = '窄幅横盘（进行中）'
+                    elif amplitude_abs < 15.0:
+                        if (current_idx - start_idx) > 30:
+                            cycle_type = 'sideways'
+                            cycle_type_desc = '标准横盘（进行中）'
+                        else:
+                            cycle_type = 'rise'
+                            cycle_type_desc = '上涨（进行中）'
+                    else:
+                        cycle_type = 'rise'
+                        cycle_type_desc = '上涨（进行中）'
+                    
+                    current_period_info = {
+                        'period_index': period_index,
+                        'cycle_type': cycle_type,
+                        'cycle_type_desc': cycle_type_desc,
+                        'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                        'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                        'start_index': int(start_idx),
+                        'end_index': int(current_idx),
+                        'duration': int(current_idx - start_idx),
+                        'low_price': start_price,
+                        'low_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                        'high_price': max_price_in_current,
+                        'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
+                        'amplitude': float(amplitude_from_current),  # 使用基于最新价格的振幅
+                        'is_current': True,  # 标记为当前周期
+                    }
+                else:  # last_point['type'] == 'peak'
+                    # 从高点开始，可能是下跌或横盘
+                    amplitude = ((min_price_in_current - start_price) / start_price) * 100 if start_price > 0 else 0
+                    amplitude_abs = abs(amplitude)
+                    
+                    # 计算基于最新价格的振幅
+                    amplitude_from_current = ((current_price - start_price) / start_price) * 100 if start_price > 0 else 0
+                    
+                    if amplitude_abs < 5.0:
+                        cycle_type = 'sideways'
+                        cycle_type_desc = '窄幅横盘（进行中）'
+                    elif amplitude_abs < 15.0:
+                        if (current_idx - start_idx) > 30:
+                            cycle_type = 'sideways'
+                            cycle_type_desc = '标准横盘（进行中）'
+                        else:
+                            cycle_type = 'decline'
+                            cycle_type_desc = '下跌（进行中）'
+                    else:
+                        cycle_type = 'decline'
+                        cycle_type_desc = '下跌（进行中）'
+                    
+                    current_period_info = {
+                        'period_index': period_index,
+                        'cycle_type': cycle_type,
+                        'cycle_type_desc': cycle_type_desc,
+                        'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                        'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                        'start_index': int(start_idx),
+                        'end_index': int(current_idx),
+                        'duration': int(current_idx - start_idx),
+                        'high_price': start_price,
+                        'high_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                        'low_price': min_price_in_current,
+                        'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
+                        'amplitude': float(amplitude_from_current),  # 使用基于最新价格的振幅
+                        'is_current': True,  # 标记为当前周期
+                    }
+                
+                cycle_periods.append(current_period_info)
+        
         # 保留所有检测到的周期（按时间从旧到新排列）
         result['cycle_periods'] = cycle_periods
     
@@ -479,8 +582,83 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
         else:
             result['cycle_quality'] = 'none'
     
-    # 5. 当前周期位置分析和预测
-    if 'dominant_cycle' in result or 'avg_cycle_length' in result:
+    # 5. 当前周期位置分析和预测（基于当前进行中的周期）
+    # 优先使用当前周期（从最后一个转折点到最新交易日）来判断阶段
+    current_period = None
+    if len(cycle_periods) > 0:
+        last_period = cycle_periods[-1]
+        if last_period.get('is_current', False):
+            current_period = last_period
+    
+    if current_period:
+        # 如果有当前周期，使用当前周期的信息判断阶段
+        current_cycle_type = current_period.get('cycle_type')
+        current_amplitude = current_period.get('amplitude', 0)
+        current_duration = current_period.get('duration', 0)
+        
+        if current_cycle_type == 'sideways':
+            # 当前是横盘，阶段信息会在横盘判断中设置
+            result['cycle_phase'] = 'sideways'
+            result['cycle_phase_desc'] = current_period.get('cycle_type_desc', '横盘阶段')
+            result['cycle_suggestion'] = '横盘整理中，等待突破'
+        elif current_cycle_type == 'rise':
+            # 当前是上涨周期，根据持续时间和振幅判断阶段
+            if current_duration <= 5:
+                result['cycle_phase'] = 'early_rise'
+                result['cycle_phase_desc'] = '周期早期上涨阶段（进行中）'
+                result['cycle_suggestion'] = '适合买入，预期还有上涨空间'
+            elif current_duration <= 15:
+                result['cycle_phase'] = 'mid_rise'
+                result['cycle_phase_desc'] = '周期中期上涨阶段（进行中）'
+                result['cycle_suggestion'] = '上涨趋势中，注意接近高点'
+            else:
+                result['cycle_phase'] = 'late_rise'
+                result['cycle_phase_desc'] = '周期后期上涨阶段（进行中）'
+                result['cycle_suggestion'] = '接近周期高点，注意风险'
+            
+            result['days_from_last_trough'] = int(current_duration)
+        elif current_cycle_type == 'decline':
+            # 当前是下跌周期
+            result['cycle_phase'] = 'decline'
+            result['cycle_phase_desc'] = '周期下跌阶段（进行中）'
+            result['cycle_suggestion'] = '下跌趋势中，等待低点'
+            result['days_from_last_peak'] = int(current_duration)
+        
+        # 计算周期位置（如果有周期长度）
+        if 'dominant_cycle' in result or 'avg_cycle_length' in result:
+            cycle_len = result.get('dominant_cycle') or result.get('avg_cycle_length')
+            if cycle_len:
+                if current_cycle_type == 'rise':
+                    # 上涨周期：周期位置 = 当前天数 / 预期周期长度
+                    expected_cycle_length = cycle_len * 0.5  # 上涨周期通常是完整周期的一半
+                    cycle_position = current_duration / expected_cycle_length if expected_cycle_length > 0 else 0
+                    cycle_position = min(1.0, max(0.0, cycle_position))
+                    result['cycle_position'] = float(cycle_position)
+                    result['days_to_next_peak'] = max(0, int(expected_cycle_length - current_duration))
+                    result['days_to_next_trough'] = max(0, int(cycle_len - current_duration))
+                    result['next_turn_type'] = 'peak'
+                    result['next_turn_days'] = result['days_to_next_peak']
+                elif current_cycle_type == 'decline':
+                    # 下跌周期：周期位置 = 0.5 + (当前天数 / 预期周期长度)
+                    expected_cycle_length = cycle_len * 0.5
+                    cycle_position = 0.5 + (current_duration / expected_cycle_length) if expected_cycle_length > 0 else 0.5
+                    cycle_position = min(1.0, max(0.5, cycle_position))
+                    result['cycle_position'] = float(cycle_position)
+                    result['days_to_next_trough'] = max(0, int(expected_cycle_length - current_duration))
+                    result['days_to_next_peak'] = max(0, int(cycle_len - current_duration))
+                    result['next_turn_type'] = 'trough'
+                    result['next_turn_days'] = result['days_to_next_trough']
+                else:
+                    # 横盘周期
+                    result['cycle_position'] = 0.0
+                    result['days_to_next_peak'] = max(0, int(cycle_len * 0.5 - current_duration))
+                    result['days_to_next_trough'] = max(0, int(cycle_len - current_duration))
+                    result['next_turn_type'] = 'peak'
+                    result['next_turn_days'] = result['days_to_next_peak']
+                
+                result['next_turn_desc'] = f'预计{result["next_turn_days"]}天后到达下一个{"高点" if result["next_turn_type"] == "peak" else "低点"}'
+    elif 'dominant_cycle' in result or 'avg_cycle_length' in result:
+        # 如果没有当前周期，使用传统方法判断（基于最近转折点）
         cycle_len = result.get('dominant_cycle') or result.get('avg_cycle_length')
         if cycle_len and len(troughs) >= 1:
             # 计算距离最近低点的周期位置

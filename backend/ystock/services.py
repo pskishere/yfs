@@ -94,9 +94,7 @@ def get_extra_analysis_data(symbol: str) -> Dict[str, Any]:
         news = get_news(symbol, limit=30)
         if news and len(news) > 0:
             extra_data["news"] = news
-            logger.info(f"已添加新闻数据到extra_data: {symbol}, {len(news)}条")
-        else:
-            logger.debug(f"未获取到新闻数据: {symbol}, news={news}")
+            # 移除新闻日志
 
         logger.info(f"已获取额外分析数据: {symbol}, 模块: {list(extra_data.keys())}")
     except Exception as exc:  # noqa: BLE001

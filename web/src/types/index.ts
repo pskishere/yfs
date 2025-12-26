@@ -204,6 +204,7 @@ export interface Indicators {
     high_time?: string;
     low_price: number;
     low_time?: string;
+    is_current?: boolean; // 标记是否为当前进行中的周期
   }>;
   [key: string]: any;
 }

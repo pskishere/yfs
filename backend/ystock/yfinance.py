@@ -1207,7 +1207,7 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
             try:
                 news = ticker.get_news(count=limit)
             except Exception as e:
-                logger.warning(f"使用get_news方法失败，回退到news属性: {e}")
+                # 移除新闻日志
                 news = ticker.news
                 news = news[:limit] if news else []
         else:
@@ -1220,7 +1220,6 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
         result = []
         for idx, item in enumerate(news):
             if not isinstance(item, dict):
-                logger.warning(f"新闻项不是字典类型: {type(item)}")
                 continue
             
             if 'content' in item and isinstance(item['content'], dict):
@@ -1229,9 +1228,6 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
                 content = item
             
             news_item = {}
-            
-            if idx == 0:
-                logger.debug(f"新闻原始数据字段: {list(content.keys())}")
             
             title = content.get('title') or content.get('headline') or content.get('summary') or ''
             news_item['title'] = str(title).strip() if title else None
@@ -1257,31 +1253,11 @@ def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
             
             if news_item.get('title') or news_item.get('link'):
                 result.append(news_item)
-            else:
-                logger.debug(f"跳过无效新闻项: 无标题且无链接")
-            
-            if len(result) == 1:
-                logger.debug(f"第一条新闻处理后的字段: {list(news_item.keys())}, title: '{news_item.get('title')}', publisher: '{news_item.get('publisher')}', link: '{news_item.get('link')}'")
         
-        logger.info(f"已获取新闻: {symbol}, 共{len(result)}条有效新闻")
-        if result:
-            logger.debug(f"新闻数据示例: title='{result[0].get('title')}', publisher='{result[0].get('publisher')}', link='{result[0].get('link')}'")
-            if logger.isEnabledFor(logging.DEBUG):
-                print(f"\n{'='*60}")
-                print(f"📰 新闻数据 ({symbol}): 共{len(result)}条")
-                print(f"{'='*60}")
-                for i, item in enumerate(result, 1):
-                    print(f"\n新闻 {i}:")
-                    print(f"  标题: {item.get('title', 'N/A')}")
-                    print(f"  发布者: {item.get('publisher', 'N/A')}")
-                    print(f"  链接: {item.get('link', 'N/A')}")
-                    print(f"  发布时间: {item.get('providerPublishTime', 'N/A')}")
-                    print(f"  所有字段: {list(item.keys())}")
-                print(f"{'='*60}\n")
         return result
         
     except Exception as e:
-        logger.error(f"获取新闻失败: {symbol}, 错误: {e}")
+        # 移除新闻错误日志
         return None
 
 
