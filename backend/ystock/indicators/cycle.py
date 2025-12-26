@@ -84,14 +84,15 @@ def calculate_autocorrelation(prices, max_lag=None):
     return np.array(autocorr), np.array(lags)
 
 
-def detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=50):
+def detect_cycle_length(autocorr, lags, min_cycle=10, max_cycle=100):
     """
     从自相关函数中检测主要周期长度
+    改进版：排除短期噪声，寻找更显著的周期
     
     参数:
         autocorr: 自相关值数组
         lags: 滞后周期数组
-        min_cycle: 最小周期长度
+        min_cycle: 最小周期长度（提高以避免短期噪声）
         max_cycle: 最大周期长度
     
     返回:
@@ -101,7 +102,7 @@ def detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=50):
     if len(autocorr) == 0 or len(lags) == 0:
         return None, 0.0
     
-    # 过滤有效范围
+    # 过滤有效范围（排除太短的周期，避免噪声）
     valid_mask = (lags >= min_cycle) & (lags <= max_cycle)
     if not np.any(valid_mask):
         return None, 0.0
@@ -109,10 +110,29 @@ def detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=50):
     valid_autocorr = autocorr[valid_mask]
     valid_lags = lags[valid_mask]
     
-    # 找到自相关值最大的周期
-    max_idx = np.argmax(valid_autocorr)
-    dominant_cycle = int(valid_lags[max_idx])
-    cycle_strength = float(valid_autocorr[max_idx])
+    # 使用find_peaks找到所有局部最大值，而不是简单地找全局最大值
+    # 这样可以避免短期噪声干扰
+    from scipy.signal import find_peaks as find_peaks_signal
+    
+    # 寻找所有峰值，要求最小高度和最小距离
+    peaks_idx, properties = find_peaks_signal(
+        valid_autocorr, 
+        height=0.2,  # 最小自相关值
+        distance=max(5, min_cycle // 3)  # 峰值之间的最小距离
+    )
+    
+    if len(peaks_idx) == 0:
+        # 如果没有找到峰值，回退到全局最大值
+        max_idx = np.argmax(valid_autocorr)
+        dominant_cycle = int(valid_lags[max_idx])
+        cycle_strength = float(valid_autocorr[max_idx])
+    else:
+        # 从所有峰值中选择强度最高的
+        peak_strengths = valid_autocorr[peaks_idx]
+        max_peak_idx = np.argmax(peak_strengths)
+        best_peak_idx = peaks_idx[max_peak_idx]
+        dominant_cycle = int(valid_lags[best_peak_idx])
+        cycle_strength = float(valid_autocorr[best_peak_idx])
     
     # 如果周期强度太低，认为没有明显周期
     if cycle_strength < 0.3:
@@ -332,10 +352,24 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
     autocorr, lags = calculate_autocorrelation(prices, max_lag=min(100, len(prices) // 2))
     
     if len(autocorr) > 0:
-        # 检测主要周期
-        dominant_cycle, cycle_strength = detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=50)
+        # 检测主要周期（提高最小周期以避免短期噪声）
+        dominant_cycle, cycle_strength = detect_cycle_length(autocorr, lags, min_cycle=10, max_cycle=100)
         
-        if dominant_cycle:
+        # 优先使用实际检测到的平均周期长度作为主要周期
+        # 因为实际的高低点周期比自相关分析更准确和直观
+        if 'avg_cycle_length' in result and result['avg_cycle_length']:
+            # 使用实际检测到的周期
+            result['dominant_cycle'] = int(result['avg_cycle_length'])
+            # 如果自相关也检测到周期且强度较高，使用自相关的强度
+            # 否则使用基于周期一致性的强度
+            if dominant_cycle and cycle_strength > 0.4:
+                result['cycle_strength'] = cycle_strength
+            elif 'cycle_consistency' in result:
+                result['cycle_strength'] = result['cycle_consistency']
+            else:
+                result['cycle_strength'] = 0.5  # 默认中等强度
+        elif dominant_cycle:
+            # 没有实际周期数据，使用自相关检测的结果
             result['dominant_cycle'] = dominant_cycle
             result['cycle_strength'] = cycle_strength
         
