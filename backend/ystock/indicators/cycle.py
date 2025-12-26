@@ -224,10 +224,11 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                 
                 # 根据振幅判断周期类型
                 # 窄幅横盘：5%以内；标准横盘：5%-15%；宽幅震荡：15%-25%
-                if amplitude < 5.0:
+                amplitude_abs = abs(amplitude)
+                if amplitude_abs < 5.0:
                     cycle_type = 'sideways'
                     cycle_type_desc = '窄幅横盘'
-                elif amplitude < 15.0:
+                elif amplitude_abs < 15.0:
                     # 5%-15%可能是标准横盘，但如果是上涨周期，保持为上涨
                     # 这里可以根据周期持续时间进一步判断
                     if (max_idx - start_idx) > 30:  # 持续时间超过30天，可能是横盘
@@ -286,8 +287,7 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                     if (min_idx - start_idx) > 30:  # 持续时间超过30天，可能是横盘
                         cycle_type = 'sideways'
                         cycle_type_desc = '标准横盘'
-                        # 横盘时振幅取绝对值
-                        amplitude = amplitude_abs
+                        # 横盘时振幅保持正负方向（不取绝对值）
                     else:
                         cycle_type = 'decline'
                         cycle_type_desc = '下跌'

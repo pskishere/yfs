@@ -2067,18 +2067,21 @@ const MainPage: React.FC = () => {
                                           const endPrice = isRise ? record.high_price : isDecline ? record.low_price : (record.high_price || record.low_price);
                                           amplitude = ((endPrice - startPrice) / startPrice) * 100;
                                         }
-                                        // 横盘周期振幅很小，显示为绝对值
-                                        // 下跌周期振幅应该已经是负数，不需要再处理
-                                        if (isSideways) {
-                                          amplitude = Math.abs(amplitude);
+                                        // 横盘周期振幅也保持正负方向，不取绝对值
+                                        // 上涨周期振幅为正数，下跌周期振幅为负数
+                                        let color = '#faad14'; // 默认横盘颜色
+                                        if (!isSideways) {
+                                          color = amplitude >= 0 ? '#cf1322' : '#3f8600';
+                                        } else {
+                                          // 横盘周期根据振幅方向选择颜色
+                                          color = amplitude >= 0 ? '#faad14' : '#fa8c16'; // 正数用橙色，负数用深橙色
                                         }
-                                        const color = isSideways ? '#faad14' : (amplitude >= 0 ? '#cf1322' : '#3f8600');
                                         return (
                                           <span style={{ 
                                             fontSize: 12, 
                                             color: color
                                           }}>
-                                            {isSideways ? '' : (amplitude >= 0 ? '+' : '')}{amplitude.toFixed(2)}%
+                                            {amplitude >= 0 ? '+' : ''}{amplitude.toFixed(2)}%
                                           </span>
                                         );
                                       },
