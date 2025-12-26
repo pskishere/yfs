@@ -1989,9 +1989,22 @@ const MainPage: React.FC = () => {
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
                                         const isSideways = record.cycle_type === 'sideways';
-                                        const startPrice = isRise ? record.low_price : record.high_price;
-                                        let color = isRise ? '#3f8600' : '#cf1322';
-                                        if (isSideways) color = '#faad14';
+                                        const isDecline = record.cycle_type === 'decline';
+                                        
+                                        // 横盘周期：根据振幅方向判断起始价格
+                                        // 振幅为正：从低点到高点，起始价格是低点
+                                        // 振幅为负：从高点到低点，起始价格是高点
+                                        let startPrice;
+                                        if (isSideways) {
+                                          const amplitude = record.amplitude || 0;
+                                          startPrice = amplitude >= 0 ? record.low_price : record.high_price;
+                                        } else if (isRise) {
+                                          startPrice = record.low_price;
+                                        } else {
+                                          startPrice = record.high_price;
+                                        }
+                                        
+                                        let color = isRise ? '#3f8600' : isDecline ? '#cf1322' : '#faad14';
                                         return (
                                           <span style={{ 
                                             fontWeight: 500, 
@@ -2026,9 +2039,22 @@ const MainPage: React.FC = () => {
                                       width: 120,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
+                                        const isSideways = record.cycle_type === 'sideways';
                                         const isDecline = record.cycle_type === 'decline';
-                                        // 横盘周期：结束价格取高点（因为可能是到高点的横盘）
-                                        const endPrice = isRise ? record.high_price : isDecline ? record.low_price : (record.high_price || record.low_price);
+                                        
+                                        // 横盘周期：根据振幅方向判断结束价格
+                                        // 振幅为正：从低点到高点，结束价格是高点
+                                        // 振幅为负：从高点到低点，结束价格是低点
+                                        let endPrice;
+                                        if (isSideways) {
+                                          const amplitude = record.amplitude || 0;
+                                          endPrice = amplitude >= 0 ? record.high_price : record.low_price;
+                                        } else if (isRise) {
+                                          endPrice = record.high_price;
+                                        } else {
+                                          endPrice = record.low_price;
+                                        }
+                                        
                                         const color = isRise ? '#cf1322' : isDecline ? '#3f8600' : '#faad14';
                                         return (
                                           <span style={{ 
