@@ -181,10 +181,19 @@ export interface Indicators {
   min_cycle_amplitude?: number;
   // 周期总结
   cycle_summary?: string;
+  // 横盘判断
+  sideways_market?: boolean;
+  sideways_strength?: number;
+  sideways_reasons?: string[];
+  sideways_price_range_pct?: number;
+  sideways_price_change_pct?: number;
+  sideways_volatility?: number;
+  sideways_amplitude_20?: number; // 20日振幅统计
+  sideways_trend_pct?: number; // 趋势变化百分比
   // 周期时间段详情
   cycle_periods?: Array<{
     period_index: number;
-    cycle_type?: 'rise' | 'decline';
+    cycle_type?: 'rise' | 'decline' | 'sideways';
     cycle_type_desc?: string;
     start_time?: string;
     end_time?: string;

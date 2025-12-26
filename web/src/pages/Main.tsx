@@ -1649,33 +1649,6 @@ const MainPage: React.FC = () => {
                               items={(() => {
                                 const items = [];
 
-                                // 主要周期信息
-                                if (indicators.dominant_cycle !== undefined) {
-                                  items.push({
-                                    label: '主要周期',
-                                    span: 1,
-                                    children: (
-                                      <Space size="small">
-                                        <span style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>
-                                          {indicators.dominant_cycle}天
-                                        </span>
-                                        {indicators.cycle_strength !== undefined && (
-                                          <Tag
-                                            color={
-                                              indicators.cycle_strength >= 0.6 ? 'success' :
-                                                indicators.cycle_strength >= 0.4 ? 'default' :
-                                                  indicators.cycle_strength >= 0.2 ? 'warning' : 'error'
-                                            }
-                                            style={{ fontSize: 11 }}
-                                          >
-                                            {(indicators.cycle_strength * 100).toFixed(0)}%
-                                          </Tag>
-                                        )}
-                                      </Space>
-                                    ),
-                                  });
-                                }
-
                                 // 平均周期
                                 if (indicators.avg_cycle_length !== undefined) {
                                   items.push({
@@ -1689,32 +1662,128 @@ const MainPage: React.FC = () => {
                                   });
                                 }
 
-                                // 周期质量
-                                if (indicators.cycle_quality) {
+                                // 周期稳定性评估
+                                if (indicators.cycle_stability) {
                                   items.push({
-                                    label: '周期质量',
+                                    label: '周期稳定性',
                                     span: 1,
                                     children: (
-                                      <Tag
-                                        color={
-                                          indicators.cycle_quality === 'strong' ? 'success' :
-                                            indicators.cycle_quality === 'moderate' ? 'default' :
-                                              indicators.cycle_quality === 'weak' ? 'warning' : 'error'
-                                        }
-                                        style={{ fontSize: 12 }}
-                                      >
-                                        {indicators.cycle_quality === 'strong' ? '强' :
-                                          indicators.cycle_quality === 'moderate' ? '中等' :
-                                            indicators.cycle_quality === 'weak' ? '弱' : '无'}
-                                      </Tag>
+                                      <Space size="small" direction="vertical">
+                                        <Tag
+                                          color={
+                                            indicators.cycle_stability === 'high' ? 'success' :
+                                              indicators.cycle_stability === 'medium' ? 'default' :
+                                                indicators.cycle_stability === 'low' ? 'warning' : 'error'
+                                          }
+                                          style={{ fontSize: 12 }}
+                                        >
+                                          {indicators.cycle_stability === 'high' ? '非常稳定' :
+                                            indicators.cycle_stability === 'medium' ? '较为稳定' :
+                                              indicators.cycle_stability === 'low' ? '不够稳定' : '不稳定'}
+                                        </Tag>
+                                        {indicators.cycle_stability_desc && (
+                                          <span style={{ fontSize: 11, color: '#999' }}>
+                                            {indicators.cycle_stability_desc}
+                                          </span>
+                                        )}
+                                      </Space>
                                     ),
                                   });
                                 }
 
-                                // 当前阶段
-                                if (indicators.cycle_phase) {
+                                // 横盘判断或当前阶段（互斥显示）
+                                if (indicators.sideways_market !== undefined) {
+                                  if (indicators.sideways_market) {
+                                    // 如果是横盘，显示横盘信息
+                                    items.push({
+                                      label: '市场状态',
+                                      span: 1,
+                                      children: (
+                                        <Space size="small" direction="vertical" style={{ width: '100%' }}>
+                                          <Tag
+                                            color="orange"
+                                            style={{ fontSize: 12 }}
+                                          >
+                                            横盘
+                                          </Tag>
+                                          {indicators.sideways_strength !== undefined && (
+                                            <span style={{ fontSize: 11, color: '#999' }}>
+                                              强度: {(indicators.sideways_strength * 100).toFixed(0)}%
+                                            </span>
+                                          )}
+                                          {indicators.sideways_amplitude_20 !== undefined && (
+                                            <div style={{ fontSize: 11, color: '#666' }}>
+                                              20日振幅: {indicators.sideways_amplitude_20.toFixed(2)}%
+                                            </div>
+                                          )}
+                                          {indicators.sideways_price_change_pct !== undefined && (
+                                            <div style={{ fontSize: 11, color: '#666' }}>
+                                              20日价格变化: {indicators.sideways_price_change_pct.toFixed(2)}%
+                                            </div>
+                                          )}
+                                          {indicators.sideways_price_range_pct !== undefined && (
+                                            <div style={{ fontSize: 11, color: '#666' }}>
+                                              波动范围: {indicators.sideways_price_range_pct.toFixed(2)}%
+                                            </div>
+                                          )}
+                                          {indicators.sideways_reasons && indicators.sideways_reasons.length > 0 && (
+                                            <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                                              <div style={{ fontWeight: 500, marginBottom: 4 }}>判断依据:</div>
+                                              {indicators.sideways_reasons.map((reason, idx) => (
+                                                <div key={idx} style={{ marginLeft: 8 }}>• {reason}</div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </Space>
+                                      ),
+                                    });
+                                  } else if (indicators.cycle_phase) {
+                                    // 如果不是横盘，显示上涨或下跌阶段
+                                    items.push({
+                                      label: '市场状态',
+                                      span: 1,
+                                      children: (
+                                        <Space size="small" direction="vertical">
+                                          <Tag
+                                            color={
+                                              indicators.cycle_phase === 'early_rise' ? 'success' :
+                                                indicators.cycle_phase === 'mid_rise' ? 'default' :
+                                                  indicators.cycle_phase === 'late_rise' ? 'warning' : 'error'
+                                            }
+                                            style={{ fontSize: 12 }}
+                                          >
+                                            {indicators.cycle_phase === 'early_rise' ? '早期上涨' :
+                                              indicators.cycle_phase === 'mid_rise' ? '中期上涨' :
+                                                indicators.cycle_phase === 'late_rise' ? '后期上涨' : '下跌'}
+                                          </Tag>
+                                          {indicators.cycle_phase_desc && (
+                                            <span style={{ fontSize: 11, color: '#999' }}>
+                                              {indicators.cycle_phase_desc}
+                                            </span>
+                                          )}
+                                          {indicators.cycle_position !== undefined && (
+                                            <div style={{ fontSize: 11, color: '#999' }}>
+                                              周期进度: {(indicators.cycle_position * 100).toFixed(0)}%
+                                              {indicators.days_from_last_trough !== undefined && (
+                                                <span style={{ marginLeft: 4 }}>
+                                                  (距低点{indicators.days_from_last_trough}天)
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                          {indicators.cycle_suggestion && (
+                                            <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                                              {indicators.cycle_suggestion}
+                                            </div>
+                                          )}
+                                        </Space>
+                                      ),
+                                    });
+                                  }
+                                } else if (indicators.cycle_phase) {
+                                  // 如果没有横盘判断但有阶段信息，也显示阶段
                                   items.push({
-                                    label: '当前阶段',
+                                    label: '市场状态',
                                     span: 1,
                                     children: (
                                       <Space size="small" direction="vertical">
@@ -1730,6 +1799,11 @@ const MainPage: React.FC = () => {
                                             indicators.cycle_phase === 'mid_rise' ? '中期上涨' :
                                               indicators.cycle_phase === 'late_rise' ? '后期上涨' : '下跌'}
                                         </Tag>
+                                        {indicators.cycle_phase_desc && (
+                                          <span style={{ fontSize: 11, color: '#999' }}>
+                                            {indicators.cycle_phase_desc}
+                                          </span>
+                                        )}
                                         {indicators.cycle_position !== undefined && (
                                           <div style={{ fontSize: 11, color: '#999' }}>
                                             周期进度: {(indicators.cycle_position * 100).toFixed(0)}%
@@ -1738,6 +1812,11 @@ const MainPage: React.FC = () => {
                                                 (距低点{indicators.days_from_last_trough}天)
                                               </span>
                                             )}
+                                          </div>
+                                        )}
+                                        {indicators.cycle_suggestion && (
+                                          <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                                            {indicators.cycle_suggestion}
                                           </div>
                                         )}
                                       </Space>
@@ -1870,12 +1949,20 @@ const MainPage: React.FC = () => {
                                       align: 'center' as const,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
+                                        const isSideways = record.cycle_type === 'sideways';
+                                        const isDecline = record.cycle_type === 'decline';
+                                        
+                                        let tagColor = 'default';
+                                        if (isRise) tagColor = 'success';
+                                        else if (isDecline) tagColor = 'error';
+                                        else if (isSideways) tagColor = 'warning';
+                                        
                                         return (
                                           <Tag
-                                            color={isRise ? 'success' : 'error'}
+                                            color={tagColor}
                                             style={{ fontSize: 12, fontWeight: 500 }}
                                           >
-                                            {record.cycle_type_desc || (isRise ? '上涨' : '下跌')}
+                                            {record.cycle_type_desc || (isRise ? '上涨' : isDecline ? '下跌' : '横盘')}
                                           </Tag>
                                         );
                                       },
@@ -1904,11 +1991,14 @@ const MainPage: React.FC = () => {
                                       width: 120,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
+                                        const isSideways = record.cycle_type === 'sideways';
                                         const startPrice = isRise ? record.low_price : record.high_price;
+                                        let color = isRise ? '#3f8600' : '#cf1322';
+                                        if (isSideways) color = '#faad14';
                                         return (
                                           <span style={{ 
                                             fontWeight: 500, 
-                                            color: isRise ? '#3f8600' : '#cf1322' 
+                                            color: color
                                           }}>
                                             {formatCurrency(startPrice)}
                                           </span>
@@ -1939,11 +2029,14 @@ const MainPage: React.FC = () => {
                                       width: 120,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
-                                        const endPrice = isRise ? record.high_price : record.low_price;
+                                        const isDecline = record.cycle_type === 'decline';
+                                        // 横盘周期：结束价格取高点（因为可能是到高点的横盘）
+                                        const endPrice = isRise ? record.high_price : isDecline ? record.low_price : (record.high_price || record.low_price);
+                                        const color = isRise ? '#cf1322' : isDecline ? '#3f8600' : '#faad14';
                                         return (
                                           <span style={{ 
                                             fontWeight: 500, 
-                                            color: isRise ? '#cf1322' : '#3f8600' 
+                                            color: color
                                           }}>
                                             {formatCurrency(endPrice)}
                                           </span>
@@ -1965,16 +2058,27 @@ const MainPage: React.FC = () => {
                                       align: 'right' as const,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
-                                        const startPrice = isRise ? record.low_price : record.high_price;
-                                        const endPrice = isRise ? record.high_price : record.low_price;
-                                        // 下跌周期振幅为负数，上涨周期振幅为正数
-                                        const amplitude = ((endPrice - startPrice) / startPrice) * 100;
+                                        const isSideways = record.cycle_type === 'sideways';
+                                        const isDecline = record.cycle_type === 'decline';
+                                        // 使用记录中的振幅，如果没有则计算
+                                        let amplitude = record.amplitude;
+                                        if (amplitude === undefined) {
+                                          const startPrice = isRise ? record.low_price : isDecline ? record.high_price : (record.low_price || record.high_price);
+                                          const endPrice = isRise ? record.high_price : isDecline ? record.low_price : (record.high_price || record.low_price);
+                                          amplitude = ((endPrice - startPrice) / startPrice) * 100;
+                                        }
+                                        // 横盘周期振幅很小，显示为绝对值
+                                        // 下跌周期振幅应该已经是负数，不需要再处理
+                                        if (isSideways) {
+                                          amplitude = Math.abs(amplitude);
+                                        }
+                                        const color = isSideways ? '#faad14' : (amplitude >= 0 ? '#cf1322' : '#3f8600');
                                         return (
                                           <span style={{ 
                                             fontSize: 12, 
-                                            color: amplitude >= 0 ? '#cf1322' : '#3f8600' 
+                                            color: color
                                           }}>
-                                            {amplitude >= 0 ? '+' : ''}{amplitude.toFixed(2)}%
+                                            {isSideways ? '' : (amplitude >= 0 ? '+' : '')}{amplitude.toFixed(2)}%
                                           </span>
                                         );
                                       },
