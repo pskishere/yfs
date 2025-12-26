@@ -84,15 +84,14 @@ def calculate_autocorrelation(prices, max_lag=None):
     return np.array(autocorr), np.array(lags)
 
 
-def detect_cycle_length(autocorr, lags, min_cycle=10, max_cycle=100):
+def detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=100):
     """
     从自相关函数中检测主要周期长度
-    改进版：排除短期噪声，寻找更显著的周期
     
     参数:
         autocorr: 自相关值数组
         lags: 滞后周期数组
-        min_cycle: 最小周期长度（提高以避免短期噪声）
+        min_cycle: 最小周期长度
         max_cycle: 最大周期长度
     
     返回:
@@ -102,7 +101,7 @@ def detect_cycle_length(autocorr, lags, min_cycle=10, max_cycle=100):
     if len(autocorr) == 0 or len(lags) == 0:
         return None, 0.0
     
-    # 过滤有效范围（排除太短的周期，避免噪声）
+    # 过滤有效范围
     valid_mask = (lags >= min_cycle) & (lags <= max_cycle)
     if not np.any(valid_mask):
         return None, 0.0
@@ -110,29 +109,10 @@ def detect_cycle_length(autocorr, lags, min_cycle=10, max_cycle=100):
     valid_autocorr = autocorr[valid_mask]
     valid_lags = lags[valid_mask]
     
-    # 使用find_peaks找到所有局部最大值，而不是简单地找全局最大值
-    # 这样可以避免短期噪声干扰
-    from scipy.signal import find_peaks as find_peaks_signal
-    
-    # 寻找所有峰值，要求最小高度和最小距离
-    peaks_idx, properties = find_peaks_signal(
-        valid_autocorr, 
-        height=0.2,  # 最小自相关值
-        distance=max(5, min_cycle // 3)  # 峰值之间的最小距离
-    )
-    
-    if len(peaks_idx) == 0:
-        # 如果没有找到峰值，回退到全局最大值
-        max_idx = np.argmax(valid_autocorr)
-        dominant_cycle = int(valid_lags[max_idx])
-        cycle_strength = float(valid_autocorr[max_idx])
-    else:
-        # 从所有峰值中选择强度最高的
-        peak_strengths = valid_autocorr[peaks_idx]
-        max_peak_idx = np.argmax(peak_strengths)
-        best_peak_idx = peaks_idx[max_peak_idx]
-        dominant_cycle = int(valid_lags[best_peak_idx])
-        cycle_strength = float(valid_autocorr[best_peak_idx])
+    # 找到自相关值最大的周期
+    max_idx = np.argmax(valid_autocorr)
+    dominant_cycle = int(valid_lags[max_idx])
+    cycle_strength = float(valid_autocorr[max_idx])
     
     # 如果周期强度太低，认为没有明显周期
     if cycle_strength < 0.3:
@@ -228,8 +208,6 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
             # 判断周期类型
             if start_point['type'] == 'trough' and end_point['type'] == 'peak':
                 # 上涨周期：从低点到高点
-                cycle_type = 'rise'
-                cycle_type_desc = '上涨'
                 start_price = float(prices[start_idx])
                 end_price = float(prices[end_idx])
                 
@@ -240,6 +218,27 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                 # 找到周期内的最高价
                 max_price_in_period = float(np.max(period_high_values))
                 max_idx = start_idx + int(np.argmax(period_high_values))
+                
+                # 计算振幅
+                amplitude = ((max_price_in_period - start_price) / start_price) * 100 if start_price > 0 else 0
+                
+                # 根据振幅判断周期类型
+                # 窄幅横盘：5%以内；标准横盘：5%-15%；宽幅震荡：15%-25%
+                if amplitude < 5.0:
+                    cycle_type = 'sideways'
+                    cycle_type_desc = '窄幅横盘'
+                elif amplitude < 15.0:
+                    # 5%-15%可能是标准横盘，但如果是上涨周期，保持为上涨
+                    # 这里可以根据周期持续时间进一步判断
+                    if (max_idx - start_idx) > 30:  # 持续时间超过30天，可能是横盘
+                        cycle_type = 'sideways'
+                        cycle_type_desc = '标准横盘'
+                    else:
+                        cycle_type = 'rise'
+                        cycle_type_desc = '上涨'
+                else:
+                    cycle_type = 'rise'
+                    cycle_type_desc = '上涨'
                 
                 period_info = {
                     'period_index': period_index,
@@ -254,14 +253,13 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                     'low_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
                     'high_price': max_price_in_period,
                     'high_time': timestamps[max_idx] if timestamps and max_idx < len(timestamps) else None,
+                    'amplitude': float(amplitude),
                 }
                 cycle_periods.append(period_info)
                 period_index += 1
                 
             elif start_point['type'] == 'peak' and end_point['type'] == 'trough':
                 # 下跌周期：从高点到低点
-                cycle_type = 'decline'
-                cycle_type_desc = '下跌'
                 start_price = float(prices[start_idx])
                 end_price = float(prices[end_idx])
                 
@@ -272,6 +270,30 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                 # 找到周期内的最低价
                 min_price_in_period = float(np.min(period_low_values))
                 min_idx = start_idx + int(np.argmin(period_low_values))
+                
+                # 计算振幅（下跌周期振幅为负数）
+                amplitude = ((min_price_in_period - start_price) / start_price) * 100 if start_price > 0 else 0
+                amplitude_abs = abs(amplitude)  # 用于判断周期类型的绝对值
+                
+                # 根据振幅判断周期类型
+                # 窄幅横盘：5%以内；标准横盘：5%-15%；宽幅震荡：15%-25%
+                if amplitude_abs < 5.0:
+                    cycle_type = 'sideways'
+                    cycle_type_desc = '窄幅横盘'
+                elif amplitude_abs < 15.0:
+                    # 5%-15%可能是标准横盘，但如果是下跌周期，保持为下跌
+                    # 这里可以根据周期持续时间进一步判断
+                    if (min_idx - start_idx) > 30:  # 持续时间超过30天，可能是横盘
+                        cycle_type = 'sideways'
+                        cycle_type_desc = '标准横盘'
+                        # 横盘时振幅取绝对值
+                        amplitude = amplitude_abs
+                    else:
+                        cycle_type = 'decline'
+                        cycle_type_desc = '下跌'
+                else:
+                    cycle_type = 'decline'
+                    cycle_type_desc = '下跌'
                 
                 period_info = {
                     'period_index': period_index,
@@ -286,6 +308,7 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                     'high_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
                     'low_price': min_price_in_period,
                     'low_time': timestamps[min_idx] if timestamps and min_idx < len(timestamps) else None,
+                    'amplitude': float(amplitude),
                 }
                 cycle_periods.append(period_info)
                 period_index += 1
@@ -352,24 +375,10 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
     autocorr, lags = calculate_autocorrelation(prices, max_lag=min(100, len(prices) // 2))
     
     if len(autocorr) > 0:
-        # 检测主要周期（提高最小周期以避免短期噪声）
-        dominant_cycle, cycle_strength = detect_cycle_length(autocorr, lags, min_cycle=10, max_cycle=100)
+        # 检测主要周期
+        dominant_cycle, cycle_strength = detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=100)
         
-        # 优先使用实际检测到的平均周期长度作为主要周期
-        # 因为实际的高低点周期比自相关分析更准确和直观
-        if 'avg_cycle_length' in result and result['avg_cycle_length']:
-            # 使用实际检测到的周期
-            result['dominant_cycle'] = int(result['avg_cycle_length'])
-            # 如果自相关也检测到周期且强度较高，使用自相关的强度
-            # 否则使用基于周期一致性的强度
-            if dominant_cycle and cycle_strength > 0.4:
-                result['cycle_strength'] = cycle_strength
-            elif 'cycle_consistency' in result:
-                result['cycle_strength'] = result['cycle_consistency']
-            else:
-                result['cycle_strength'] = 0.5  # 默认中等强度
-        elif dominant_cycle:
-            # 没有实际周期数据，使用自相关检测的结果
+        if dominant_cycle:
             result['dominant_cycle'] = dominant_cycle
             result['cycle_strength'] = cycle_strength
         
@@ -532,6 +541,118 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
             result['cycle_stability'] = 'very_low'
             result['cycle_stability_desc'] = '周期不稳定，无明显规律'
     
+    # 6.5. 整体横盘判断（结合多个技术指标）
+    # 使用ADX、均线缠绕、20日振幅统计等指标综合判断
+    is_sideways = False
+    sideways_strength = 0.0
+    sideways_reasons = []
+    
+    # 计算最近20个交易日的振幅统计
+    lookback_20 = min(20, len(prices))
+    if lookback_20 >= 20:
+        recent_20_prices = prices[-lookback_20:]
+        recent_20_highs = highs[-lookback_20:] if len(highs) >= lookback_20 else recent_20_prices
+        recent_20_lows = lows[-lookback_20:] if len(lows) >= lookback_20 else recent_20_prices
+        
+        # 20日平均最高价与最低价之差
+        avg_high_20 = np.mean(recent_20_highs)
+        avg_low_20 = np.mean(recent_20_lows)
+        avg_price_20 = np.mean(recent_20_prices)
+        amplitude_20 = ((avg_high_20 - avg_low_20) / avg_price_20) * 100 if avg_price_20 > 0 else 0
+        
+        # 条件1：20日振幅统计小于10%（标准横盘特征）
+        condition1 = amplitude_20 < 10.0
+        
+        # 条件2：计算均线缠绕（如果均线相互缠绕，可能是横盘）
+        # 简化版：计算短期和长期均线的差异
+        if len(prices) >= 60:
+            ma5 = np.mean(prices[-5:])
+            ma10 = np.mean(prices[-10:])
+            ma20 = np.mean(prices[-20:])
+            ma60 = np.mean(prices[-60:]) if len(prices) >= 60 else ma20
+            
+            # 均线缠绕：各均线之间的差异小于5%
+            ma_diff_5_10 = abs(ma5 - ma10) / avg_price_20 * 100 if avg_price_20 > 0 else 0
+            ma_diff_10_20 = abs(ma10 - ma20) / avg_price_20 * 100 if avg_price_20 > 0 else 0
+            ma_diff_20_60 = abs(ma20 - ma60) / avg_price_20 * 100 if avg_price_20 > 0 else 0
+            
+            condition2 = ma_diff_5_10 < 2.0 and ma_diff_10_20 < 3.0 and ma_diff_20_60 < 5.0
+        else:
+            condition2 = False
+        
+        # 条件3：计算ADX（如果可用，ADX < 25表示无趋势）
+        # 这里简化计算ADX，或者从外部传入
+        # 暂时使用价格变化率作为趋势强度的替代
+        price_change_20 = ((recent_20_prices[-1] - recent_20_prices[0]) / recent_20_prices[0]) * 100 if recent_20_prices[0] > 0 else 0
+        condition3 = abs(price_change_20) < 5.0  # 20日价格变化小于5%
+        
+        # 条件4：价格波动范围适中（3%-25%）
+        price_range_20 = (np.max(recent_20_highs) - np.min(recent_20_lows)) / avg_price_20 * 100 if avg_price_20 > 0 else 0
+        condition4 = 3.0 <= price_range_20 <= 25.0
+        
+        # 条件5：结合周期特征（如果上涨和下跌周期振幅相近）
+        cycle_sideways_score = 0.0
+        if len(cycle_periods) >= 4:
+            rise_amplitudes = []
+            decline_amplitudes = []
+            for p in cycle_periods:
+                if p.get('cycle_type') == 'rise':
+                    start_price = p.get('low_price', 0)
+                    end_price = p.get('high_price', 0)
+                    if start_price > 0:
+                        amp = ((end_price - start_price) / start_price) * 100
+                        rise_amplitudes.append(amp)
+                elif p.get('cycle_type') == 'decline':
+                    start_price = p.get('high_price', 0)
+                    end_price = p.get('low_price', 0)
+                    if start_price > 0:
+                        amp = abs(((end_price - start_price) / start_price) * 100)
+                        decline_amplitudes.append(amp)
+            
+            if len(rise_amplitudes) > 0 and len(decline_amplitudes) > 0:
+                avg_rise_amp = np.mean(rise_amplitudes)
+                avg_decline_amp = np.mean(decline_amplitudes)
+                if avg_rise_amp > 0 and avg_decline_amp > 0:
+                    amp_diff_ratio = abs(avg_rise_amp - avg_decline_amp) / max(avg_rise_amp, avg_decline_amp)
+                    if amp_diff_ratio < 0.3:
+                        cycle_sideways_score = 1.0 - amp_diff_ratio
+                        condition5 = cycle_sideways_score > 0.5
+                    else:
+                        condition5 = False
+                else:
+                    condition5 = False
+            else:
+                condition5 = False
+        else:
+            condition5 = False
+        
+        # 计算横盘强度
+        conditions_met = sum([condition1, condition2, condition3, condition4, condition5])
+        base_strength = conditions_met / 5.0
+        sideways_strength = min(1.0, base_strength * 0.7 + cycle_sideways_score * 0.3)
+        
+        # 判断为横盘：至少满足3个条件，或者满足条件1+条件3（20日振幅小且价格变化小）
+        if conditions_met >= 3 or (condition1 and condition3):
+            is_sideways = True
+            if condition1:
+                sideways_reasons.append(f'20日振幅{amplitude_20:.1f}%')
+            if condition2:
+                sideways_reasons.append('均线缠绕')
+            if condition3:
+                sideways_reasons.append(f'20日价格变化{abs(price_change_20):.1f}%')
+            if condition4:
+                sideways_reasons.append(f'波动范围{price_range_20:.1f}%')
+            if condition5:
+                sideways_reasons.append('周期振幅相近')
+        
+        result['sideways_market'] = is_sideways
+        result['sideways_strength'] = float(sideways_strength)
+        result['sideways_price_range_pct'] = float(price_range_20)
+        result['sideways_price_change_pct'] = float(price_change_20)
+        result['sideways_amplitude_20'] = float(amplitude_20)
+        if is_sideways:
+            result['sideways_reasons'] = sideways_reasons
+    
     # 7. 综合周期分析总结
     summary_parts = []
     if 'dominant_cycle' in result:
@@ -539,6 +660,8 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
     if 'cycle_quality' in result:
         quality_map = {'strong': '强', 'moderate': '中等', 'weak': '弱', 'none': '无'}
         summary_parts.append(f"质量{quality_map.get(result['cycle_quality'], '未知')}")
+    if 'sideways_market' in result and result['sideways_market']:
+        summary_parts.append('横盘')
     if 'cycle_phase_desc' in result:
         summary_parts.append(result['cycle_phase_desc'])
     if summary_parts:
