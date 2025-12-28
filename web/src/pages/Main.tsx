@@ -37,8 +37,6 @@ import {
   RightOutlined,
   ShareAltOutlined,
   DatabaseOutlined,
-  BankOutlined,
-  UserOutlined,
   FileTextOutlined,
   MoneyCollectOutlined,
   ThunderboltOutlined,
@@ -48,6 +46,7 @@ import {
   CloseCircleOutlined,
   DeleteOutlined,
   MenuOutlined,
+  TeamOutlined,
   CloseOutlined,
 } from '@ant-design/icons';
 import {
@@ -75,7 +74,7 @@ import TradingViewChart from '../components/TradingViewChart';
 import { IndicatorLabel } from '../components/IndicatorLabel';
 import { FinancialTable } from '../components/FinancialTable';
 import { getPositionColumns, getOrderColumns } from '../config/tableColumns';
-import { formatValue, formatLargeNumber, getRSIStatus, statusMaps, translateRating, formatDateTime } from '../utils/formatters';
+import { formatValue, formatLargeNumber, getRSIStatus, statusMaps, translateRating, translateAction, formatDateTime } from '../utils/formatters';
 import './Main.css';
 
 // TabPane 已在 Ant Design v6 中移除，使用 items prop 代替
@@ -1132,19 +1131,20 @@ const MainPage: React.FC = () => {
                       column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
                       size="small"
                       layout="vertical"
-                      items={[
+                      items={(() => {
+                        const items = [
                         {
                           label: '当前价格',
-                          
+                            
                           children: (
-                            <span style={{ fontSize: 16, fontWeight: 600 }}>
+                              <span style={{ fontSize: 16, fontWeight: 600 }}>
                               {formatCurrency(analysisResult.indicators.current_price)}
                             </span>
                           ),
                         },
                         {
                           label: '价格变化',
-                          
+                            
                           children: (
                             <Space>
                               {(analysisResult.indicators.price_change_pct ?? 0) >= 0 ? (
@@ -1153,7 +1153,7 @@ const MainPage: React.FC = () => {
                                 <FallOutlined style={{ color: '#cf1322' }} />
                               )}
                               <span style={{
-                                fontSize: 14,
+                                  fontSize: 14,
                                 fontWeight: 600,
                                 color: (analysisResult.indicators.price_change_pct ?? 0) >= 0 ? '#3f8600' : '#cf1322',
                               }}>
@@ -1164,15 +1164,50 @@ const MainPage: React.FC = () => {
                         },
                         {
                           label: '数据点数',
-                          
+                            
                           children: `${analysisResult.indicators.data_points || 0}条数据`,
                         },
                         {
                           label: '趋势方向',
-                          
+                            
                           children: getTrendTag(analysisResult.indicators.trend_direction),
                         },
-                      ]}
+                        ];
+
+                        // 添加移动平均线
+                        const maItems = [5, 10, 20, 50]
+                              .map((period) => {
+                                const key = `ma${period}`;
+                                const value = analysisResult.indicators[key];
+                                if (value === undefined) return null as any;
+                                const currentPrice = analysisResult.indicators.current_price || 0;
+                                const diff = ((currentPrice - value) / value * 100);
+                                return {
+                              label: createIndicatorLabel(`MA${period}`, 'ma'),
+                              
+                                  children: (
+                                    <Space>
+                                      <span style={{
+                                        fontSize: 16,
+                                        fontWeight: 600,
+                                        color: diff >= 0 ? '#3f8600' : '#cf1322',
+                                      }}>
+                                        {formatCurrency(value)}
+                                      </span>
+                                      <span style={{
+                                        fontSize: 14,
+                                        color: diff >= 0 ? '#3f8600' : '#cf1322',
+                                      }}>
+                                        ({diff >= 0 ? '+' : ''}{diff.toFixed(1)}%)
+                                      </span>
+                                    </Space>
+                                  ),
+                                };
+                              })
+                          .filter(item => item !== null);
+                        
+                        return [...items, ...maItems];
+                      })()}
                     />
                     </div>
                   </div>
@@ -1202,69 +1237,11 @@ const MainPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* 移动平均线 */}
-                  {[5, 10, 20, 50].some(p => analysisResult.indicators[`ma${p}`] !== undefined) && (
-                    <div id="section-ma">
-                    <Collapse
-                      ghost
-                      defaultActiveKey={['ma']}
-                      items={[{
-                        key: 'ma',
-                        label: (
-                          <span>
-                            <BarChartOutlined style={{ marginRight: 8 }} />
-                            {createIndicatorLabel('移动平均线', 'ma')}
-                          </span>
-                        ),
-                        children: (
-                          <Descriptions
-                            bordered
-                            column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
-                            size="small"
-                            layout="vertical"
-                            items={[5, 10, 20, 50]
-                              .map((period) => {
-                                const key = `ma${period}`;
-                                const value = analysisResult.indicators[key];
-                                if (value === undefined) return null as any;
-                                const currentPrice = analysisResult.indicators.current_price || 0;
-                                const diff = ((currentPrice - value) / value * 100);
-                                return {
-                                  label: `MA${period}`,
-                                  
-                                  children: (
-                                    <Space>
-                                      <span style={{
-                                        fontSize: 16,
-                                        fontWeight: 600,
-                                        color: diff >= 0 ? '#3f8600' : '#cf1322',
-                                      }}>
-                                        {formatCurrency(value)}
-                                      </span>
-                                      <span style={{
-                                        fontSize: 14,
-                                        color: diff >= 0 ? '#3f8600' : '#cf1322',
-                                      }}>
-                                        ({diff >= 0 ? '+' : ''}{diff.toFixed(1)}%)
-                                      </span>
-                                    </Space>
-                                  ),
-                                };
-                              })
-                              .filter(item => item !== null)}
-                          />
-                        ),
-                      }]}
-                      style={{ marginTop: 24 }}
-                    />
-                    </div>
-                  )}
-
                   {/* 技术指标 */}
                   <div id="section-indicators">
                   <Collapse
                     ghost
-                    defaultActiveKey={['indicators']}
+                    defaultActiveKey={[]}
                     items={[{
                       key: 'indicators',
                       label: (
@@ -1712,7 +1689,7 @@ const MainPage: React.FC = () => {
                         />
                       ),
                     }]}
-                    style={{ marginTop: 24 }}
+                    style={{ marginTop: 0 }}
                   />
 
 
@@ -1731,7 +1708,7 @@ const MainPage: React.FC = () => {
                         label: (
                           <span>
                             <BarChartOutlined style={{ marginRight: 8 }} />
-                            周期分析
+                            {createIndicatorLabel('周期分析', 'cycle')}
                             {analysisResult.indicators.cycle_summary && (
                               <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
                                 {analysisResult.indicators.cycle_summary}
@@ -2044,35 +2021,35 @@ const MainPage: React.FC = () => {
                                   周期时间段分析 ({indicators.cycle_periods.length}个周期)
                                 </div>
                                 <div style={{ overflowX: 'auto', width: '100%' }}>
-                                  <Table
-                                    dataSource={indicators.cycle_periods.slice().reverse()}
-                                    columns={[
-                                      {
-                                        title: '周期类型',
-                                        key: 'cycle_type',
+                                <Table
+                                  dataSource={indicators.cycle_periods.slice().reverse()}
+                                  columns={[
+                                    {
+                                      title: '周期类型',
+                                      key: 'cycle_type',
                                         width: 100,
                                         fixed: 'left' as const,
-                                        align: 'center' as const,
-                                        render: (_: any, record: any) => {
-                                          const isRise = record.cycle_type === 'rise';
-                                          const isSideways = record.cycle_type === 'sideways';
-                                          const isDecline = record.cycle_type === 'decline';
-                                          
-                                          let tagColor = 'default';
-                                          if (isRise) tagColor = 'success';
-                                          else if (isDecline) tagColor = 'error';
-                                          else if (isSideways) tagColor = 'warning';
-                                          
-                                          return (
-                                            <Tag
-                                              color={tagColor}
-                                              style={{ fontSize: 12, fontWeight: 500 }}
-                                            >
-                                              {record.cycle_type_desc || (isRise ? '上涨' : isDecline ? '下跌' : '横盘')}
-                                            </Tag>
-                                          );
-                                        },
+                                      align: 'center' as const,
+                                      render: (_: any, record: any) => {
+                                        const isRise = record.cycle_type === 'rise';
+                                        const isSideways = record.cycle_type === 'sideways';
+                                        const isDecline = record.cycle_type === 'decline';
+                                        
+                                        let tagColor = 'default';
+                                        if (isRise) tagColor = 'success';
+                                        else if (isDecline) tagColor = 'error';
+                                        else if (isSideways) tagColor = 'warning';
+                                        
+                                        return (
+                                          <Tag
+                                            color={tagColor}
+                                            style={{ fontSize: 12, fontWeight: 500 }}
+                                          >
+                                            {record.cycle_type_desc || (isRise ? '上涨' : isDecline ? '下跌' : '横盘')}
+                                          </Tag>
+                                        );
                                       },
+                                    },
                                     {
                                       title: '起始日期',
                                       key: 'start_time',
@@ -2254,7 +2231,281 @@ const MainPage: React.FC = () => {
                           </div>
                         ),
                       }]}
-                      style={{ marginTop: 24 }}
+                      style={{ marginTop: 0 }}
+                    />
+                    </div>
+                  )}
+
+                  {/* 机构操作分析 */}
+                  {analysisResult.indicators.activity_score !== undefined && (
+                    <div id="section-institutional">
+                    <Collapse
+                      ghost
+                      defaultActiveKey={['institutional']}
+                      items={[{
+                        key: 'institutional',
+                        label: (
+                          <span>
+                            <BarChartOutlined style={{ marginRight: 8 }} />
+                            {createIndicatorLabel('机构操作分析', 'institutional_activity')}
+                            {analysisResult.indicators.activity_level_desc && (
+                              <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
+                                {analysisResult.indicators.activity_level_desc}
+                              </span>
+                            )}
+                          </span>
+                        ),
+                        children: (
+                          <div>
+                            {(() => {
+                              const indicators = analysisResult.indicators;
+                              return (
+                                <>
+                            <Descriptions
+                              bordered
+                              column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
+                              size="small"
+                              layout="horizontal"
+                              items={(() => {
+                                const items = [];
+
+                                // 机构操作强度
+                                if (indicators.activity_score !== undefined) {
+                                  items.push({
+                                    label: '操作强度',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        <div>
+                                          <span style={{ fontSize: 14, fontWeight: 500 }}>
+                                            {indicators.activity_score.toFixed(0)}分
+                                          </span>
+                                          <Tag
+                                            color={
+                                              indicators.activity_score >= 60 ? 'error' :
+                                                indicators.activity_score >= 40 ? 'warning' :
+                                                  indicators.activity_score >= 20 ? 'default' : 'success'
+                                            }
+                                            style={{ marginLeft: 8, fontSize: 12 }}
+                                          >
+                                            {indicators.activity_level === 'high' ? '明显' :
+                                              indicators.activity_level === 'medium' ? '中等' :
+                                                indicators.activity_level === 'low' ? '较弱' : '无'}
+                                          </Tag>
+                                        </div>
+                                        {indicators.suggestion && (
+                                          <span style={{ fontSize: 11, color: '#666' }}>
+                                            {indicators.suggestion}
+                                          </span>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 成交量异常
+                                if (indicators.volume_ratio_20 !== undefined) {
+                                  items.push({
+                                    label: '成交量比率',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        <span style={{ fontSize: 14, fontWeight: 500 }}>
+                                          {indicators.volume_ratio_20.toFixed(2)}倍
+                                        </span>
+                                        {indicators.is_volume_surge && (
+                                          <Tag color="error" style={{ fontSize: 12 }}>
+                                            异常放量（强烈）
+                                          </Tag>
+                                        )}
+                                        {indicators.is_volume_spike && !indicators.is_volume_surge && (
+                                          <Tag color="warning" style={{ fontSize: 12 }}>
+                                            放量
+                                          </Tag>
+                                        )}
+                                        {indicators.is_volume_shrink && (
+                                          <Tag color="default" style={{ fontSize: 12 }}>
+                                            缩量
+                                          </Tag>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 量价关系
+                                if (indicators.price_change_5d !== undefined && indicators.volume_change_5d !== undefined) {
+                                  items.push({
+                                    label: '量价关系',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        <span style={{ fontSize: 13 }}>
+                                          5日价格: {indicators.price_change_5d >= 0 ? '+' : ''}{indicators.price_change_5d.toFixed(2)}%
+                                        </span>
+                                        <span style={{ fontSize: 13 }}>
+                                          5日成交量: {indicators.volume_change_5d >= 0 ? '+' : ''}{indicators.volume_change_5d.toFixed(2)}%
+                                        </span>
+                                        {indicators.price_volume_rising && (
+                                          <Tag color="success" style={{ fontSize: 12 }}>
+                                            价涨量增（建仓信号）
+                                          </Tag>
+                                        )}
+                                        {indicators.price_volume_falling && (
+                                          <Tag color="error" style={{ fontSize: 12 }}>
+                                            价跌量增（出货信号）
+                                          </Tag>
+                                        )}
+                                        {indicators.price_rising_volume_shrinking && (
+                                          <Tag color="warning" style={{ fontSize: 12 }}>
+                                            价涨量缩（控盘）
+                                          </Tag>
+                                        )}
+                                        {indicators.price_falling_volume_shrinking && (
+                                          <Tag color="default" style={{ fontSize: 12 }}>
+                                            价跌量缩（洗盘）
+                                          </Tag>
+                                        )}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 资金流向
+                                if (indicators.fund_flow) {
+                                  items.push({
+                                    label: '资金流向',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        <Tag
+                                          color={
+                                            indicators.fund_flow === 'inflow' ? 'success' :
+                                              indicators.fund_flow === 'outflow' ? 'error' : 'default'
+                                          }
+                                          style={{ fontSize: 12 }}
+                                        >
+                                          {indicators.fund_flow_desc || 
+                                            (indicators.fund_flow === 'inflow' ? '资金流入' :
+                                              indicators.fund_flow === 'outflow' ? '资金流出' : '资金平衡')}
+                                        </Tag>
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 持仓成本
+                                if (indicators.cost_position) {
+                                  items.push({
+                                    label: '持仓成本',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        {indicators.vwap && (
+                                          <span style={{ fontSize: 13 }}>
+                                            VWAP: {formatCurrency(indicators.vwap)}
+                                          </span>
+                                        )}
+                                        {indicators.vwap_deviation !== undefined && (
+                                          <span style={{ fontSize: 13 }}>
+                                            偏离: {indicators.vwap_deviation >= 0 ? '+' : ''}{indicators.vwap_deviation.toFixed(2)}%
+                                          </span>
+                                        )}
+                                        <Tag
+                                          color={
+                                            indicators.cost_position === 'below_cost' ? 'success' :
+                                              indicators.cost_position === 'above_cost' ? 'error' : 'default'
+                                          }
+                                          style={{ fontSize: 12 }}
+                                        >
+                                          {indicators.cost_position_desc || 
+                                            (indicators.cost_position === 'below_cost' ? '低于机构成本' :
+                                              indicators.cost_position === 'above_cost' ? '高于机构成本' : '接近机构成本')}
+                                        </Tag>
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 筹码集中度
+                                if (indicators.chip_concentration) {
+                                  items.push({
+                                    label: '筹码集中度',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        {indicators.vp_poc && (
+                                          <span style={{ fontSize: 13 }}>
+                                            POC: {formatCurrency(indicators.vp_poc)}
+                                          </span>
+                                        )}
+                                        {indicators.poc_deviation !== undefined && (
+                                          <span style={{ fontSize: 13 }}>
+                                            偏离: {indicators.poc_deviation >= 0 ? '+' : ''}{indicators.poc_deviation.toFixed(2)}%
+                                          </span>
+                                        )}
+                                        <Tag
+                                          color={
+                                            indicators.chip_concentration === 'high' ? 'success' :
+                                              indicators.chip_concentration === 'low' ? 'error' : 'default'
+                                          }
+                                          style={{ fontSize: 12 }}
+                                        >
+                                          {indicators.chip_concentration_desc || 
+                                            (indicators.chip_concentration === 'high' ? '高度集中' :
+                                              indicators.chip_concentration === 'medium' ? '中等集中' : '分散')}
+                                        </Tag>
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 价格行为模式
+                                if (indicators.price_pattern) {
+                                  items.push({
+                                    label: '价格模式',
+                                    children: (
+                                      <Space size="small" orientation="vertical">
+                                        <Tag
+                                          color={
+                                            indicators.price_pattern === 'accumulation' ? 'success' :
+                                              indicators.price_pattern === 'distribution' ? 'error' :
+                                                indicators.price_pattern === 'controlled_rise' ? 'warning' : 'default'
+                                          }
+                                          style={{ fontSize: 12 }}
+                                        >
+                                          {indicators.price_pattern_desc || 
+                                            (indicators.price_pattern === 'accumulation' ? '建仓模式' :
+                                              indicators.price_pattern === 'distribution' ? '出货模式' :
+                                                indicators.price_pattern === 'consolidation' ? '洗盘模式' :
+                                                  indicators.price_pattern === 'controlled_rise' ? '控盘拉升' : '正常波动')}
+                                        </Tag>
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 操作信号
+                                if (indicators.activity_signals && indicators.activity_signals.length > 0) {
+                                  items.push({
+                                    label: '操作信号',
+                                    span: 2,
+                                    children: (
+                                      <Space size="small" wrap>
+                                        {indicators.activity_signals.map((signal, index) => (
+                                          <Tag key={index} color="blue" style={{ fontSize: 12 }}>
+                                            {signal}
+                                          </Tag>
+                                        ))}
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                return items;
+                              })()}
+                            />
+                                </>
+                              );
+                            })()}
+                          </div>
+                        ),
+                      }]}
+                      style={{ marginTop: 0 }}
                     />
                     </div>
                   )}
@@ -2387,7 +2638,7 @@ const MainPage: React.FC = () => {
                           />
                         ),
                       }]}
-                      style={{ marginTop: 24 }}
+                      style={{ marginTop: 0 }}
                     />
                     </div>
                   )}
@@ -2490,7 +2741,7 @@ const MainPage: React.FC = () => {
                           />
                         ),
                       }]}
-                      style={{ marginTop: 16 }}
+                      style={{ marginTop: 0 }}
                     />
                   )}
 
@@ -2813,166 +3064,17 @@ const MainPage: React.FC = () => {
                             ),
                           }] : []),
                       ]}
-                      style={{ marginTop: 16 }}
+                      style={{ marginTop: 0 }}
                     />
                     )}
 
-                  {/* 市场数据（股息、机构持仓、分析师推荐等） */}
+                  {/* 市场数据（股息、分析师推荐等） */}
                   {analysisResult.extra_data && (
                     <div>
                     <Collapse
                       ghost
-                      defaultActiveKey={['institutional', 'analyst']}
+                      defaultActiveKey={[]}
                       items={[
-                        // 机构持仓
-                        analysisResult.extra_data.institutional_holders && analysisResult.extra_data.institutional_holders.length > 0 ? {
-                          key: 'institutional',
-                          label: (
-                            <span>
-                              <BankOutlined style={{ marginRight: 8 }} />
-                              <span>机构持仓</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(前{analysisResult.extra_data.institutional_holders.length}大)</span>
-                            </span>
-                          ),
-                          children: (
-                            <Table
-                              size="small"
-                              pagination={false}
-                              dataSource={analysisResult.extra_data.institutional_holders}
-                              rowKey={(record) => `${record.Holder || ''}-${record['Date Reported'] || ''}-${record.id || Math.random().toString()}`}
-                              columns={[
-                                { 
-                                  title: '机构名称', 
-                                  dataIndex: 'Holder', 
-                                  key: 'holder',
-                                  width: '35%',
-                                  render: (val: string) => (
-                                    <span style={{ fontWeight: 500 }}>{val}</span>
-                                  )
-                                },
-                                { 
-                                  title: '持股数', 
-                                  dataIndex: 'Shares', 
-                                  key: 'shares',
-                                  render: (val: number) => val ? (
-                                    <span style={{ color: '#1890ff' }}>
-                                      {val.toLocaleString()}
-                                    </span>
-                                  ) : '-'
-                                },
-                                {
-                                  title: '市值',
-                                  dataIndex: 'Value',
-                                  key: 'value',
-                                  render: (val: number) => val ? (
-                                    <span style={{ fontWeight: 600 }}>
-                                      {formatLargeNumber(val)}
-                                    </span>
-                                  ) : '-'
-                                },
-                                {
-                                  title: '占比',
-                                  dataIndex: 'pctHeld',
-                                  key: 'pct',
-                                  render: (val: number) => val ? (
-                                    <Tag color="blue">{(val * 100).toFixed(2)}%</Tag>
-                                  ) : '-'
-                                },
-                              ]}
-                              scroll={{ x: 600 }}
-                            />
-                          ),
-                        } : null,
-                        
-                        // 内部交易
-                        analysisResult.extra_data.insider_transactions && analysisResult.extra_data.insider_transactions.length > 0 ? {
-                          key: 'insider',
-                          label: (
-                            <span>
-                              <UserOutlined style={{ marginRight: 8 }} />
-                              <span>内部交易</span> <span style={{ color: '#8c8c8c', fontSize: '13px' }}>(最近{analysisResult.extra_data.insider_transactions.length}笔)</span>
-                            </span>
-                          ),
-                          children: (
-                            <Table
-                              size="small"
-                              pagination={{ pageSize: 10, showSizeChanger: false }}
-                              dataSource={analysisResult.extra_data.insider_transactions}
-                              rowKey={(record) => `${record.Insider || ''}-${record['Start Date'] || ''}-${record.id || Math.random().toString()}`}
-                              columns={[
-                                { 
-                                  title: '内部人员', 
-                                  dataIndex: 'Insider', 
-                                  key: 'insider',
-                                  width: '25%',
-                                  render: (val: string) => (
-                                    <span style={{ fontSize: 13 }}>{val}</span>
-                                  )
-                                },
-                                { 
-                                  title: '交易类型', 
-                                  dataIndex: 'Text', 
-                                  key: 'transaction',
-                                  width: '35%',
-                                  render: (val: string) => {
-                                    if (!val) return <Tag color="default">-</Tag>;
-                                    
-                                    let displayText = val;
-                                    let color = 'default';
-                                    
-                                    const lowerVal = val.toLowerCase();
-                                    if (lowerVal.includes('sale') || lowerVal.includes('sell')) {
-                                      color = 'red';
-                                      displayText = '出售';
-                                    } else if (lowerVal.includes('purchase') || lowerVal.includes('buy')) {
-                                      color = 'green';
-                                      displayText = '购买';
-                                    } else if (lowerVal.includes('stock gift')) {
-                                      color = 'blue';
-                                      displayText = '股票赠与';
-                                    } else if (lowerVal.includes('option exercise')) {
-                                      color = 'cyan';
-                                      displayText = '期权行使';
-                                    } else if (lowerVal.includes('stock award')) {
-                                      color = 'purple';
-                                      displayText = '股票奖励';
-                                    } else {
-                                      // 显示原始文本的前30个字符
-                                      displayText = val.length > 30 ? val.substring(0, 30) + '...' : val;
-                                    }
-                                    
-                                    return (
-                                      <Tag color={color} title={val}>
-                                        {displayText}
-                                      </Tag>
-                                    );
-                                  }
-                                },
-                                { 
-                                  title: '股数', 
-                                  dataIndex: 'Shares', 
-                                  key: 'shares',
-                                  render: (val: number) => val ? (
-                                    <span style={{ color: '#1890ff' }}>
-                                      {val.toLocaleString()}
-                                    </span>
-                                  ) : '-'
-                                },
-                                { 
-                                  title: '价值', 
-                                  dataIndex: 'Value', 
-                                  key: 'value',
-                                  render: (val: number) => val ? (
-                                    <span style={{ fontWeight: 600 }}>
-                                      {formatLargeNumber(val)}
-                                    </span>
-                                  ) : '-'
-                                },
-                              ]}
-                              scroll={{ x: 600 }}
-                            />
-                          ),
-                        } : null,
-                        
                         // 分析师推荐
                         analysisResult.extra_data.analyst_recommendations && analysisResult.extra_data.analyst_recommendations.length > 0 ? {
                           key: 'analyst',
@@ -3052,15 +3154,29 @@ const MainPage: React.FC = () => {
                                   dataIndex: 'Action', 
                                   key: 'action',
                                   render: (val: string) => {
-                                    const lower = val?.toLowerCase() || '';
+                                    if (!val) return '-';
+                                    const lower = val.toLowerCase();
+                                    const translated = translateAction(val);
+                                    
+                                    // 根据翻译结果确定颜色和图标
+                                    let color = 'default';
+                                    let icon = null;
+                                    
                                     if (lower.includes('up') || lower.includes('upgrade')) {
-                                      return <Tag color="success" icon={<RiseOutlined />}>上调</Tag>;
+                                      color = 'success';
+                                      icon = <RiseOutlined />;
                                     } else if (lower.includes('down') || lower.includes('downgrade')) {
-                                      return <Tag color="error" icon={<FallOutlined />}>下调</Tag>;
+                                      color = 'error';
+                                      icon = <FallOutlined />;
                                     } else if (lower.includes('init') || lower.includes('main')) {
-                                      return <Tag color="processing">新评级</Tag>;
+                                      color = 'processing';
                                     }
-                                    return val ? <Tag>{val}</Tag> : '-';
+                                    
+                                    return (
+                                      <Tag color={color} icon={icon}>
+                                        {translated}
+                                      </Tag>
+                                    );
                                   }
                                 },
                               ]}
@@ -3224,12 +3340,12 @@ const MainPage: React.FC = () => {
                           })(),
                         } : null,
                       ].filter((item): item is NonNullable<typeof item> => item !== null)}
-                      style={{ marginTop: 16 }}
+                      style={{ marginTop: 0 }}
                     />
                     </div>
                   )}
 
-                  </div>
+                </div>
                 </div>
               )}
 
@@ -3437,9 +3553,9 @@ const MainPage: React.FC = () => {
                   const sectionMap: Record<string, string> = {
                     'price-info': 'section-price-info',
                     'chart': 'section-chart',
-                    'ma': 'section-ma',
                     'indicators': 'section-indicators',
                     'cycle': 'section-cycle',
+                    'institutional': 'section-institutional',
                     'pivot': 'section-pivot',
                   };
                   const sectionId = sectionMap[key];
@@ -3458,11 +3574,6 @@ const MainPage: React.FC = () => {
                     label: 'K线图',
                     icon: <BarChartOutlined />,
                   },
-                  ...[5, 10, 20, 50].some(p => analysisResult?.indicators?.[`ma${p}`] !== undefined) ? [{
-                    key: 'ma',
-                    label: '移动平均线',
-                    icon: <RiseOutlined />,
-                  }] : [],
                   {
                     key: 'indicators',
                     label: '技术指标',
@@ -3472,6 +3583,11 @@ const MainPage: React.FC = () => {
                     key: 'cycle',
                     label: '周期分析',
                     icon: <CloudOutlined />,
+                  }] : [],
+                  ...(analysisResult?.indicators?.activity_score !== undefined) ? [{
+                    key: 'institutional',
+                    label: '机构操作分析',
+                    icon: <TeamOutlined />,
                   }] : [],
                   ...(analysisResult?.indicators?.pivot || analysisResult?.indicators?.pivot_r1 || analysisResult?.indicators?.resistance_20d_high) ? [{
                     key: 'pivot',

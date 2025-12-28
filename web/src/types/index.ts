@@ -190,6 +190,31 @@ export interface Indicators {
   sideways_volatility?: number;
   sideways_amplitude_20?: number; // 20日振幅统计
   sideways_trend_pct?: number; // 趋势变化百分比
+  // 机构操作分析
+  volume_ratio_20?: number;
+  volume_ratio_60?: number;
+  is_volume_spike?: boolean;
+  is_volume_surge?: boolean;
+  is_volume_shrink?: boolean;
+  price_change_5d?: number;
+  volume_change_5d?: number;
+  price_volume_rising?: boolean;
+  price_volume_falling?: boolean;
+  price_rising_volume_shrinking?: boolean;
+  price_falling_volume_shrinking?: boolean;
+  fund_flow?: 'inflow' | 'outflow' | 'neutral';
+  fund_flow_desc?: string;
+  cost_position?: 'below_cost' | 'above_cost' | 'near_cost';
+  cost_position_desc?: string;
+  chip_concentration?: 'high' | 'medium' | 'low';
+  chip_concentration_desc?: string;
+  price_pattern?: 'accumulation' | 'distribution' | 'consolidation' | 'controlled_rise' | 'normal';
+  price_pattern_desc?: string;
+  activity_score?: number;
+  activity_signals?: string[];
+  activity_level?: 'high' | 'medium' | 'low' | 'none';
+  activity_level_desc?: string;
+  suggestion?: string;
   // 周期时间段详情
   cycle_periods?: Array<{
     period_index: number;

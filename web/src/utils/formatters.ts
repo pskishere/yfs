@@ -385,6 +385,75 @@ export const getRSIStatus = (rsi: number | undefined): { color: string; text: st
 };
 
 /**
+ * 翻译交易操作类型
+ * 
+ * @param action - 交易操作类型（如 "upgrade", "downgrade", "init" 等）
+ * @returns 对应的中文翻译
+ */
+export const translateAction = (action: string | undefined | null): string => {
+  if (!action) return '-';
+  
+  const lower = action.toLowerCase().trim();
+  
+  const actionMap: Record<string, string> = {
+    // 评级变化
+    'up': '上调',
+    'upgrade': '上调',
+    'upgraded': '上调',
+    'down': '下调',
+    'downgrade': '下调',
+    'downgraded': '下调',
+    'init': '新评级',
+    'initiate': '新评级',
+    'initiated': '新评级',
+    'maintain': '维持',
+    'maintained': '维持',
+    'main': '维持',
+    'reiterate': '重申',
+    'reiterated': '重申',
+    'no change': '无变化',
+    'unchanged': '无变化',
+    
+    // 交易类型
+    'buy': '买入',
+    'purchase': '购买',
+    'sell': '卖出',
+    'sale': '出售',
+    'hold': '持有',
+    
+    // 内部交易类型
+    'stock gift': '股票赠与',
+    'option exercise': '期权行使',
+    'stock award': '股票奖励',
+    'stock option exercise': '股票期权行使',
+    'automatic sale': '自动出售',
+    'automatic purchase': '自动购买',
+    'discretionary transaction': '自主交易',
+    'non-discretionary transaction': '非自主交易',
+    
+    // 其他
+    'change': '变化',
+    '変化': '变化', // 日语
+    'reit': 'REIT', // 房地产投资信托基金
+  };
+  
+  // 精确匹配
+  if (actionMap[lower]) {
+    return actionMap[lower];
+  }
+  
+  // 部分匹配
+  for (const [key, value] of Object.entries(actionMap)) {
+    if (lower.includes(key) || key.includes(lower)) {
+      return value;
+    }
+  }
+  
+  // 如果都不匹配，返回原值
+  return action;
+};
+
+/**
  * 状态映射配置
  */
 export const statusMaps = {

@@ -75,13 +75,14 @@ def get_extra_analysis_data(symbol: str) -> Dict[str, Any]:
     """
     extra_data: Dict[str, Any] = {}
     try:
-        institutional = get_institutional_holders(symbol)
-        if institutional:
-            extra_data["institutional_holders"] = institutional[:20]
+        # 不再获取机构持仓和内部交易数据
+        # institutional = get_institutional_holders(symbol)
+        # if institutional:
+        #     extra_data["institutional_holders"] = institutional[:20]
 
-        insider = get_insider_transactions(symbol)
-        if insider:
-            extra_data["insider_transactions"] = insider[:15]
+        # insider = get_insider_transactions(symbol)
+        # if insider:
+        #     extra_data["insider_transactions"] = insider[:15]
 
         recommendations = get_recommendations(symbol)
         if recommendations:
@@ -151,8 +152,13 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
     if ind_error:
         return None, create_error_response(ind_error)
 
+    # 即使数据不足，也允许返回部分指标
     if not indicators:
-        return None, ({"success": False, "message": "数据不足，无法计算技术指标"}, 404)
+        # 如果完全没有数据，返回错误；否则返回空指标但允许继续
+        if not hist_data or len(hist_data) == 0:
+            return None, ({"success": False, "message": "无法获取历史数据"}, 404)
+        # 有数据但指标计算失败，返回空指标结构
+        indicators = {"symbol": symbol, "current_price": 0, "data_points": len(hist_data) if hist_data else 0}
 
     signals = generate_signals(indicators)
     formatted_candles = format_candle_data(hist_data)

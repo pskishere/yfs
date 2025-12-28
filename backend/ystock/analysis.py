@@ -19,7 +19,7 @@ from .indicators import (
     calculate_fibonacci_retracement, get_trend,
     calculate_cci, calculate_adx, calculate_sar,
     calculate_supertrend, calculate_stoch_rsi, calculate_volume_profile,
-    calculate_ichimoku, calculate_cycle_analysis
+    calculate_ichimoku, calculate_cycle_analysis, calculate_institutional_activity
 )
 from .indicators.ml_predictions import calculate_ml_predictions
 
@@ -45,9 +45,12 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
     if error:
         return None, error
     
-    if not hist_data or len(hist_data) < 20:
-        logger.warning(f"数据不足，无法计算技术指标: {symbol}")
-        return None, None
+    if not hist_data or len(hist_data) == 0:
+        return None, {"code": "NO_DATA", "message": f"无法获取历史数据: {symbol}"}
+    
+    # 数据不足时仍然尝试计算，但记录警告
+    if len(hist_data) < 20:
+        logger.warning(f"数据不足，部分指标可能无法计算: {symbol} (当前只有{len(hist_data)}条数据，建议至少20条)")
     
     closes = np.array([bar['close'] for bar in hist_data])
     highs = np.array([bar['high'] for bar in hist_data])
@@ -169,6 +172,34 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
     if len(closes) >= 20 and len(valid_volumes) > 0:
         ml_data = calculate_ml_predictions(closes, highs, lows, volumes)
         result.update(ml_data)
+    
+    # 机构操作分析（需要VWAP、OBV趋势、VP POC等数据）
+    if len(closes) >= 20 and len(valid_volumes) > 0:
+        # 计算VWAP（成交量加权平均价）
+        vwap = None
+        if len(closes) >= 20:
+            # 使用最近20天的数据计算VWAP
+            recent_closes = closes[-20:]
+            recent_volumes = volumes[-20:]
+            total_value = np.sum(recent_closes * recent_volumes)
+            total_volume = np.sum(recent_volumes)
+            if total_volume > 0:
+                vwap = total_value / total_volume
+        
+        # 获取OBV趋势
+        obv_trend = result.get('obv_trend')
+        
+        # 获取Volume Profile POC
+        vp_poc = result.get('vp_poc')
+        
+        # 计算机构操作分析
+        institutional_data = calculate_institutional_activity(
+            closes, highs, lows, volumes,
+            vwap=vwap,
+            obv_trend=obv_trend,
+            vp_poc=vp_poc
+        )
+        result.update(institutional_data)
 
     try:
         fundamental_data = get_fundamental_data(symbol)
@@ -871,32 +902,10 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         
         extra_sections = []
         if extra_data:
-            if extra_data.get('institutional_holders'):
-                inst = extra_data['institutional_holders']
-                inst_text = f"机构持仓 (前{min(len(inst), 10)}大机构):\n"
-                for i, holder in enumerate(inst[:10], 1):
-                    name = holder.get('Holder', '未知')
-                    shares = holder.get('Shares', 0) or 0
-                    value = holder.get('Value', 0) or 0
-                    pct = (holder.get('% Out') or holder.get('%Out') or holder.get('pctHeld') or 
-                           holder.get('Percent') or holder.get('% Held') or holder.get('pct_held'))
-                    if pct is not None:
-                        try:
-                            pct_val = float(pct)
-                            if pct_val < 1:
-                                pct_str = f"{(pct_val * 100):.2f}%"
-                            else:
-                                pct_str = f"{pct_val:.2f}%"
-                        except:
-                            pct_str = str(pct)
-                    else:
-                        pct_str = 'N/A'
-                    inst_text += f"   {i}. {name}\n"
-                    try:
-                        inst_text += f"      持股: {int(shares):,}, 市值: ${int(value):,.0f}, 占比: {pct_str}\n"
-                    except:
-                        inst_text += f"      持股: {shares}, 市值: ${value}, 占比: {pct_str}\n"
-                extra_sections.append(inst_text)
+            # 不再获取和显示机构持仓数据
+            # if extra_data.get('institutional_holders'):
+            #     inst = extra_data['institutional_holders']
+            #     ...
             
             # 分析师推荐
             if extra_data.get('analyst_recommendations'):
@@ -2422,8 +2431,9 @@ class StockAnalyzer:
                 'growth': self.analyze_growth(data.get('fundamental', {})),
                 'profitability': self.analyze_profitability(data.get('fundamental', {})),
                 'dividend': self.analyze_dividend(data),
-                'institutional': self.analyze_institutional(data),
-                'insider': self.analyze_insider(data),
+                # 不再分析机构持仓和内部交易
+                # 'institutional': self.analyze_institutional(data),
+                # 'insider': self.analyze_insider(data),
                 'analyst': self.analyze_analyst(data),
                 'earnings': self.analyze_earnings(data),
                 'esg': self.analyze_esg(data.get('sustainability', {})),
