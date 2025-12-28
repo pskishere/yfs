@@ -54,6 +54,11 @@
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
   }
+
+  /* 移动端减小分析内容区域的左右边距 */
+  .main-page .analysis-content {
+    padding: 0 2px;
+  }
   
   /* 移动端 Drawer 全屏优化 */
   :global(.ant-drawer) {
@@ -131,7 +136,7 @@
   /* 分析结果区域在移动端减少内边距 */
   .main-page > div:last-child,
   .main-page .analysis-content {
-    padding: 0 8px !important;
+    padding: 0 2px !important;
   }
 
   /* Descriptions组件在移动端减少列数 */
@@ -147,6 +152,32 @@
   .main-page :global(.ant-descriptions-item-content) {
     font-size: 12px;
     padding: 8px 4px !important;
+  }
+
+  /* 所有 Descriptions 紧凑布局 */
+  .main-page :global(.ant-descriptions-item-label),
+  .main-page :global(.ant-descriptions-item-content) {
+    padding: 4px 8px !important;
+  }
+
+  .main-page :global(.ant-descriptions-row) {
+    margin-bottom: 0 !important;
+  }
+
+  .main-page :global(.ant-descriptions-item) {
+    padding-bottom: 4px !important;
+  }
+
+  .main-page :global(.ant-descriptions-view) {
+    padding: 8px !important;
+  }
+
+  .main-page :global(.ant-descriptions-item-label) {
+    font-size: 13px !important;
+  }
+
+  .main-page :global(.ant-descriptions-item-content) {
+    font-size: 13px !important;
   }
 
   /* 表格在移动端可以横向滚动 */
@@ -255,7 +286,7 @@
 
   .main-page > div:last-child,
   .main-page .analysis-content {
-    padding: 0 4px !important;
+    padding: 0 2px !important;
   }
 
   .main-page :global(.ant-descriptions-title) {

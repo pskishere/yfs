@@ -185,7 +185,6 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
 def generate_signals(indicators: dict, account_value: float = 100000, risk_percent: float = 2.0):
     """
     基于技术指标生成买卖信号
-    使用新的多维度加权评分系统
     """
     if not indicators:
         return None
@@ -282,13 +281,9 @@ def generate_signals(indicators: dict, account_value: float = 100000, risk_perce
             elif ml_trend == 'down':
                 signals['signals'].append(f'🤖 ML预测: 轻微看跌(置信度{ml_confidence:.1f}%) - 谨慎悲观')
             
-    score, score_details = calculate_comprehensive_score(indicators)
-    signals['score'] = score
-    signals['score_details'] = score_details
-    
-    recommendation, action = get_recommendation(score)
-    signals['recommendation'] = recommendation
-    signals['action'] = action
+    # 评分系统已移除
+    signals['recommendation'] = 'N/A'
+    signals['action'] = 'hold'
     
     risk_assessment = assess_risk(indicators)
     signals['risk'] = {
@@ -949,19 +944,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
         
         extra_text = "\n\n".join(extra_sections) if extra_sections else None
         
-        score_details = signals.get('score_details', {})
-        dimensions = score_details.get('dimensions', {}) if score_details else {}
-        
-        if not isinstance(dimensions, dict):
-            dimensions = {}
-        dimensions = {
-            'trend': dimensions.get('trend', 50),
-            'momentum': dimensions.get('momentum', 50),
-            'volume': dimensions.get('volume', 50),
-            'volatility': dimensions.get('volatility', 50),
-            'support_resistance': dimensions.get('support_resistance', 50),
-            'advanced': dimensions.get('advanced', 50)
-        }
+        # 评分系统已移除
         
         stop_loss_val = signals.get('stop_loss')
         stop_loss_str = fmt_price(stop_loss_val) if stop_loss_val is not None else '未计算'
@@ -979,14 +962,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 **当前价格:** {fmt_price(indicators.get('current_price', 0))}  
 **货币单位:** {currency_symbol}{f" (代码: {currency_code})" if currency_code else ""}  
 **分析周期:** {duration} ({indicators.get('data_points', 0)}个交易日)
-
-**多维度评分详情:**
-- 趋势方向维度: {dimensions.get('trend', 0):.1f}/100
-- 动量指标维度: {dimensions.get('momentum', 0):.1f}/100
-- 成交量分析维度: {dimensions.get('volume', 0):.1f}/100
-- 波动性维度: {dimensions.get('volatility', 0):.1f}/100
-- 支撑压力维度: {dimensions.get('support_resistance', 0):.1f}/100
-- 高级指标维度: {dimensions.get('advanced', 0):.1f}/100
 
 ---
 
@@ -1039,9 +1014,9 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 请按照以下结构提供全面分析，每个部分都要有深度和洞察：
 
-## 一、多维度评分解读
+## 一、技术面综合分析
 
-基于系统提供的多维度评分结果，详细分析（请结合最新新闻事件进行解读）：
+基于技术指标数据，详细分析（请结合最新新闻事件进行解读）：
 
 1. **趋势方向维度**
    - 解释当前趋势状态（上涨/下跌/横盘）及其强度
@@ -1142,7 +1117,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 ## 五、综合分析结论
 
 1. **买卖建议**
-   - 基于多维度评分系统的综合判断
+   - 基于技术指标的综合判断
    - 明确的操作建议（买入/卖出/观望）及理由
 
 2. **具体操作价位（必须明确给出）**
@@ -1190,7 +1165,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 1. **结构清晰**: 严格按照上述五个部分组织内容，使用明确的标题和分段
 2. **数据引用**: 分析时要引用具体的技术指标数值和基本面数据
 3. **逻辑严密**: 每个结论都要有数据支撑和逻辑推理
-4. **重点突出**: 对于评分高的维度要深入分析，对于风险点要明确警示
+4. **重点突出**: 对于关键指标要深入分析，对于风险点要明确警示
 5. **语言专业**: 使用专业术语但保持可读性，避免过度复杂
 6. **建议明确**: 操作建议要具体可执行，避免模糊表述
 7. **价位必须明确**: 在"具体操作价位"部分，必须明确给出具体的买入价位、止损价位和止盈价位，包括具体价格数字、百分比和风险收益比，不能只给建议不给具体价格
@@ -1209,14 +1184,6 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 **货币单位:** {currency_symbol}{f" (代码: {currency_code})" if currency_code else ""}  
 **分析周期:** {duration} ({indicators.get('data_points', 0)}个交易日)  
 **⚠️ 注意:** 无基本面数据，仅基于技术分析
-
-**多维度评分详情:**
-- 趋势方向维度: {dimensions.get('trend', 0):.1f}/100
-- 动量指标维度: {dimensions.get('momentum', 0):.1f}/100
-- 成交量分析维度: {dimensions.get('volume', 0):.1f}/100
-- 波动性维度: {dimensions.get('volatility', 0):.1f}/100
-- 支撑压力维度: {dimensions.get('support_resistance', 0):.1f}/100
-- 高级指标维度: {dimensions.get('advanced', 0):.1f}/100
 
 ---
 # 技术指标数据
@@ -1268,9 +1235,9 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 请按照以下结构提供纯技术分析，每个部分都要有深度：
 
-## 一、多维度评分解读
+## 一、技术面综合分析
 
-基于系统提供的多维度评分结果，详细分析各维度的技术含义（请结合最新新闻事件进行解读）：
+基于技术指标数据，详细分析各维度的技术含义（请结合最新新闻事件进行解读）：
 
 1. **趋势方向维度**
    - 解释当前趋势状态及其强度
@@ -1332,7 +1299,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 ## 三、综合分析结论
 
 1. **买卖建议**
-   - 基于多维度评分系统的综合判断
+   - 基于技术指标的综合判断
    - 明确的操作建议及理由
 
 2. **具体操作价位（必须明确给出）**
@@ -1379,7 +1346,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 1. **结构清晰**: 严格按照上述五个部分组织内容，使用明确的标题和分段
 2. **数据引用**: 分析时要引用具体的技术指标数值
 3. **逻辑严密**: 每个结论都要有数据支撑
-4. **重点突出**: 对于评分高的维度要深入分析
+4. **重点突出**: 对于关键指标要深入分析
 5. **语言专业**: 使用专业术语但保持可读性
 6. **建议明确**: 操作建议要具体可执行
 7. **价位必须明确**: 在"具体操作价位"部分，必须明确给出具体的买入价位、止损价位和止盈价位，包括具体价格数字、百分比和风险收益比，不能只给建议不给具体价格
@@ -1417,7 +1384,7 @@ def perform_ai_analysis(symbol, indicators, signals, duration, model=DEFAULT_AI_
 
 
 # === merged from scoring.py ===
-# 评分系统模块 - 基于技术指标的多维度加权评分算法
+# 评分系统模块已移除 - 以下类保留以避免导入错误，但不再使用
 
 
 class ScoringSystem:
@@ -2137,34 +2104,17 @@ class ScoringSystem:
             return '🔴 强烈卖出', 'strong_sell'
 
 
-# 全局评分系统实例
-_scoring_system = ScoringSystem()
-
+# 评分系统已移除
+# 以下函数和类保留以避免导入错误，但不再使用
+_scoring_system = None  # 已废弃
 
 def calculate_comprehensive_score(indicators: Dict) -> Tuple[int, Dict]:
-    """
-    计算综合评分的便捷函数
-    
-    Args:
-        indicators: 技术指标字典
-        
-    Returns:
-        (综合评分, 详细评分字典)
-    """
-    return _scoring_system.calculate_score(indicators)
-
+    """已废弃：评分系统已移除"""
+    return 50, {}
 
 def get_recommendation(score: int) -> Tuple[str, str]:
-    """
-    获取建议的便捷函数
-    
-    Args:
-        score: 综合评分
-        
-    Returns:
-        (建议文字, 操作标识)
-    """
-    return _scoring_system.get_recommendation(score)
+    """已废弃：评分系统已移除"""
+    return 'N/A', 'hold'
 
 
 # === merged from signal_generators.py ===

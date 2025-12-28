@@ -111,7 +111,7 @@ export const IndicatorLabel: React.FC<IndicatorLabelProps> = ({ label, indicator
         placement="left"
         open={open}
         onClose={() => setOpen(false)}
-        width={isMobile ? '100%' : 420}
+        size={isMobile ? 'large' : 420}
         destroyOnClose
       >
         {createKnowledgeContent(info, isMobile)}
