@@ -574,7 +574,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
         marginBottom: '12px',
         padding: '8px 12px',
         backgroundColor: theme === 'light' ? '#f5f5f5' : '#1e1e1e',
-        borderRadius: '4px',
+        borderRadius: '0',
         display: 'flex',
         flexWrap: 'wrap',
         gap: '8px',
@@ -596,7 +596,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
             border: `1px solid ${indicatorVisibility.ma5 ? '#2196f3' : '#ccc'}`,
             backgroundColor: indicatorVisibility.ma5 ? '#2196f3' : 'transparent',
             color: indicatorVisibility.ma5 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '4px',
+            borderRadius: '0',
             cursor: 'pointer',
           }}
         >
@@ -610,7 +610,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
             border: `1px solid ${indicatorVisibility.ma10 ? '#2196f3' : '#ccc'}`,
             backgroundColor: indicatorVisibility.ma10 ? '#2196f3' : 'transparent',
             color: indicatorVisibility.ma10 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '4px',
+            borderRadius: '0',
             cursor: 'pointer',
           }}
         >
@@ -624,7 +624,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
             border: `1px solid ${indicatorVisibility.ma20 ? '#2196f3' : '#ccc'}`,
             backgroundColor: indicatorVisibility.ma20 ? '#2196f3' : 'transparent',
             color: indicatorVisibility.ma20 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '4px',
+            borderRadius: '0',
             cursor: 'pointer',
           }}
         >
@@ -638,7 +638,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
             border: `1px solid ${indicatorVisibility.ma50 ? '#2196f3' : '#ccc'}`,
             backgroundColor: indicatorVisibility.ma50 ? '#2196f3' : 'transparent',
             color: indicatorVisibility.ma50 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '4px',
+            borderRadius: '0',
             cursor: 'pointer',
           }}
         >
@@ -652,7 +652,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
             border: `1px solid ${indicatorVisibility.bb ? '#2196f3' : '#ccc'}`,
             backgroundColor: indicatorVisibility.bb ? '#2196f3' : 'transparent',
             color: indicatorVisibility.bb ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '4px',
+            borderRadius: '0',
             cursor: 'pointer',
           }}
         >

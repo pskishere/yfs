@@ -110,7 +110,7 @@ const renderSignalWithIcon = (signal: string): React.ReactNode => {
     // 云 (盘整)
     { pattern: /☁️/g, icon: <CloudOutlined style={{ color: '#8c8c8c', marginRight: 4 }} /> },
     // 灰色圆圈 (中性) - 使用简单的圆点
-    { pattern: /⚪|⚫|🔘/g, icon: <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> },
+    { pattern: /⚪|⚫|🔘/g, icon: <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '0', backgroundColor: '#d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> },
   ];
 
   // 查找所有 emoji 的位置

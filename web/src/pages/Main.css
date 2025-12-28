@@ -39,6 +39,31 @@
   margin-right: 0;
 }
 
+/* 确保输入框和下拉框高度一致 */
+.main-page .fixed-top :global(.ant-auto-complete .ant-input),
+.main-page .fixed-top :global(.ant-input),
+.main-page .fixed-top :global(.ant-select-selector),
+.main-page .fixed-top :global(.ant-select) {
+  height: 32px !important;
+}
+
+.main-page .fixed-top :global(.ant-auto-complete .ant-input),
+.main-page .fixed-top :global(.ant-input) {
+  padding: 4px 11px !important;
+  line-height: 22px !important;
+}
+
+.main-page .fixed-top :global(.ant-select-selector) {
+  height: 32px !important;
+  padding: 0 11px !important;
+}
+
+.main-page .fixed-top :global(.ant-select-selection-search-input),
+.main-page .fixed-top :global(.ant-select-selection-placeholder),
+.main-page .fixed-top :global(.ant-select-selection-item) {
+  line-height: 30px !important;
+}
+
 /* 移动端响应式样式 */
 @media (max-width: 768px) {
   .main-page {
@@ -249,7 +274,7 @@
   
   /* 移动端卡片优化 */
   :global(.ant-card) {
-    border-radius: 8px;
+    border-radius: 0;
     margin-bottom: 12px;
   }
   
@@ -337,19 +362,36 @@
 /* 确保 Descriptions 组件背景色为白色 */
 .main-page :global(.ant-descriptions) {
   background: #fff !important;
+  border-radius: 0 !important;
 }
 
 .main-page :global(.ant-descriptions-view) {
   background: #fff !important;
+  border-radius: 0 !important;
 }
 
 .main-page :global(.ant-descriptions-table) {
   background: #fff !important;
+  border-radius: 0 !important;
+}
+
+.main-page :global(.ant-descriptions-bordered) {
+  border-radius: 0 !important;
+}
+
+.main-page :global(.ant-descriptions-bordered .ant-descriptions-view) {
+  border-radius: 0 !important;
+}
+
+.main-page :global(.ant-descriptions-bordered .ant-descriptions-item-label),
+.main-page :global(.ant-descriptions-bordered .ant-descriptions-item-content) {
+  border-radius: 0 !important;
 }
 
 .main-page ::global(.ant-descriptions-item-label),
 .main-page ::global(.ant-descriptions-item-content) {
   background: #fff !important;
+  border-radius: 0 !important;
 }
 
 /* 确保浮动按钮有颜色 - 所有状态和所有可能的类名 */
