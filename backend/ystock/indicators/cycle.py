@@ -338,13 +338,12 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                 
                 # 判断当前周期的类型
                 if last_point['type'] == 'trough':
-                    # 从低点开始，可能是上涨或横盘
-                    amplitude = ((max_price_in_current - start_price) / start_price) * 100 if start_price > 0 else 0
-                    amplitude_abs = abs(amplitude)
-                    
+                    # 从低点开始，可能是上涨或横盘，但需要根据实际价格变化判断
                     # 计算基于最新价格的振幅
                     amplitude_from_current = ((current_price - start_price) / start_price) * 100 if start_price > 0 else 0
+                    amplitude_abs = abs(amplitude_from_current)
                     
+                    # 根据实际价格变化判断周期类型
                     if amplitude_abs < 5.0:
                         cycle_type = 'sideways'
                         cycle_type_desc = '窄幅横盘（进行中）'
@@ -353,66 +352,199 @@ def analyze_cycle_pattern(prices, highs, lows, timestamps=None):
                             cycle_type = 'sideways'
                             cycle_type_desc = '标准横盘（进行中）'
                         else:
+                            # 根据实际价格变化方向判断
+                            if amplitude_from_current > 0:
+                                cycle_type = 'rise'
+                                cycle_type_desc = '上涨（进行中）'
+                            else:
+                                cycle_type = 'decline'
+                                cycle_type_desc = '下跌（进行中）'
+                    else:
+                        # 根据实际价格变化方向判断
+                        if amplitude_from_current > 0:
                             cycle_type = 'rise'
                             cycle_type_desc = '上涨（进行中）'
-                    else:
-                        cycle_type = 'rise'
-                        cycle_type_desc = '上涨（进行中）'
-                    
-                    current_period_info = {
-                        'period_index': period_index,
-                        'cycle_type': cycle_type,
-                        'cycle_type_desc': cycle_type_desc,
-                        'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
-                        'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
-                        'start_index': int(start_idx),
-                        'end_index': int(current_idx),
-                        'duration': int(current_idx - start_idx),
-                        'low_price': start_price,
-                        'low_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
-                        'high_price': max_price_in_current,
-                        'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
-                        'amplitude': float(amplitude_from_current),  # 使用基于最新价格的振幅
-                        'is_current': True,  # 标记为当前周期
-                    }
-                else:  # last_point['type'] == 'peak'
-                    # 从高点开始，可能是下跌或横盘
-                    amplitude = ((min_price_in_current - start_price) / start_price) * 100 if start_price > 0 else 0
-                    amplitude_abs = abs(amplitude)
-                    
-                    # 计算基于最新价格的振幅
-                    amplitude_from_current = ((current_price - start_price) / start_price) * 100 if start_price > 0 else 0
-                    
-                    if amplitude_abs < 5.0:
-                        cycle_type = 'sideways'
-                        cycle_type_desc = '窄幅横盘（进行中）'
-                    elif amplitude_abs < 15.0:
-                        if (current_idx - start_idx) > 30:
-                            cycle_type = 'sideways'
-                            cycle_type_desc = '标准横盘（进行中）'
                         else:
                             cycle_type = 'decline'
                             cycle_type_desc = '下跌（进行中）'
-                    else:
-                        cycle_type = 'decline'
-                        cycle_type_desc = '下跌（进行中）'
                     
-                    current_period_info = {
-                        'period_index': period_index,
-                        'cycle_type': cycle_type,
-                        'cycle_type_desc': cycle_type_desc,
-                        'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
-                        'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
-                        'start_index': int(start_idx),
-                        'end_index': int(current_idx),
-                        'duration': int(current_idx - start_idx),
-                        'high_price': start_price,
-                        'high_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
-                        'low_price': min_price_in_current,
-                        'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
-                        'amplitude': float(amplitude_from_current),  # 使用基于最新价格的振幅
-                        'is_current': True,  # 标记为当前周期
-                    }
+                    # 根据周期类型设置起始价格和结束价格，并计算正确的振幅
+                    if cycle_type == 'rise':
+                        # 上涨周期：起始价格是低点，结束价格是高点
+                        actual_start_price = start_price  # 从低点开始，起始价格就是低点
+                        actual_end_price = max_price_in_current  # 结束价格是周期内的最高价
+                        # 振幅 = (结束价格 - 起始价格) / 起始价格 * 100
+                        amplitude_corrected = ((actual_end_price - actual_start_price) / actual_start_price) * 100 if actual_start_price > 0 else 0
+                        current_period_info = {
+                            'period_index': period_index,
+                            'cycle_type': cycle_type,
+                            'cycle_type_desc': cycle_type_desc,
+                            'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                            'start_index': int(start_idx),
+                            'end_index': int(current_idx),
+                            'duration': int(current_idx - start_idx),
+                            'low_price': actual_start_price,  # 起始价格是低点
+                            'low_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'high_price': actual_end_price,  # 结束价格是周期内的最高价
+                            'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
+                            'amplitude': float(amplitude_corrected),  # 使用正确的振幅计算
+                            'is_current': True,  # 标记为当前周期
+                        }
+                    elif cycle_type == 'decline':
+                        # 下跌周期：起始价格是高点，结束价格是低点
+                        actual_start_price = max_price_in_current  # 起始价格是周期内的最高价
+                        actual_end_price = min_price_in_current  # 结束价格是周期内的最低价
+                        # 振幅 = (结束价格 - 起始价格) / 起始价格 * 100（应该是负数）
+                        amplitude_corrected = ((actual_end_price - actual_start_price) / actual_start_price) * 100 if actual_start_price > 0 else 0
+                        current_period_info = {
+                            'period_index': period_index,
+                            'cycle_type': cycle_type,
+                            'cycle_type_desc': cycle_type_desc,
+                            'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                            'start_index': int(start_idx),
+                            'end_index': int(current_idx),
+                            'duration': int(current_idx - start_idx),
+                            'high_price': actual_start_price,  # 起始价格是周期内的最高价
+                            'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
+                            'low_price': actual_end_price,  # 结束价格是周期内的最低价
+                            'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
+                            'amplitude': float(amplitude_corrected),  # 使用正确的振幅计算
+                            'is_current': True,  # 标记为当前周期
+                        }
+                    else:
+                        # 横盘周期：根据振幅方向判断起始价格和结束价格
+                        # 振幅方向由 amplitude_from_current 决定
+                        if amplitude_from_current >= 0:
+                            # 振幅为正：从低点到高点
+                            actual_start_price = min_price_in_current
+                            actual_end_price = max_price_in_current
+                        else:
+                            # 振幅为负：从高点到低点
+                            actual_start_price = max_price_in_current
+                            actual_end_price = min_price_in_current
+                        amplitude_corrected = ((actual_end_price - actual_start_price) / actual_start_price) * 100 if actual_start_price > 0 else 0
+                        current_period_info = {
+                            'period_index': period_index,
+                            'cycle_type': cycle_type,
+                            'cycle_type_desc': cycle_type_desc,
+                            'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                            'start_index': int(start_idx),
+                            'end_index': int(current_idx),
+                            'duration': int(current_idx - start_idx),
+                            'high_price': max_price_in_current,
+                            'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
+                            'low_price': min_price_in_current,
+                            'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
+                            'amplitude': float(amplitude_corrected),  # 使用正确的振幅计算
+                            'is_current': True,  # 标记为当前周期
+                        }
+                else:  # last_point['type'] == 'peak'
+                    # 从高点开始，可能是下跌或横盘，但需要根据实际价格变化判断
+                    # 计算基于最新价格的振幅
+                    amplitude_from_current = ((current_price - start_price) / start_price) * 100 if start_price > 0 else 0
+                    amplitude_abs = abs(amplitude_from_current)
+                    
+                    # 根据实际价格变化判断周期类型
+                    if amplitude_abs < 5.0:
+                        cycle_type = 'sideways'
+                        cycle_type_desc = '窄幅横盘（进行中）'
+                    elif amplitude_abs < 15.0:
+                        if (current_idx - start_idx) > 30:
+                            cycle_type = 'sideways'
+                            cycle_type_desc = '标准横盘（进行中）'
+                        else:
+                            # 根据实际价格变化方向判断
+                            if amplitude_from_current > 0:
+                                cycle_type = 'rise'
+                                cycle_type_desc = '上涨（进行中）'
+                            else:
+                                cycle_type = 'decline'
+                                cycle_type_desc = '下跌（进行中）'
+                    else:
+                        # 根据实际价格变化方向判断
+                        if amplitude_from_current > 0:
+                            cycle_type = 'rise'
+                            cycle_type_desc = '上涨（进行中）'
+                        else:
+                            cycle_type = 'decline'
+                            cycle_type_desc = '下跌（进行中）'
+                    
+                    # 根据周期类型设置起始价格和结束价格，并计算正确的振幅
+                    if cycle_type == 'rise':
+                        # 上涨周期：起始价格是低点，结束价格是高点
+                        actual_start_price = min_price_in_current  # 起始价格是周期内的最低价
+                        actual_end_price = max_price_in_current  # 结束价格是周期内的最高价
+                        # 振幅 = (结束价格 - 起始价格) / 起始价格 * 100
+                        amplitude_corrected = ((actual_end_price - actual_start_price) / actual_start_price) * 100 if actual_start_price > 0 else 0
+                        current_period_info = {
+                            'period_index': period_index,
+                            'cycle_type': cycle_type,
+                            'cycle_type_desc': cycle_type_desc,
+                            'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                            'start_index': int(start_idx),
+                            'end_index': int(current_idx),
+                            'duration': int(current_idx - start_idx),
+                            'low_price': actual_start_price,  # 起始价格是周期内的最低价
+                            'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
+                            'high_price': actual_end_price,  # 结束价格是周期内的最高价
+                            'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
+                            'amplitude': float(amplitude_corrected),  # 使用正确的振幅计算
+                            'is_current': True,  # 标记为当前周期
+                        }
+                    elif cycle_type == 'decline':
+                        # 下跌周期：起始价格是高点，结束价格是低点
+                        actual_start_price = start_price  # 从高点开始，起始价格就是高点
+                        actual_end_price = min_price_in_current  # 结束价格是周期内的最低价
+                        # 振幅 = (结束价格 - 起始价格) / 起始价格 * 100（应该是负数）
+                        amplitude_corrected = ((actual_end_price - actual_start_price) / actual_start_price) * 100 if actual_start_price > 0 else 0
+                        current_period_info = {
+                            'period_index': period_index,
+                            'cycle_type': cycle_type,
+                            'cycle_type_desc': cycle_type_desc,
+                            'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                            'start_index': int(start_idx),
+                            'end_index': int(current_idx),
+                            'duration': int(current_idx - start_idx),
+                            'high_price': actual_start_price,  # 起始价格是高点
+                            'high_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'low_price': actual_end_price,  # 结束价格是周期内的最低价
+                            'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
+                            'amplitude': float(amplitude_corrected),  # 使用正确的振幅计算
+                            'is_current': True,  # 标记为当前周期
+                        }
+                    else:
+                        # 横盘周期：根据振幅方向判断起始价格和结束价格
+                        # 振幅方向由 amplitude_from_current 决定
+                        if amplitude_from_current >= 0:
+                            # 振幅为正：从低点到高点
+                            actual_start_price = min_price_in_current
+                            actual_end_price = max_price_in_current
+                        else:
+                            # 振幅为负：从高点到低点
+                            actual_start_price = max_price_in_current
+                            actual_end_price = min_price_in_current
+                        amplitude_corrected = ((actual_end_price - actual_start_price) / actual_start_price) * 100 if actual_start_price > 0 else 0
+                        current_period_info = {
+                            'period_index': period_index,
+                            'cycle_type': cycle_type,
+                            'cycle_type_desc': cycle_type_desc,
+                            'start_time': timestamps[start_idx] if timestamps and start_idx < len(timestamps) else None,
+                            'end_time': timestamps[current_idx] if timestamps and current_idx < len(timestamps) else None,
+                            'start_index': int(start_idx),
+                            'end_index': int(current_idx),
+                            'duration': int(current_idx - start_idx),
+                            'high_price': max_price_in_current,
+                            'high_time': timestamps[max_idx_in_current] if timestamps and max_idx_in_current < len(timestamps) else None,
+                            'low_price': min_price_in_current,
+                            'low_time': timestamps[min_idx_in_current] if timestamps and min_idx_in_current < len(timestamps) else None,
+                            'amplitude': float(amplitude_corrected),  # 使用正确的振幅计算
+                            'is_current': True,  # 标记为当前周期
+                        }
                 
                 cycle_periods.append(current_period_info)
         

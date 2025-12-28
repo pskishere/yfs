@@ -227,6 +227,8 @@ const MainPage: React.FC = () => {
 
   // 技术指标解释信息
   const [indicatorInfoMap, setIndicatorInfoMap] = useState<Record<string, IndicatorInfo>>({});
+  const [cyclePeriodPageSize, setCyclePeriodPageSize] = useState<number>(10);
+  const [cyclePeriodCurrent, setCyclePeriodCurrent] = useState<number>(1);
 
   // 响应式状态：检测是否为移动端
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth <= 768);
@@ -1936,34 +1938,36 @@ const MainPage: React.FC = () => {
                                 <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>
                                   周期时间段分析 ({indicators.cycle_periods.length}个周期)
                                 </div>
-                                <Table
-                                  dataSource={indicators.cycle_periods.slice().reverse()}
-                                  columns={[
-                                    {
-                                      title: '周期类型',
-                                      key: 'cycle_type',
-                                      width: 80,
-                                      align: 'center' as const,
-                                      render: (_: any, record: any) => {
-                                        const isRise = record.cycle_type === 'rise';
-                                        const isSideways = record.cycle_type === 'sideways';
-                                        const isDecline = record.cycle_type === 'decline';
-                                        
-                                        let tagColor = 'default';
-                                        if (isRise) tagColor = 'success';
-                                        else if (isDecline) tagColor = 'error';
-                                        else if (isSideways) tagColor = 'warning';
-                                        
-                                        return (
-                                          <Tag
-                                            color={tagColor}
-                                            style={{ fontSize: 12, fontWeight: 500 }}
-                                          >
-                                            {record.cycle_type_desc || (isRise ? '上涨' : isDecline ? '下跌' : '横盘')}
-                                          </Tag>
-                                        );
+                                <div style={{ overflowX: 'auto', width: '100%' }}>
+                                  <Table
+                                    dataSource={indicators.cycle_periods.slice().reverse()}
+                                    columns={[
+                                      {
+                                        title: '周期类型',
+                                        key: 'cycle_type',
+                                        width: 100,
+                                        fixed: 'left' as const,
+                                        align: 'center' as const,
+                                        render: (_: any, record: any) => {
+                                          const isRise = record.cycle_type === 'rise';
+                                          const isSideways = record.cycle_type === 'sideways';
+                                          const isDecline = record.cycle_type === 'decline';
+                                          
+                                          let tagColor = 'default';
+                                          if (isRise) tagColor = 'success';
+                                          else if (isDecline) tagColor = 'error';
+                                          else if (isSideways) tagColor = 'warning';
+                                          
+                                          return (
+                                            <Tag
+                                              color={tagColor}
+                                              style={{ fontSize: 12, fontWeight: 500 }}
+                                            >
+                                              {record.cycle_type_desc || (isRise ? '上涨' : isDecline ? '下跌' : '横盘')}
+                                            </Tag>
+                                          );
+                                        },
                                       },
-                                    },
                                     {
                                       title: '起始日期',
                                       key: 'start_time',
@@ -2111,11 +2115,20 @@ const MainPage: React.FC = () => {
                                     },
                                   ]}
                                   pagination={{
-                                    pageSize: 10,
+                                    current: cyclePeriodCurrent,
+                                    pageSize: cyclePeriodPageSize,
                                     showSizeChanger: true,
                                     showQuickJumper: true,
                                     showTotal: (total) => `共 ${total} 个周期`,
                                     pageSizeOptions: ['10', '20', '30', '50'],
+                                    onChange: (page, pageSize) => {
+                                      setCyclePeriodCurrent(page);
+                                      setCyclePeriodPageSize(pageSize);
+                                    },
+                                    onShowSizeChange: (_current, size) => {
+                                      setCyclePeriodCurrent(1); // 切换每页数量时重置到第一页
+                                      setCyclePeriodPageSize(size);
+                                    },
                                     locale: {
                                       items_per_page: '条/页',
                                       jump_to: '跳至',
@@ -2124,8 +2137,10 @@ const MainPage: React.FC = () => {
                                   }}
                                   size="small"
                                   style={{ fontSize: 12 }}
+                                  scroll={{ x: 'max-content' }}
                                   rowKey={(record, index) => `period-${record.period_index || index}`}
                                 />
+                                </div>
                               </div>
                             ) : null}
                                 </>
