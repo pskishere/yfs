@@ -1076,7 +1076,7 @@ const MainPage: React.FC = () => {
 
         {(analysisResult || aiAnalysisResult) && !analysisLoading && (
           <div style={{ marginTop: 24 }}>
-            <Space orientation="vertical" style={{ width: '100%' }} size="middle">
+            <Space orientation="vertical" style={{ width: '100%' }} size="small">
               {/* 技术分析 */}
               {analysisResult && analysisResult.indicators && (
                 <div>
@@ -1119,23 +1119,29 @@ const MainPage: React.FC = () => {
                     </Space>
                     
                     <div id="section-price-info">
-                    <Descriptions
-                      title={
-                        <span>
-                          <BarChartOutlined style={{ marginRight: 8 }} />
-                          价格信息
-                          {currentSymbol && (
-                            <span style={{ marginLeft: 8, color: '#595959', fontWeight: 500 }}>
-                              {currentSymbol} {stockName ? `(${stockName})` : ''}
-                            </span>
-                          )}
-                        </span>
-                      }
-                      bordered
-                      column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
-                      size="small"
-                      layout="vertical"
-                      items={(() => {
+                    <Collapse
+                      ghost
+                      defaultActiveKey={['price-info']}
+                      items={[{
+                        key: 'price-info',
+                        label: (
+                          <span>
+                            <BarChartOutlined style={{ marginRight: 8 }} />
+                            价格信息
+                            {currentSymbol && (
+                              <span style={{ marginLeft: 8, color: '#595959', fontWeight: 500 }}>
+                                {currentSymbol} {stockName ? `(${stockName})` : ''}
+                              </span>
+                            )}
+                          </span>
+                        ),
+                        children: (
+                          <Descriptions
+                            bordered
+                            column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
+                            size="small"
+                            layout="vertical"
+                            items={(() => {
                         const items = [
                         {
                           label: '当前价格',
@@ -1212,34 +1218,45 @@ const MainPage: React.FC = () => {
                         
                         return [...items, ...maItems];
                       })()}
+                          />
+                        ),
+                      }]}
+                      style={{ marginTop: 0 }}
                     />
                     </div>
-                  </div>
 
                   {/* K线图 */}
                   {currentSymbol && (
-                    <div id="section-chart" style={{ marginTop: 24, overflowX: 'auto' }}>
-                      <div style={{
-                        fontSize: '16px',
-                        fontWeight: 500,
-                        marginBottom: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}>
-                        <BarChartOutlined style={{ marginRight: 8 }} />
-                        K线图
-                      </div>
-                      <div style={{ minWidth: '100%', width: '100%' }}>
-                        <TradingViewChart
-                          symbol={currentSymbol}
-                          height={isMobile ? 300 : 500}
-                          theme="light"
-                          indicators={analysisResult?.indicators}
-                          candles={analysisResult?.candles}
-                        />
-                      </div>
+                    <div id="section-chart">
+                      <Collapse
+                        ghost
+                        defaultActiveKey={[]}
+                        items={[{
+                          key: 'chart',
+                          label: (
+                            <span>
+                              <BarChartOutlined style={{ marginRight: 8 }} />
+                              K线图
+                            </span>
+                          ),
+                          children: (
+                            <div style={{ overflowX: 'auto', minWidth: '100%', width: '100%' }}>
+                              <TradingViewChart
+                                symbol={currentSymbol}
+                                height={isMobile ? 300 : 500}
+                                theme="light"
+                                indicators={analysisResult?.indicators}
+                                candles={analysisResult?.candles}
+                              />
+                            </div>
+                          ),
+                        }]}
+                        style={{ marginTop: 0 }}
+                      />
                     </div>
                   )}
+
+                  </div>
 
                   {/* 技术指标 */}
                   <div id="section-indicators">

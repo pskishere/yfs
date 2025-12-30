@@ -33,6 +33,17 @@
   margin-right: 0;
 }
 
+/* Collapse 组件header和内容区域与顶栏对齐 */
+.main-page .analysis-content :global(.ant-collapse-header) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.main-page .analysis-content :global(.ant-collapse-content-box) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
 /* Descriptions 组件边距对齐 */
 .main-page :global(.ant-descriptions) {
   margin-left: 0;
