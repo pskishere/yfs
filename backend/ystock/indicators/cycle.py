@@ -896,3 +896,243 @@ def calculate_cycle_analysis(closes, highs, lows, timestamps=None):
     
     return analyze_cycle_pattern(closes, highs, lows, timestamps)
 
+
+def analyze_yearly_cycles(closes, highs, lows, timestamps=None):
+    """
+    分析年周期数据
+    计算每年的第一天和最后一天的涨幅，以及最低点到最高点的涨幅
+    
+    参数:
+        closes: 收盘价数组
+        highs: 最高价数组
+        lows: 最低价数组
+        timestamps: 时间戳数组（可选）
+    
+    返回:
+        list: 年周期数据列表
+    """
+    if len(closes) < 30 or timestamps is None or len(timestamps) == 0:
+        return []
+    
+    from datetime import datetime
+    
+    # 按年份分组数据
+    yearly_data = {}
+    for i, ts in enumerate(timestamps):
+        if ts is None:
+            continue
+        try:
+            # 解析时间戳
+            if isinstance(ts, str):
+                if 'T' in ts:
+                    dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                elif ' ' in ts:
+                    dt = datetime.strptime(ts.split()[0], '%Y-%m-%d')
+                else:
+                    dt = datetime.strptime(ts, '%Y-%m-%d')
+            else:
+                continue
+            
+            year = dt.year
+            if year not in yearly_data:
+                yearly_data[year] = {
+                    'indices': [],
+                    'dates': [],
+                    'closes': [],
+                    'highs': [],
+                    'lows': []
+                }
+            yearly_data[year]['indices'].append(i)
+            yearly_data[year]['dates'].append(ts)
+            yearly_data[year]['closes'].append(closes[i] if i < len(closes) else None)
+            yearly_data[year]['highs'].append(highs[i] if i < len(highs) else None)
+            yearly_data[year]['lows'].append(lows[i] if i < len(lows) else None)
+        except Exception:
+            continue
+    
+    # 计算每年的统计数据
+    yearly_cycles = []
+    for year in sorted(yearly_data.keys()):
+        data = yearly_data[year]
+        if len(data['indices']) == 0:
+            continue
+        
+        # 获取第一天和最后一天的数据
+        first_idx = data['indices'][0]
+        last_idx = data['indices'][-1]
+        
+        first_close = data['closes'][0]
+        last_close = data['closes'][-1]
+        
+        # 计算第一天到最后一天的涨幅
+        first_to_last_change = ((last_close - first_close) / first_close * 100) if first_close > 0 else 0
+        
+        # 计算最低点到最高点的涨幅
+        period_highs = [h for h in data['highs'] if h is not None]
+        period_lows = [l for l in data['lows'] if l is not None]
+        
+        if len(period_highs) > 0 and len(period_lows) > 0:
+            max_high = float(np.max(period_highs))
+            min_low = float(np.min(period_lows))
+            low_to_high_change = ((max_high - min_low) / min_low * 100) if min_low > 0 else 0
+            
+            # 找到最高点和最低点的日期
+            max_high_idx_in_data = None
+            min_low_idx_in_data = None
+            for idx, h in enumerate(data['highs']):
+                if h is not None and abs(h - max_high) < 0.0001:
+                    max_high_idx_in_data = idx
+                    break
+            for idx, l in enumerate(data['lows']):
+                if l is not None and abs(l - min_low) < 0.0001:
+                    min_low_idx_in_data = idx
+                    break
+            
+            max_high_date = data['dates'][max_high_idx_in_data] if max_high_idx_in_data is not None else data['dates'][0]
+            min_low_date = data['dates'][min_low_idx_in_data] if min_low_idx_in_data is not None else data['dates'][0]
+        else:
+            max_high = None
+            min_low = None
+            low_to_high_change = 0
+            max_high_date = None
+            min_low_date = None
+        
+        yearly_cycles.append({
+            'year': year,
+            'first_date': data['dates'][0],
+            'last_date': data['dates'][-1],
+            'first_close': float(first_close),
+            'last_close': float(last_close),
+            'first_to_last_change': float(first_to_last_change),
+            'min_low': float(min_low) if min_low is not None else None,
+            'max_high': float(max_high) if max_high is not None else None,
+            'min_low_date': min_low_date,
+            'max_high_date': max_high_date,
+            'low_to_high_change': float(low_to_high_change),
+            'trading_days': len(data['indices'])
+        })
+    
+    return yearly_cycles
+
+
+def analyze_monthly_cycles(closes, highs, lows, timestamps=None):
+    """
+    分析月周期数据
+    计算每月的第一天和最后一天的涨幅，以及最低点到最高点的涨幅
+    
+    参数:
+        closes: 收盘价数组
+        highs: 最高价数组
+        lows: 最低价数组
+        timestamps: 时间戳数组（可选）
+    
+    返回:
+        list: 月周期数据列表
+    """
+    if len(closes) < 30 or timestamps is None or len(timestamps) == 0:
+        return []
+    
+    from datetime import datetime
+    
+    # 按年月分组数据
+    monthly_data = {}
+    for i, ts in enumerate(timestamps):
+        if ts is None:
+            continue
+        try:
+            # 解析时间戳
+            if isinstance(ts, str):
+                if 'T' in ts:
+                    dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                elif ' ' in ts:
+                    dt = datetime.strptime(ts.split()[0], '%Y-%m-%d')
+                else:
+                    dt = datetime.strptime(ts, '%Y-%m-%d')
+            else:
+                continue
+            
+            year_month = f"{dt.year}-{dt.month:02d}"
+            if year_month not in monthly_data:
+                monthly_data[year_month] = {
+                    'indices': [],
+                    'dates': [],
+                    'closes': [],
+                    'highs': [],
+                    'lows': [],
+                    'year': dt.year,
+                    'month': dt.month
+                }
+            monthly_data[year_month]['indices'].append(i)
+            monthly_data[year_month]['dates'].append(ts)
+            monthly_data[year_month]['closes'].append(closes[i] if i < len(closes) else None)
+            monthly_data[year_month]['highs'].append(highs[i] if i < len(highs) else None)
+            monthly_data[year_month]['lows'].append(lows[i] if i < len(lows) else None)
+        except Exception:
+            continue
+    
+    # 计算每月的统计数据
+    monthly_cycles = []
+    for year_month in sorted(monthly_data.keys()):
+        data = monthly_data[year_month]
+        if len(data['indices']) == 0:
+            continue
+        
+        # 获取第一天和最后一天的数据
+        first_idx = data['indices'][0]
+        last_idx = data['indices'][-1]
+        
+        first_close = data['closes'][0]
+        last_close = data['closes'][-1]
+        
+        # 计算第一天到最后一天的涨幅
+        first_to_last_change = ((last_close - first_close) / first_close * 100) if first_close > 0 else 0
+        
+        # 计算最低点到最高点的涨幅
+        period_highs = [h for h in data['highs'] if h is not None]
+        period_lows = [l for l in data['lows'] if l is not None]
+        
+        if len(period_highs) > 0 and len(period_lows) > 0:
+            max_high = float(np.max(period_highs))
+            min_low = float(np.min(period_lows))
+            low_to_high_change = ((max_high - min_low) / min_low * 100) if min_low > 0 else 0
+            
+            # 找到最高点和最低点的日期
+            max_high_idx_in_data = None
+            min_low_idx_in_data = None
+            for idx, h in enumerate(data['highs']):
+                if h is not None and abs(h - max_high) < 0.0001:
+                    max_high_idx_in_data = idx
+                    break
+            for idx, l in enumerate(data['lows']):
+                if l is not None and abs(l - min_low) < 0.0001:
+                    min_low_idx_in_data = idx
+                    break
+            
+            max_high_date = data['dates'][max_high_idx_in_data] if max_high_idx_in_data is not None else data['dates'][0]
+            min_low_date = data['dates'][min_low_idx_in_data] if min_low_idx_in_data is not None else data['dates'][0]
+        else:
+            max_high = None
+            min_low = None
+            low_to_high_change = 0
+            max_high_date = None
+            min_low_date = None
+        
+        monthly_cycles.append({
+            'year': data['year'],
+            'month': data['month'],
+            'year_month': year_month,
+            'first_date': data['dates'][0],
+            'last_date': data['dates'][-1],
+            'first_close': float(first_close),
+            'last_close': float(last_close),
+            'first_to_last_change': float(first_to_last_change),
+            'min_low': float(min_low) if min_low is not None else None,
+            'max_high': float(max_high) if max_high is not None else None,
+            'min_low_date': min_low_date,
+            'max_high_date': max_high_date,
+            'low_to_high_change': float(low_to_high_change),
+            'trading_days': len(data['indices'])
+        })
+    
+    return monthly_cycles
+

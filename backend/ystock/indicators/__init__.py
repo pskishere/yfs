@@ -25,7 +25,7 @@ from .supertrend import calculate_supertrend
 from .stoch_rsi import calculate_stoch_rsi
 from .volume_profile import calculate_volume_profile
 from .ichimoku import calculate_ichimoku
-from .cycle import calculate_cycle_analysis
+from .cycle import calculate_cycle_analysis, analyze_yearly_cycles, analyze_monthly_cycles
 from .institutional_activity import calculate_institutional_activity
 
 __all__ = [
@@ -52,6 +52,8 @@ __all__ = [
     'calculate_volume_profile',
     'calculate_ichimoku',
     'calculate_cycle_analysis',
+    'analyze_yearly_cycles',
+    'analyze_monthly_cycles',
     'calculate_institutional_activity',
 ]
 

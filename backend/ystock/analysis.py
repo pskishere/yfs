@@ -19,7 +19,7 @@ from .indicators import (
     calculate_fibonacci_retracement, get_trend,
     calculate_cci, calculate_adx, calculate_sar,
     calculate_supertrend, calculate_stoch_rsi, calculate_volume_profile,
-    calculate_ichimoku, calculate_cycle_analysis, calculate_institutional_activity
+    calculate_ichimoku, calculate_cycle_analysis, analyze_yearly_cycles, analyze_monthly_cycles, calculate_institutional_activity
 )
 from .indicators.ml_predictions import calculate_ml_predictions
 
@@ -168,6 +168,12 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
                     timestamps.append(None)
         cycle_data = calculate_cycle_analysis(closes, highs, lows, timestamps if timestamps else None)
         result.update(cycle_data)
+        
+        # 计算年周期和月周期分析
+        yearly_cycles = analyze_yearly_cycles(closes, highs, lows, timestamps if timestamps else None)
+        monthly_cycles = analyze_monthly_cycles(closes, highs, lows, timestamps if timestamps else None)
+        result['yearly_cycles'] = yearly_cycles
+        result['monthly_cycles'] = monthly_cycles
 
     if len(closes) >= 20 and len(valid_volumes) > 0:
         ml_data = calculate_ml_predictions(closes, highs, lows, volumes)

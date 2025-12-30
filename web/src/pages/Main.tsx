@@ -232,6 +232,10 @@ const MainPage: React.FC = () => {
   const [indicatorInfoMap, setIndicatorInfoMap] = useState<Record<string, IndicatorInfo>>({});
   const [cyclePeriodPageSize, setCyclePeriodPageSize] = useState<number>(10);
   const [cyclePeriodCurrent, setCyclePeriodCurrent] = useState<number>(1);
+  const [yearlyCyclePageSize, setYearlyCyclePageSize] = useState<number>(10);
+  const [yearlyCycleCurrent, setYearlyCycleCurrent] = useState<number>(1);
+  const [monthlyCyclePageSize, setMonthlyCyclePageSize] = useState<number>(10);
+  const [monthlyCycleCurrent, setMonthlyCycleCurrent] = useState<number>(1);
   const [pageNavigatorVisible, setPageNavigatorVisible] = useState<boolean>(false);
 
   // 响应式状态：检测是否为移动端
@@ -2017,13 +2021,17 @@ const MainPage: React.FC = () => {
                             {/* 周期时间段表格 */}
                             {indicators.cycle_periods && indicators.cycle_periods.length > 0 ? (
                               <div style={{ marginTop: 16 }}>
-                                <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>
-                                  周期时间段分析 ({indicators.cycle_periods.length}个周期)
-                                </div>
-                                <div style={{ overflowX: 'auto', width: '100%' }}>
-                                <Table
-                                  dataSource={indicators.cycle_periods.slice().reverse()}
-                                  columns={[
+                                <Tabs
+                                  defaultActiveKey="cycle-periods"
+                                  items={[
+                                    {
+                                      key: 'cycle-periods',
+                                      label: `周期时间段 (${indicators.cycle_periods.length})`,
+                                      children: (
+                                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                                          <Table
+                                            dataSource={indicators.cycle_periods.slice().reverse()}
+                                            columns={[
                                     {
                                       title: '周期类型',
                                       key: 'cycle_type',
@@ -2221,8 +2229,333 @@ const MainPage: React.FC = () => {
                                   style={{ fontSize: 12 }}
                                   scroll={{ x: 'max-content' }}
                                   rowKey={(record) => `period-${record.period_index || record.id || Math.random().toString()}`}
+                                            />
+                                          </div>
+                                        ),
+                                    },
+                                    indicators.yearly_cycles && indicators.yearly_cycles.length > 0 ? {
+                                      key: 'yearly-cycles',
+                                      label: `年周期 (${indicators.yearly_cycles.length})`,
+                                      children: (
+                                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                                          <Table
+                                            dataSource={indicators.yearly_cycles.slice().reverse()}
+                                            columns={[
+                                              {
+                                                title: '年份',
+                                                dataIndex: 'year',
+                                                key: 'year',
+                                                width: 80,
+                                                fixed: 'left' as const,
+                                                align: 'center' as const,
+                                                render: (year: number) => `${year}年`,
+                                              },
+                                              {
+                                                title: '第一天',
+                                                key: 'first_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.first_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '第一天收盘价',
+                                                key: 'first_close',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => formatCurrency(record.first_close),
+                                              },
+                                              {
+                                                title: '最后一天',
+                                                key: 'last_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.last_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '最后一天收盘价',
+                                                key: 'last_close',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => formatCurrency(record.last_close),
+                                              },
+                                              {
+                                                title: '周期涨幅',
+                                                key: 'first_to_last_change',
+                                                width: 150,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => {
+                                                  const change = record.first_to_last_change || 0;
+                                                  const color = change >= 0 ? '#cf1322' : '#3f8600';
+                                                  return (
+                                                    <span style={{ color, fontWeight: 500 }}>
+                                                      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                                                    </span>
+                                                  );
+                                                },
+                                              },
+                                              {
+                                                title: '最低价',
+                                                key: 'min_low',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => record.min_low ? formatCurrency(record.min_low) : '-',
+                                              },
+                                              {
+                                                title: '最低价日期',
+                                                key: 'min_low_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.min_low_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '最高价',
+                                                key: 'max_high',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => record.max_high ? formatCurrency(record.max_high) : '-',
+                                              },
+                                              {
+                                                title: '最高价日期',
+                                                key: 'max_high_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.max_high_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '最低到最高涨幅',
+                                                key: 'low_to_high_change',
+                                                width: 150,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => {
+                                                  const change = record.low_to_high_change || 0;
+                                                  const color = '#cf1322';
+                                                  return (
+                                                    <span style={{ color, fontWeight: 500 }}>
+                                                      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                                                    </span>
+                                                  );
+                                                },
+                                              },
+                                              {
+                                                title: '交易日数',
+                                                dataIndex: 'trading_days',
+                                                key: 'trading_days',
+                                                width: 100,
+                                                align: 'center' as const,
+                                                render: (days: number) => `${days}天`,
+                                              },
+                                            ]}
+                                            pagination={{
+                                              current: yearlyCycleCurrent,
+                                              pageSize: yearlyCyclePageSize,
+                                              showSizeChanger: true,
+                                              showQuickJumper: true,
+                                              showTotal: (total) => `共 ${total} 个年度`,
+                                              pageSizeOptions: ['10', '20', '30', '50'],
+                                              onChange: (page, pageSize) => {
+                                                setYearlyCycleCurrent(page);
+                                                setYearlyCyclePageSize(pageSize);
+                                              },
+                                              onShowSizeChange: (_current, size) => {
+                                                setYearlyCycleCurrent(1);
+                                                setYearlyCyclePageSize(size);
+                                              },
+                                              locale: {
+                                                items_per_page: '条/页',
+                                                jump_to: '跳至',
+                                                page: '页',
+                                              },
+                                            }}
+                                            size="small"
+                                            style={{ fontSize: 12 }}
+                                            scroll={{ x: 'max-content' }}
+                                            rowKey={(record) => `yearly-${record.year}`}
+                                          />
+                                        </div>
+                                      ),
+                                    } : null,
+                                    indicators.monthly_cycles && indicators.monthly_cycles.length > 0 ? {
+                                      key: 'monthly-cycles',
+                                      label: `月周期 (${indicators.monthly_cycles.length})`,
+                                      children: (
+                                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                                          <Table
+                                            dataSource={indicators.monthly_cycles.slice().reverse()}
+                                            columns={[
+                                              {
+                                                title: '月份',
+                                                key: 'year_month',
+                                                width: 100,
+                                                fixed: 'left' as const,
+                                                align: 'center' as const,
+                                                render: (_: any, record: any) => `${record.year}年${record.month}月`,
+                                              },
+                                              {
+                                                title: '第一天',
+                                                key: 'first_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.first_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '第一天收盘价',
+                                                key: 'first_close',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => formatCurrency(record.first_close),
+                                              },
+                                              {
+                                                title: '最后一天',
+                                                key: 'last_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.last_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '最后一天收盘价',
+                                                key: 'last_close',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => formatCurrency(record.last_close),
+                                              },
+                                              {
+                                                title: '周期涨幅',
+                                                key: 'first_to_last_change',
+                                                width: 150,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => {
+                                                  const change = record.first_to_last_change || 0;
+                                                  const color = change >= 0 ? '#cf1322' : '#3f8600';
+                                                  return (
+                                                    <span style={{ color, fontWeight: 500 }}>
+                                                      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                                                    </span>
+                                                  );
+                                                },
+                                              },
+                                              {
+                                                title: '最低价',
+                                                key: 'min_low',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => record.min_low ? formatCurrency(record.min_low) : '-',
+                                              },
+                                              {
+                                                title: '最低价日期',
+                                                key: 'min_low_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.min_low_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '最高价',
+                                                key: 'max_high',
+                                                width: 120,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => record.max_high ? formatCurrency(record.max_high) : '-',
+                                              },
+                                              {
+                                                title: '最高价日期',
+                                                key: 'max_high_date',
+                                                width: 120,
+                                                render: (_: any, record: any) => {
+                                                  const dateStr = record.max_high_date;
+                                                  if (dateStr) {
+                                                    return dateStr.split('T')[0].split(' ')[0];
+                                                  }
+                                                  return '-';
+                                                },
+                                              },
+                                              {
+                                                title: '最低到最高涨幅',
+                                                key: 'low_to_high_change',
+                                                width: 150,
+                                                align: 'right' as const,
+                                                render: (_: any, record: any) => {
+                                                  const change = record.low_to_high_change || 0;
+                                                  const color = '#cf1322';
+                                                  return (
+                                                    <span style={{ color, fontWeight: 500 }}>
+                                                      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                                                    </span>
+                                                  );
+                                                },
+                                              },
+                                              {
+                                                title: '交易日数',
+                                                dataIndex: 'trading_days',
+                                                key: 'trading_days',
+                                                width: 100,
+                                                align: 'center' as const,
+                                                render: (days: number) => `${days}天`,
+                                              },
+                                            ]}
+                                            pagination={{
+                                              current: monthlyCycleCurrent,
+                                              pageSize: monthlyCyclePageSize,
+                                              showSizeChanger: true,
+                                              showQuickJumper: true,
+                                              showTotal: (total) => `共 ${total} 个月度`,
+                                              pageSizeOptions: ['10', '20', '30', '50'],
+                                              onChange: (page, pageSize) => {
+                                                setMonthlyCycleCurrent(page);
+                                                setMonthlyCyclePageSize(pageSize);
+                                              },
+                                              onShowSizeChange: (_current, size) => {
+                                                setMonthlyCycleCurrent(1);
+                                                setMonthlyCyclePageSize(size);
+                                              },
+                                              locale: {
+                                                items_per_page: '条/页',
+                                                jump_to: '跳至',
+                                                page: '页',
+                                              },
+                                            }}
+                                            size="small"
+                                            style={{ fontSize: 12 }}
+                                            scroll={{ x: 'max-content' }}
+                                            rowKey={(record) => `monthly-${record.year}-${record.month}`}
+                                          />
+                                        </div>
+                                      ),
+                                    } : null,
+                                  ].filter((item): item is NonNullable<typeof item> => item !== null)}
                                 />
-                                </div>
                               </div>
                             ) : null}
                                 </>

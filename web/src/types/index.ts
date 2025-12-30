@@ -231,6 +231,38 @@ export interface Indicators {
     low_time?: string;
     is_current?: boolean; // 标记是否为当前进行中的周期
   }>;
+  // 年周期数据
+  yearly_cycles?: Array<{
+    year: number;
+    first_date?: string;
+    last_date?: string;
+    first_close: number;
+    last_close: number;
+    first_to_last_change: number;
+    min_low?: number;
+    max_high?: number;
+    min_low_date?: string;
+    max_high_date?: string;
+    low_to_high_change: number;
+    trading_days: number;
+  }>;
+  // 月周期数据
+  monthly_cycles?: Array<{
+    year: number;
+    month: number;
+    year_month: string;
+    first_date?: string;
+    last_date?: string;
+    first_close: number;
+    last_close: number;
+    first_to_last_change: number;
+    min_low?: number;
+    max_high?: number;
+    min_low_date?: string;
+    max_high_date?: string;
+    low_to_high_change: number;
+    trading_days: number;
+  }>;
   [key: string]: any;
 }
 
