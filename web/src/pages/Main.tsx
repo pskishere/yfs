@@ -2054,7 +2054,7 @@ const MainPage: React.FC = () => {
                                       key: 'cycle_type',
                                         width: 100,
                                         fixed: 'left' as const,
-                                      align: 'center' as const,
+                                      align: 'left' as const,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
                                         const isSideways = record.cycle_type === 'sideways';
@@ -2182,14 +2182,14 @@ const MainPage: React.FC = () => {
                                       dataIndex: 'duration',
                                       key: 'duration',
                                       width: 80,
-                                      align: 'center' as const,
+                                      align: 'left' as const,
                                       render: (val: number) => `${val}天`,
                                     },
                                     {
                                       title: '振幅',
                                       key: 'amplitude',
                                       width: 100,
-                                      align: 'right' as const,
+                                      align: 'left' as const,
                                       render: (_: any, record: any) => {
                                         const isRise = record.cycle_type === 'rise';
                                         const isSideways = record.cycle_type === 'sideways';
@@ -2264,7 +2264,7 @@ const MainPage: React.FC = () => {
                                                 key: 'year',
                                                 width: 80,
                                                 fixed: 'left' as const,
-                                                align: 'center' as const,
+                                                align: 'left' as const,
                                                 render: (year: number) => `${year}年`,
                                               },
                                               {
@@ -2283,7 +2283,7 @@ const MainPage: React.FC = () => {
                                                 title: '第一天收盘价',
                                                 key: 'first_close',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => formatCurrency(record.first_close),
                                               },
                                               {
@@ -2302,14 +2302,14 @@ const MainPage: React.FC = () => {
                                                 title: '最后一天收盘价',
                                                 key: 'last_close',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => formatCurrency(record.last_close),
                                               },
                                               {
                                                 title: '周期涨幅',
                                                 key: 'first_to_last_change',
                                                 width: 150,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => {
                                                   const change = record.first_to_last_change || 0;
                                                   const color = change >= 0 ? '#cf1322' : '#3f8600';
@@ -2324,7 +2324,7 @@ const MainPage: React.FC = () => {
                                                 title: '最低价',
                                                 key: 'min_low',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => record.min_low ? formatCurrency(record.min_low) : '-',
                                               },
                                               {
@@ -2343,7 +2343,7 @@ const MainPage: React.FC = () => {
                                                 title: '最高价',
                                                 key: 'max_high',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => record.max_high ? formatCurrency(record.max_high) : '-',
                                               },
                                               {
@@ -2362,7 +2362,7 @@ const MainPage: React.FC = () => {
                                                 title: '最低到最高涨幅',
                                                 key: 'low_to_high_change',
                                                 width: 150,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => {
                                                   const change = record.low_to_high_change || 0;
                                                   const color = '#cf1322';
@@ -2378,7 +2378,7 @@ const MainPage: React.FC = () => {
                                                 dataIndex: 'trading_days',
                                                 key: 'trading_days',
                                                 width: 100,
-                                                align: 'center' as const,
+                                                align: 'left' as const,
                                                 render: (days: number) => `${days}天`,
                                               },
                                             ]}
@@ -2424,7 +2424,7 @@ const MainPage: React.FC = () => {
                                                 key: 'year_month',
                                                 width: 100,
                                                 fixed: 'left' as const,
-                                                align: 'center' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => `${record.year}年${record.month}月`,
                                               },
                                               {
@@ -2443,7 +2443,7 @@ const MainPage: React.FC = () => {
                                                 title: '第一天收盘价',
                                                 key: 'first_close',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => formatCurrency(record.first_close),
                                               },
                                               {
@@ -2462,14 +2462,14 @@ const MainPage: React.FC = () => {
                                                 title: '最后一天收盘价',
                                                 key: 'last_close',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => formatCurrency(record.last_close),
                                               },
                                               {
                                                 title: '周期涨幅',
                                                 key: 'first_to_last_change',
                                                 width: 150,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => {
                                                   const change = record.first_to_last_change || 0;
                                                   const color = change >= 0 ? '#cf1322' : '#3f8600';
@@ -2484,7 +2484,7 @@ const MainPage: React.FC = () => {
                                                 title: '最低价',
                                                 key: 'min_low',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => record.min_low ? formatCurrency(record.min_low) : '-',
                                               },
                                               {
@@ -2503,7 +2503,7 @@ const MainPage: React.FC = () => {
                                                 title: '最高价',
                                                 key: 'max_high',
                                                 width: 120,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => record.max_high ? formatCurrency(record.max_high) : '-',
                                               },
                                               {
@@ -2522,7 +2522,7 @@ const MainPage: React.FC = () => {
                                                 title: '最低到最高涨幅',
                                                 key: 'low_to_high_change',
                                                 width: 150,
-                                                align: 'right' as const,
+                                                align: 'left' as const,
                                                 render: (_: any, record: any) => {
                                                   const change = record.low_to_high_change || 0;
                                                   const color = '#cf1322';
@@ -2538,7 +2538,7 @@ const MainPage: React.FC = () => {
                                                 dataIndex: 'trading_days',
                                                 key: 'trading_days',
                                                 width: 100,
-                                                align: 'center' as const,
+                                                align: 'left' as const,
                                                 render: (days: number) => `${days}天`,
                                               },
                                             ]}
