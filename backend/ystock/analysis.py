@@ -166,14 +166,22 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
                         timestamps.append(date_str)
                 else:
                     timestamps.append(None)
-        cycle_data = calculate_cycle_analysis(closes, highs, lows, timestamps if timestamps else None)
+        
+        # 周期分析（已包含增强功能）
+        cycle_data = calculate_cycle_analysis(
+            closes, highs, lows,
+            volumes=volumes if len(valid_volumes) > 0 else None,
+            timestamps=timestamps if timestamps else None,
+            use_adaptive=True,
+            use_wavelet=True
+        )
         result.update(cycle_data)
         
         # 计算年周期和月周期分析
-        yearly_cycles = analyze_yearly_cycles(closes, highs, lows, timestamps if timestamps else None)
-        monthly_cycles = analyze_monthly_cycles(closes, highs, lows, timestamps if timestamps else None)
-        result['yearly_cycles'] = yearly_cycles
-        result['monthly_cycles'] = monthly_cycles
+        yearly_result = analyze_yearly_cycles(closes, highs, lows, timestamps if timestamps else None)
+        monthly_result = analyze_monthly_cycles(closes, highs, lows, timestamps if timestamps else None)
+        result['yearly_cycles'] = yearly_result.get('yearly_stats', [])
+        result['monthly_cycles'] = monthly_result.get('monthly_stats', [])
 
     if len(closes) >= 20 and len(valid_volumes) > 0:
         ml_data = calculate_ml_predictions(closes, highs, lows, volumes)
@@ -198,7 +206,7 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
         # 获取Volume Profile POC
         vp_poc = result.get('vp_poc')
         
-        # 计算机构操作分析
+        # 机构操作分析（已包含增强功能）
         institutional_data = calculate_institutional_activity(
             closes, highs, lows, volumes,
             vwap=vwap,

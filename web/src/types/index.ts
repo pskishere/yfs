@@ -190,6 +190,29 @@ export interface Indicators {
   sideways_volatility?: number;
   sideways_amplitude_20?: number; // 20日振幅统计
   sideways_trend_pct?: number; // 趋势变化百分比
+  sideways_slope_pct?: number; // 横盘斜率百分比
+  sideways_price_entropy?: number; // 价格分布熵
+  sideways_volume_cv?: number; // 成交量变异系数
+  sideways_type?: 'narrow' | 'standard' | 'wide'; // 横盘类型
+  sideways_type_desc?: string; // 横盘类型描述
+  // 周期分析增强
+  adaptive_config_used?: boolean; // 是否使用自适应配置
+  config_volatility_level?: 'high' | 'medium' | 'low'; // 配置波动率等级
+  wavelet_available?: boolean; // 小波分析是否可用
+  wavelet_dominant_cycle?: number; // 小波主导周期
+  wavelet_cycle_strength?: number; // 小波周期强度
+  wavelet_recent_cycle?: number; // 最近周期（小波）
+  wavelet_cycle_stability?: number; // 小波周期稳定性
+  wavelet_significant_cycles?: Array<{
+    period: number;
+    strength: number;
+    scale: number;
+  }>; // 显著周期列表
+  wavelet_method?: string; // 小波方法
+  confidence_score?: number; // 周期预测置信度分数
+  confidence_level?: 'high' | 'medium' | 'low' | 'very_low' | 'none'; // 置信度等级
+  confidence_desc?: string; // 置信度描述
+  confidence_factors?: string[]; // 置信度因素
   // 机构操作分析
   volume_ratio_20?: number;
   volume_ratio_60?: number;
@@ -210,11 +233,41 @@ export interface Indicators {
   chip_concentration_desc?: string;
   price_pattern?: 'accumulation' | 'distribution' | 'consolidation' | 'controlled_rise' | 'normal';
   price_pattern_desc?: string;
-  activity_score?: number;
-  activity_signals?: string[];
-  activity_level?: 'high' | 'medium' | 'low' | 'none';
-  activity_level_desc?: string;
   suggestion?: string;
+  // 机构操作分析增强 - MFI
+  mfi?: number; // 资金流量指数
+  money_flow_ratio?: number; // 资金流量比率
+  mfi_signal?: 'overbought' | 'strong' | 'neutral' | 'weak' | 'oversold'; // MFI信号
+  mfi_signal_desc?: string; // MFI信号描述
+  mfi_divergence?: 'bearish' | 'bullish' | 'none'; // MFI背离
+  // 机构操作分析增强 - CMF
+  cmf?: number; // 蔡金资金流量
+  cmf_signal?: 'strong_accumulation' | 'accumulation' | 'neutral' | 'distribution' | 'strong_distribution'; // CMF信号
+  cmf_signal_desc?: string; // CMF信号描述
+  // 机构操作分析增强 - 筹码分布
+  chip_profit_ratio?: number; // 获利盘比例
+  chip_loss_ratio?: number; // 亏损盘比例
+  chip_peak_price?: number; // 筹码峰值价格
+  chip_peak_volume_ratio?: number; // 筹码峰值成交量比例
+  chip_concentration_level?: 'high' | 'medium' | 'low'; // 筹码集中度等级
+  chip_weighted_avg_cost?: number; // 加权平均成本
+  chip_cost_deviation_pct?: number; // 成本偏离度百分比
+  chip_main_cost_low?: number; // 主力成本区间下限
+  chip_main_cost_high?: number; // 主力成本区间上限
+  chip_main_cost_center?: number; // 主力成本中心
+  chip_price_position?: 'below_main_cost' | 'above_main_cost' | 'in_main_cost'; // 价格相对主力成本位置
+  chip_price_position_desc?: string; // 价格位置描述
+  chip_entropy?: number; // 筹码熵（分散度）
+  chip_dispersion?: 'highly_dispersed' | 'moderately_dispersed' | 'concentrated'; // 筹码分散程度
+  chip_dispersion_desc?: string; // 筹码分散描述
+  // 机构操作分析增强 - 主力成本
+  main_force_cost?: number; // 主力成本
+  main_force_cost_lower?: number; // 主力成本下限
+  main_force_cost_upper?: number; // 主力成本上限
+  main_force_cost_range_pct?: number; // 主力成本区间百分比
+  main_force_cost_deviation_pct?: number; // 主力成本偏离度
+  main_force_position?: 'below_cost' | 'above_cost' | 'near_cost'; // 主力仓位
+  main_force_position_desc?: string; // 主力仓位描述
   // 周期时间段详情
   cycle_periods?: Array<{
     period_index: number;
@@ -248,9 +301,7 @@ export interface Indicators {
   }>;
   // 月周期数据
   monthly_cycles?: Array<{
-    year: number;
-    month: number;
-    year_month: string;
+    month: string;  // 格式: "2024-01"
     first_date?: string;
     last_date?: string;
     first_close: number;

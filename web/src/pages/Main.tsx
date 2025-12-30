@@ -24,6 +24,7 @@ import {
   Modal,
   Popover,
   Menu,
+  Tooltip,
 } from 'antd';
 import {
   InboxOutlined,
@@ -48,6 +49,7 @@ import {
   MenuOutlined,
   TeamOutlined,
   CloseOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import {
   getPositions,
@@ -2425,7 +2427,13 @@ const MainPage: React.FC = () => {
                                                 width: 100,
                                                 fixed: 'left' as const,
                                                 align: 'left' as const,
-                                                render: (_: any, record: any) => `${record.year}年${record.month}月`,
+                                                render: (_: any, record: any) => {
+                                                  if (record.month) {
+                                                    const [year, month] = record.month.split('-');
+                                                    return `${year}年${month}月`;
+                                                  }
+                                                  return '-';
+                                                },
                                               },
                                               {
                                                 title: '第一天',
@@ -2566,7 +2574,7 @@ const MainPage: React.FC = () => {
                                             size="small"
                                             style={{ fontSize: 12 }}
                                             scroll={{ x: 'max-content' }}
-                                            rowKey={(record) => `monthly-${record.year}-${record.month}`}
+                                            rowKey={(record) => `monthly-${record.month}`}
                                           />
                                         </div>
                                       ),
@@ -2587,7 +2595,7 @@ const MainPage: React.FC = () => {
                   )}
 
                   {/* 机构操作分析 */}
-                  {analysisResult.indicators.activity_score !== undefined && (
+                  {(analysisResult.indicators.mfi !== undefined || analysisResult.indicators.volume_ratio_20 !== undefined) && (
                     <div id="section-institutional">
                     <Collapse
                       ghost
@@ -2598,11 +2606,9 @@ const MainPage: React.FC = () => {
                           <span>
                             <BarChartOutlined style={{ marginRight: 8 }} />
                             {createIndicatorLabel('机构操作分析', 'institutional_activity')}
-                            {analysisResult.indicators.activity_level_desc && (
-                              <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
-                                {analysisResult.indicators.activity_level_desc}
-                              </span>
-                            )}
+                            <span style={{ marginLeft: 12, fontSize: 11, color: '#999', fontWeight: 'normal' }}>
+                              通过资金流向、成交量、筹码分布等指标分析机构行为
+                            </span>
                           </span>
                         ),
                         children: (
@@ -2619,40 +2625,95 @@ const MainPage: React.FC = () => {
                               items={(() => {
                                 const items = [];
 
-                                // 机构操作强度
-                                if (indicators.activity_score !== undefined) {
+                                // MFI 资金流量指数
+                                if (indicators.mfi !== undefined) {
                                   items.push({
-                                    label: '操作强度',
+                                    label: (
+                                      <span>
+                                        MFI资金流量指数
+                                        <Tooltip title="综合价格和成交量的动量指标，>80超买，<20超卖">
+                                          <QuestionCircleOutlined style={{ marginLeft: 4, fontSize: 12, color: '#999' }} />
+                                        </Tooltip>
+                                      </span>
+                                    ),
                                     children: (
-                                      <Space size="small" orientation="vertical">
-                                        <div>
-                                          <span style={{ fontSize: 14, fontWeight: 500 }}>
-                                            {indicators.activity_score.toFixed(0)}分
-                                          </span>
-                                          <Tag
+                                      <Space size="small" direction="vertical">
+                                        <span style={{ fontSize: 14, fontWeight: 500 }}>
+                                          {indicators.mfi.toFixed(2)}
+                                        </span>
+                                        {indicators.mfi_signal_desc && (
+                                          <Tag 
                                             color={
-                                              indicators.activity_score >= 60 ? 'error' :
-                                                indicators.activity_score >= 40 ? 'warning' :
-                                                  indicators.activity_score >= 20 ? 'default' : 'success'
+                                              indicators.mfi_signal === 'overbought' ? 'red' :
+                                              indicators.mfi_signal === 'oversold' ? 'green' :
+                                              indicators.mfi_signal === 'strong' ? 'orange' :
+                                              indicators.mfi_signal === 'weak' ? 'blue' :
+                                              'default'
                                             }
-                                            style={{ marginLeft: 8, fontSize: 12 }}
+                                            style={{ fontSize: 12 }}
                                           >
-                                            {indicators.activity_level === 'high' ? '明显' :
-                                              indicators.activity_level === 'medium' ? '中等' :
-                                                indicators.activity_level === 'low' ? '较弱' : '无'}
+                                            {indicators.mfi_signal_desc}
                                           </Tag>
-                                        </div>
-                                        {indicators.suggestion && (
-                                          <span style={{ fontSize: 11, color: '#666' }}>
-                                            {indicators.suggestion}
-                                          </span>
                                         )}
+                                        <span style={{ fontSize: 11, color: '#666' }}>
+                                          {indicators.mfi >= 80 ? '⚠️ 资金流入过热，注意回调风险' :
+                                           indicators.mfi >= 60 ? '✓ 资金持续流入，多头强势' :
+                                           indicators.mfi >= 40 ? '→ 资金流向平衡' :
+                                           indicators.mfi >= 20 ? '⚠️ 资金流出明显，空头占优' :
+                                           '⚠️ 资金流出过度，可能超卖反弹'}
+                                        </span>
                                       </Space>
                                     ),
                                   });
                                 }
 
-                                // 成交量异常
+                                // CMF 蔡金资金流量
+                                if (indicators.cmf !== undefined) {
+                                  items.push({
+                                    label: (
+                                      <span>
+                                        CMF蔡金资金流量
+                                        <Tooltip title="衡量买卖压力，>0.25强买入，<-0.25强卖出">
+                                          <QuestionCircleOutlined style={{ marginLeft: 4, fontSize: 12, color: '#999' }} />
+                                        </Tooltip>
+                                      </span>
+                                    ),
+                                    children: (
+                                      <Space size="small" direction="vertical">
+                                        <span style={{ 
+                                          fontSize: 14, 
+                                          fontWeight: 500,
+                                          color: indicators.cmf >= 0 ? '#cf1322' : '#3f8600'
+                                        }}>
+                                          {indicators.cmf >= 0 ? '+' : ''}{indicators.cmf.toFixed(4)}
+                                        </span>
+                                        {indicators.cmf_signal_desc && (
+                                          <Tag 
+                                            color={
+                                              indicators.cmf_signal === 'strong_accumulation' ? 'red' :
+                                              indicators.cmf_signal === 'accumulation' ? 'orange' :
+                                              indicators.cmf_signal === 'strong_distribution' ? 'green' :
+                                              indicators.cmf_signal === 'distribution' ? 'blue' :
+                                              'default'
+                                            }
+                                            style={{ fontSize: 12 }}
+                                          >
+                                            {indicators.cmf_signal_desc}
+                                          </Tag>
+                                        )}
+                                        <span style={{ fontSize: 11, color: '#666' }}>
+                                          {indicators.cmf >= 0.25 ? '✓ 机构大量买入，强势吸筹' :
+                                           indicators.cmf >= 0.05 ? '✓ 持续买入，资金流入' :
+                                           indicators.cmf >= -0.05 ? '→ 资金流向中性，观望为主' :
+                                           indicators.cmf >= -0.25 ? '⚠️ 资金流出，机构减仓' :
+                                           '⚠️ 机构大量卖出，强势派发'}
+                                        </span>
+                                      </Space>
+                                    ),
+                                  });
+                                }
+
+                                // 成交量比率
                                 if (indicators.volume_ratio_20 !== undefined) {
                                   items.push({
                                     label: '成交量比率',
@@ -2772,38 +2833,6 @@ const MainPage: React.FC = () => {
                                   });
                                 }
 
-                                // 筹码集中度
-                                if (indicators.chip_concentration) {
-                                  items.push({
-                                    label: '筹码集中度',
-                                    children: (
-                                      <Space size="small" orientation="vertical">
-                                        {indicators.vp_poc && (
-                                          <span style={{ fontSize: 13 }}>
-                                            POC: {formatCurrency(indicators.vp_poc)}
-                                          </span>
-                                        )}
-                                        {indicators.poc_deviation !== undefined && (
-                                          <span style={{ fontSize: 13 }}>
-                                            偏离: {indicators.poc_deviation >= 0 ? '+' : ''}{indicators.poc_deviation.toFixed(2)}%
-                                          </span>
-                                        )}
-                                        <Tag
-                                          color={
-                                            indicators.chip_concentration === 'high' ? 'success' :
-                                              indicators.chip_concentration === 'low' ? 'error' : 'default'
-                                          }
-                                          style={{ fontSize: 12 }}
-                                        >
-                                          {indicators.chip_concentration_desc || 
-                                            (indicators.chip_concentration === 'high' ? '高度集中' :
-                                              indicators.chip_concentration === 'medium' ? '中等集中' : '分散')}
-                                        </Tag>
-                                      </Space>
-                                    ),
-                                  });
-                                }
-
                                 // 价格行为模式
                                 if (indicators.price_pattern) {
                                   items.push({
@@ -2836,7 +2865,7 @@ const MainPage: React.FC = () => {
                                     span: 2,
                                     children: (
                                       <Space size="small" wrap>
-                                        {indicators.activity_signals.map((signal, index) => (
+                                        {indicators.activity_signals.map((signal: string, index: number) => (
                                           <Tag key={index} color="blue" style={{ fontSize: 12 }}>
                                             {signal}
                                           </Tag>
@@ -3934,7 +3963,7 @@ const MainPage: React.FC = () => {
                     label: '周期分析',
                     icon: <CloudOutlined />,
                   }] : [],
-                  ...(analysisResult?.indicators?.activity_score !== undefined) ? [{
+                  ...(analysisResult?.indicators?.mfi !== undefined || analysisResult?.indicators?.volume_ratio_20 !== undefined) ? [{
                     key: 'institutional',
                     label: '机构操作分析',
                     icon: <TeamOutlined />,
