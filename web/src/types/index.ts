@@ -213,61 +213,6 @@ export interface Indicators {
   confidence_level?: 'high' | 'medium' | 'low' | 'very_low' | 'none'; // 置信度等级
   confidence_desc?: string; // 置信度描述
   confidence_factors?: string[]; // 置信度因素
-  // 机构操作分析
-  volume_ratio_20?: number;
-  volume_ratio_60?: number;
-  is_volume_spike?: boolean;
-  is_volume_surge?: boolean;
-  is_volume_shrink?: boolean;
-  price_change_5d?: number;
-  volume_change_5d?: number;
-  price_volume_rising?: boolean;
-  price_volume_falling?: boolean;
-  price_rising_volume_shrinking?: boolean;
-  price_falling_volume_shrinking?: boolean;
-  fund_flow?: 'inflow' | 'outflow' | 'neutral';
-  fund_flow_desc?: string;
-  cost_position?: 'below_cost' | 'above_cost' | 'near_cost';
-  cost_position_desc?: string;
-  chip_concentration?: 'high' | 'medium' | 'low';
-  chip_concentration_desc?: string;
-  price_pattern?: 'accumulation' | 'distribution' | 'consolidation' | 'controlled_rise' | 'normal';
-  price_pattern_desc?: string;
-  suggestion?: string;
-  // 机构操作分析增强 - MFI
-  mfi?: number; // 资金流量指数
-  money_flow_ratio?: number; // 资金流量比率
-  mfi_signal?: 'overbought' | 'strong' | 'neutral' | 'weak' | 'oversold'; // MFI信号
-  mfi_signal_desc?: string; // MFI信号描述
-  mfi_divergence?: 'bearish' | 'bullish' | 'none'; // MFI背离
-  // 机构操作分析增强 - CMF
-  cmf?: number; // 蔡金资金流量
-  cmf_signal?: 'strong_accumulation' | 'accumulation' | 'neutral' | 'distribution' | 'strong_distribution'; // CMF信号
-  cmf_signal_desc?: string; // CMF信号描述
-  // 机构操作分析增强 - 筹码分布
-  chip_profit_ratio?: number; // 获利盘比例
-  chip_loss_ratio?: number; // 亏损盘比例
-  chip_peak_price?: number; // 筹码峰值价格
-  chip_peak_volume_ratio?: number; // 筹码峰值成交量比例
-  chip_concentration_level?: 'high' | 'medium' | 'low'; // 筹码集中度等级
-  chip_weighted_avg_cost?: number; // 加权平均成本
-  chip_cost_deviation_pct?: number; // 成本偏离度百分比
-  chip_main_cost_low?: number; // 主力成本区间下限
-  chip_main_cost_high?: number; // 主力成本区间上限
-  chip_main_cost_center?: number; // 主力成本中心
-  chip_price_position?: 'below_main_cost' | 'above_main_cost' | 'in_main_cost'; // 价格相对主力成本位置
-  chip_price_position_desc?: string; // 价格位置描述
-  chip_entropy?: number; // 筹码熵（分散度）
-  chip_dispersion?: 'highly_dispersed' | 'moderately_dispersed' | 'concentrated'; // 筹码分散程度
-  chip_dispersion_desc?: string; // 筹码分散描述
-  // 机构操作分析增强 - 主力成本
-  main_force_cost?: number; // 主力成本
-  main_force_cost_lower?: number; // 主力成本下限
-  main_force_cost_upper?: number; // 主力成本上限
-  main_force_cost_range_pct?: number; // 主力成本区间百分比
-  main_force_cost_deviation_pct?: number; // 主力成本偏离度
-  main_force_position?: 'below_cost' | 'above_cost' | 'near_cost'; // 主力仓位
-  main_force_position_desc?: string; // 主力仓位描述
   // 周期时间段详情
   cycle_periods?: Array<{
     period_index: number;

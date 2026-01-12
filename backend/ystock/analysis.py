@@ -19,7 +19,7 @@ from .indicators import (
     calculate_fibonacci_retracement, get_trend,
     calculate_cci, calculate_adx, calculate_sar,
     calculate_supertrend, calculate_stoch_rsi, calculate_volume_profile,
-    calculate_ichimoku, calculate_cycle_analysis, analyze_yearly_cycles, analyze_monthly_cycles, calculate_institutional_activity
+    calculate_ichimoku, calculate_cycle_analysis, analyze_yearly_cycles, analyze_monthly_cycles
 )
 from .indicators.ml_predictions import calculate_ml_predictions
 
@@ -186,34 +186,6 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
     if len(closes) >= 20 and len(valid_volumes) > 0:
         ml_data = calculate_ml_predictions(closes, highs, lows, volumes)
         result.update(ml_data)
-    
-    # 机构操作分析（需要VWAP、OBV趋势、VP POC等数据）
-    if len(closes) >= 20 and len(valid_volumes) > 0:
-        # 计算VWAP（成交量加权平均价）
-        vwap = None
-        if len(closes) >= 20:
-            # 使用最近20天的数据计算VWAP
-            recent_closes = closes[-20:]
-            recent_volumes = volumes[-20:]
-            total_value = np.sum(recent_closes * recent_volumes)
-            total_volume = np.sum(recent_volumes)
-            if total_volume > 0:
-                vwap = total_value / total_volume
-        
-        # 获取OBV趋势
-        obv_trend = result.get('obv_trend')
-        
-        # 获取Volume Profile POC
-        vp_poc = result.get('vp_poc')
-        
-        # 机构操作分析（已包含增强功能）
-        institutional_data = calculate_institutional_activity(
-            closes, highs, lows, volumes,
-            vwap=vwap,
-            obv_trend=obv_trend,
-            vp_poc=vp_poc
-        )
-        result.update(institutional_data)
 
     try:
         fundamental_data = get_fundamental_data(symbol)
