@@ -10,8 +10,6 @@ import {
   Space,
   Tag,
   Form,
-  Input,
-  InputNumber,
   Select,
   AutoComplete,
   Descriptions,
@@ -29,7 +27,6 @@ import {
   InboxOutlined,
   ReloadOutlined,
   DollarOutlined,
-  ShoppingOutlined,
   BarChartOutlined,
   RobotOutlined,
   RiseOutlined,
@@ -50,10 +47,6 @@ import {
 } from '@ant-design/icons';
 import {
   getPositions,
-  buy,
-  sell,
-  getOrders,
-  cancelOrder,
   analyze,
   aiAnalyze,
   getHotStocks,
@@ -64,7 +57,6 @@ import {
 } from '../services/api';
 import type {
   Position,
-  Order,
   AnalysisResult,
   HotStock,
   IndicatorInfo,
@@ -72,7 +64,7 @@ import type {
 import TradingViewChart from '../components/TradingViewChart';
 import { IndicatorLabel } from '../components/IndicatorLabel';
 import { FinancialTable } from '../components/FinancialTable';
-import { getPositionColumns, getOrderColumns } from '../config/tableColumns';
+import { getPositionColumns } from '../config/tableColumns';
 import { formatValue, formatLargeNumber, getRSIStatus, statusMaps, translateRating, translateAction, formatDateTime } from '../utils/formatters';
 import './Main.css';
 
@@ -157,13 +149,7 @@ const MainPage: React.FC = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [positionsLoading, setPositionsLoading] = useState<boolean>(false);
 
-  // 交易订单相关状态
-  const [tradeForm] = Form.useForm();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [tradeLoading, setTradeLoading] = useState<boolean>(false);
-  const [orderLoading, setOrderLoading] = useState<boolean>(false);
-  const [tradeDrawerVisible, setTradeDrawerVisible] = useState<boolean>(false);
-  const [tradeDrawerTab, setTradeDrawerTab] = useState<string>('trade-form');
+
 
   // 分析相关状态
   const [analyzeForm] = Form.useForm();
@@ -330,72 +316,9 @@ const MainPage: React.FC = () => {
     }
   };
 
-  /**
-   * 加载订单列表
-   */
-  const loadOrders = async (): Promise<void> => {
-    setOrderLoading(true);
-    try {
-      const result = await getOrders();
-      if (result.success) {
-        setOrders(result.data || []);
-      } else {
-        message.error(result.message || '查询失败');
-      }
-    } catch (error: any) {
-      message.error(error.message);
-    } finally {
-      setOrderLoading(false);
-    }
-  };
 
-  /**
-   * 提交订单
-   */
-  const handleTradeSubmit = async (values: any): Promise<void> => {
-    setTradeLoading(true);
-    try {
-      const { symbol, action, quantity, orderType, limitPrice } = values;
-      const price = orderType === 'LMT' ? limitPrice : null;
 
-      const result = action === 'BUY'
-        ? await buy(symbol, quantity, price)
-        : await sell(symbol, quantity, price);
 
-      if (result.success) {
-        const orderTypeText = orderType === 'LMT' ? '限价' : '市价';
-        const actionText = action === 'BUY' ? '买单' : '卖单';
-        message.success(`${actionText}已提交: #${result.order_id} (${orderTypeText})`);
-        tradeForm.resetFields();
-        await loadOrders();
-        await loadPositions();
-      } else {
-        message.error(result.message || '提交失败');
-      }
-    } catch (error: any) {
-      message.error(error.message);
-    } finally {
-      setTradeLoading(false);
-    }
-  };
-
-  /**
-   * 撤销订单
-   */
-  const handleCancelOrder = async (orderId: number): Promise<void> => {
-    try {
-      const result = await cancelOrder(orderId);
-      if (result.success) {
-        message.success('订单已撤销');
-        await loadOrders();
-        await loadPositions();
-      } else {
-        message.error(result.message || '撤销失败');
-      }
-    } catch (error: any) {
-      message.error(error.message);
-    }
-  };
 
   /**
    * AI分析 - 使用轮询方式获取结果，避免超时
@@ -922,7 +845,6 @@ const MainPage: React.FC = () => {
   };
 
   const positionColumns = getPositionColumns(currencySymbol);
-  const orderColumns = getOrderColumns(handleCancelOrder);
 
   return (
     <div className="main-page">
@@ -944,16 +866,7 @@ const MainPage: React.FC = () => {
                   ),
                   extra: (
                     <Space onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        type="primary"
-                        icon={<DollarOutlined />}
-                        onClick={() => {
-                          setTradeDrawerVisible(true);
-                          setTradeDrawerTab('trade-form');
-                        }}
-                      >
-                        交易
-                      </Button>
+
                       <Button
                         icon={<ReloadOutlined />}
                         onClick={loadPositions}
@@ -3435,158 +3348,7 @@ const MainPage: React.FC = () => {
         )}
       </div>
 
-      {/* 交易抽屉 - 已隐藏 */}
-      {false && (
-        <Drawer
-          title={
-            <span>
-              <DollarOutlined style={{ marginRight: 8 }} />
-              交易
-            </span>
-          }
-          placement="right"
-          width={isMobile ? '100%' : 600}
-          onClose={() => setTradeDrawerVisible(false)}
-          open={tradeDrawerVisible}
-          styles={{
-            body: {
-              padding: isMobile ? '12px' : '24px',
-            },
-          }}
-        >
-          <Tabs 
-            activeKey={tradeDrawerTab} 
-            onChange={setTradeDrawerTab}
-            items={[
-              {
-                key: 'trade-form',
-                label: (
-                  <span>
-                    <DollarOutlined />
-                    下单
-                  </span>
-                ),
-                children: (
-                  <Form
-                    form={tradeForm}
-                    layout="vertical"
-                    onFinish={async (values) => {
-                      await handleTradeSubmit(values);
-                      setTradeDrawerTab('orders');
-                    }}
-                    initialValues={{
-                      action: 'BUY',
-                      orderType: 'MKT',
-                    }}
-                  >
-                    <Form.Item
-                      label="交易方向"
-                      name="action"
-                      rules={[{ required: true, message: '请选择交易方向' }]}
-                    >
-                      <Select>
-                        <Select.Option value="BUY">买入</Select.Option>
-                        <Select.Option value="SELL">卖出</Select.Option>
-                      </Select>
-                    </Form.Item>
 
-                    <Form.Item
-                      label="股票代码"
-                      name="symbol"
-                      rules={[{ required: true, message: '请输入股票代码' }]}
-                    >
-                      <Input placeholder="例如: AAPL" style={{ textTransform: 'uppercase' }} />
-                    </Form.Item>
-
-                    <Form.Item
-                      label="数量"
-                      name="quantity"
-                      rules={[{ required: true, message: '请输入数量' }]}
-                    >
-                      <InputNumber
-                        min={1}
-                        step={1}
-                        placeholder="例如: 10"
-                        style={{ width: '100%' }}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      label="订单类型"
-                      name="orderType"
-                      rules={[{ required: true, message: '请选择订单类型' }]}
-                    >
-                      <Select>
-                        <Select.Option value="MKT">市价单</Select.Option>
-                        <Select.Option value="LMT">限价单</Select.Option>
-                      </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                      noStyle
-                      shouldUpdate={(prevValues, currentValues) =>
-                        prevValues.orderType !== currentValues.orderType
-                      }
-                    >
-                      {({ getFieldValue }) =>
-                        getFieldValue('orderType') === 'LMT' ? (
-                          <Form.Item
-                            label="限价"
-                            name="limitPrice"
-                            rules={[{ required: true, message: '请输入限价' }]}
-                          >
-                            <InputNumber
-                              min={0}
-                              step={0.01}
-                              placeholder="例如: 175.50"
-                              style={{ width: '100%' }}
-                            />
-                          </Form.Item>
-                        ) : null
-                      }
-                    </Form.Item>
-
-                    <Form.Item>
-                      <Button type="primary" htmlType="submit" loading={tradeLoading} block>
-                        提交订单
-                      </Button>
-                    </Form.Item>
-                  </Form>
-                ),
-              },
-              {
-                key: 'orders',
-                label: (
-                  <span>
-                    <ShoppingOutlined />
-                    订单列表
-                  </span>
-                ),
-                children: (
-                  <Space orientation="vertical" style={{ width: '100%' }}>
-                    <div>
-                      <Button icon={<ReloadOutlined />} onClick={loadOrders} loading={orderLoading}>
-                        刷新
-                      </Button>
-                      <span style={{ marginLeft: 16, color: '#666' }}>
-                        共 {orders.length} 个订单
-                      </span>
-                    </div>
-                    <Table
-                      columns={orderColumns}
-                      dataSource={orders}
-                      rowKey="orderId"
-                      loading={orderLoading}
-                      pagination={{ pageSize: 10 }}
-                      scroll={{ y: 400 }}
-                    />
-                  </Space>
-                ),
-              },
-            ]}
-          />
-        </Drawer>
-      )}
 
       {/* AI分析报告抽屉 */}
       <Drawer

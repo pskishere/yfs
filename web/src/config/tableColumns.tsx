@@ -1,9 +1,7 @@
 /**
  * 表格列配置
  */
-import { Button, Tag } from 'antd';
-import { CloseCircleOutlined } from '@ant-design/icons';
-import type { Order } from '../types/index';
+import { Tag } from 'antd';
 import { statusMaps } from '../utils/formatters';
 
 /**
@@ -66,10 +64,9 @@ export const getPositionColumns = (currencySymbol: string = '$') => [
 /**
  * 订单表格列定义
  * 
- * @param handleCancelOrder - 撤销订单的处理函数
  * @returns Ant Design表格列配置数组
  */
-export const getOrderColumns = (handleCancelOrder: (orderId: number) => void) => [
+export const getOrderColumns = () => [
   {
     title: '订单ID',
     dataIndex: 'orderId',
@@ -125,21 +122,5 @@ export const getOrderColumns = (handleCancelOrder: (orderId: number) => void) =>
     align: 'left' as const,
     render: (filled: number | undefined) => filled?.toFixed(0) || 0,
   },
-  {
-    title: '操作',
-    key: 'action',
-    align: 'left' as const,
-    render: (_: any, record: Order) => (
-      record.status !== 'Filled' && record.status !== 'Cancelled' ? (
-        <Button
-          type="link"
-          danger
-          icon={<CloseCircleOutlined />}
-          onClick={() => handleCancelOrder(record.orderId)}
-        >
-          撤销
-        </Button>
-      ) : null
-    ),
-  },
+
 ];

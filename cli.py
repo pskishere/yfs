@@ -170,98 +170,7 @@ class TradingCLI:
             msg = result.get('message', '未知错误') if result else '查询失败'
             print(f"❌ {msg}")
             
-    def buy(self, symbol: str, quantity: float, price: Optional[float] = None):
-        """
-        买入
-        """
-        order_data = {
-            'symbol': symbol.upper(),
-            'action': 'BUY',
-            'quantity': quantity,
-            'order_type': 'LMT' if price else 'MKT'
-        }
-        
-        if price:
-            order_data['limit_price'] = price
-            
-        result = self._request('POST', '/api/order', order_data)
-        if result and result.get('success'):
-            order_id = result.get('order_id')
-            order_type = "限价" if price else "市价"
-            price_str = f" @${price}" if price else ""
-            print(f"✅ 买单已提交: #{order_id} - {symbol.upper()} x{quantity}{price_str} ({order_type})")
-            
-            # 等待并查看订单状态
-            import time
-            time.sleep(1.5)
-            order_detail = self._request('GET', f'/api/order/{order_id}')
-            if order_detail and order_detail.get('success'):
-                data = order_detail['data']
-                status = data.get('status', 'Unknown')
-                filled = data.get('filled', 0)
-                remaining = data.get('remaining', quantity)
-                print(f"   状态: {status} | 已成交: {filled} | 剩余: {remaining}")
-            else:
-                print(f"   ⚠️  订单可能被拒绝，请查看后端日志或使用 'orders' 命令")
-        else:
-            msg = result.get('message', '未知错误') if result else '提交失败'
-            print(f"❌ {msg}")
-            
-    def sell(self, symbol: str, quantity: float, price: Optional[float] = None):
-        """
-        卖出
-        """
-        order_data = {
-            'symbol': symbol.upper(),
-            'action': 'SELL',
-            'quantity': quantity,
-            'order_type': 'LMT' if price else 'MKT'
-        }
-        
-        if price:
-            order_data['limit_price'] = price
-            
-        result = self._request('POST', '/api/order', order_data)
-        if result and result.get('success'):
-            order_id = result.get('order_id')
-            order_type = "限价" if price else "市价"
-            price_str = f" @${price}" if price else ""
-            print(f"✅ 卖单已提交: #{order_id} - {symbol.upper()} x{quantity}{price_str} ({order_type})")
-            
-            # 等待并查看订单状态
-            import time
-            time.sleep(1.5)
-            order_detail = self._request('GET', f'/api/order/{order_id}')
-            if order_detail and order_detail.get('success'):
-                data = order_detail['data']
-                status = data.get('status', 'Unknown')
-                filled = data.get('filled', 0)
-                remaining = data.get('remaining', quantity)
-                print(f"   状态: {status} | 已成交: {filled} | 剩余: {remaining}")
-            else:
-                print(f"   ⚠️  订单可能被拒绝，请查看后端日志或使用 'orders' 命令")
-        else:
-            msg = result.get('message', '未知错误') if result else '提交失败'
-            print(f"❌ {msg}")
-            
-    def cancel(self, order_id: int):
-        """
-        撤销订单
-        """
-        result = self._request('DELETE', f'/api/order/{order_id}')
-        if result and result.get('success'):
-            print(f"✅ {result.get('message')}")
-            
-            # 等待并查看订单状态
-            import time
-            time.sleep(0.5)
-            order_detail = self._request('GET', f'/api/order/{order_id}')
-            if order_detail and order_detail.get('success'):
-                status = order_detail['data'].get('status', 'Unknown')
-                print(f"   当前状态: {status}")
-        else:
-            msg = result.get('message', '未知错误') if result else '撤销失败'
-            print(f"⚠️  {msg}")
+
             
     def health(self):
         """
@@ -1381,11 +1290,6 @@ class TradingCLI:
   ti AAPL        指标解释    ti AAPL 3M 1day 自定义周期
   hot            热门股票    hot 20          美股热门(20个)
 
-📊 交易:
-  b AAPL 10      市价买      b AAPL 10 175  限价买
-  s AAPL 10      市价卖      s AAPL 10 180  限价卖
-  x 123          撤单
-
 📈 数据:
   hi AAPL        历史数据
 
@@ -1516,31 +1420,7 @@ def main():
                 limit = int(args[0]) if len(args) > 0 else 20
                 cli.hot_stocks(limit)
             
-            # 交易命令
-            elif cmd in ['buy', 'b']:
-                if len(args) < 2:
-                    print("❌ 用法: b <symbol> <quantity> [price]")
-                else:
-                    symbol = args[0]
-                    quantity = float(args[1])
-                    price = float(args[2]) if len(args) > 2 else None
-                    cli.buy(symbol, quantity, price)
-                    
-            elif cmd in ['sell', 's']:
-                if len(args) < 2:
-                    print("❌ 用法: s <symbol> <quantity> [price]")
-                else:
-                    symbol = args[0]
-                    quantity = float(args[1])
-                    price = float(args[2]) if len(args) > 2 else None
-                    cli.sell(symbol, quantity, price)
-                    
-            elif cmd in ['cancel', 'x']:
-                if len(args) < 1:
-                    print("❌ 用法: x <order_id>")
-                else:
-                    order_id = int(args[0])
-                    cli.cancel(order_id)
+
                     
             # 其他命令
             elif cmd in ['help', '?']:

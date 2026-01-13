@@ -89,74 +89,7 @@ export const getOrders = async (): Promise<ApiResponse<Order[]>> => {
   }
 };
 
-/**
- * 买入股票
- */
-export const buy = async (
-  symbol: string,
-  quantity: number,
-  limitPrice: number | null = null
-): Promise<ApiResponse> => {
-  try {
-    const orderData: any = {
-      symbol: symbol.toUpperCase(),
-      action: 'BUY',
-      quantity: quantity,
-      order_type: limitPrice ? 'LMT' : 'MKT',
-    };
 
-    if (limitPrice) {
-      orderData.limit_price = limitPrice;
-    }
-
-    const response = await api.post<ApiResponse>('/api/order', orderData);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 卖出股票
- */
-export const sell = async (
-  symbol: string,
-  quantity: number,
-  limitPrice: number | null = null
-): Promise<ApiResponse> => {
-  try {
-    const orderData: any = {
-      symbol: symbol.toUpperCase(),
-      action: 'SELL',
-      quantity: quantity,
-      order_type: limitPrice ? 'LMT' : 'MKT',
-    };
-
-    if (limitPrice) {
-      orderData.limit_price = limitPrice;
-    }
-
-    const response = await api.post<ApiResponse>('/api/order', orderData);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 撤销订单
- */
-export const cancelOrder = async (orderId: number): Promise<ApiResponse> => {
-  try {
-    const response = await api.delete<ApiResponse>(`/api/order/${orderId}`);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
 
 /**
  * 技术分析 - 获取数据并保存到数据库（不包含AI分析）
