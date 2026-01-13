@@ -32,7 +32,7 @@ class StockChatConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
         """
-        连接 WebSocket
+        连接 WebSocket（无需认证）
         """
         self.session_id = self.scope['url_route']['kwargs'].get('session_id')
         
@@ -60,7 +60,7 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         
         # 发送最近的历史记录
         try:
-            recent_history = await self.get_session_history(10)
+            recent_history = await self.get_session_history(50)
             if recent_history:
                 await self.send_json({
                     'type': 'history',
@@ -101,6 +101,8 @@ class StockChatConsumer(AsyncWebsocketConsumer):
                 'message': self.handle_message,
                 'cancel': self.handle_cancel,
                 'get_history': self.handle_get_history,
+                'regenerate': self.handle_regenerate,
+                'edit_message': self.handle_edit_message,
             }
             
             handler = handlers.get(message_type)
@@ -195,6 +197,165 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             'type': 'history',
             'messages': history
         })
+    
+    async def handle_regenerate(self, data: Dict[str, Any]):
+        """处理重新生成请求（完整版）"""
+        async with self.streaming_lock:
+            message_id = data.get('message_id')
+            
+            # 如果没有提供 message_id，获取最后一条 AI 消息
+            if not message_id:
+                last_ai_message = await self.get_last_ai_message()
+                if last_ai_message:
+                    message_id = last_ai_message.get('id')
+            
+            if not message_id:
+                await self.send_json({
+                    'type': 'error',
+                    'message': '找不到要重新生成的消息'
+                })
+                return
+            
+            # 获取要重新生成的消息（应该是AI消息）
+            message = await self.get_message(message_id)
+            if not message:
+                await self.send_json({
+                    'type': 'error',
+                    'message': '消息不存在'
+                })
+                return
+            
+            # 获取父用户消息
+            parent_message = await self.get_parent_user_message(message)
+            if not parent_message:
+                await self.send_json({
+                    'type': 'error',
+                    'message': '找不到原始用户消息'
+                })
+                return
+            
+            # 删除原AI消息及其后续所有消息
+            await self.delete_message_and_children(message.id)
+            
+            # 获取更新后的消息列表
+            updated_messages = await self.get_session_history(100)
+            await self.send_json({
+                'type': 'messages_deleted',
+                'deleted_from_message_id': message.id,
+                'messages': updated_messages
+            })
+            
+            # 重置取消标志
+            self.should_cancel = False
+            
+            # 创建新的 AI 消息占位符
+            ai_message_id = await self.create_ai_message_placeholder(parent_id=parent_message.id)
+            self.current_message_id = ai_message_id
+            
+            # 发送重新生成开始消息
+            await self.send_json({
+                'type': 'regeneration_started',
+                'message_id': ai_message_id,
+                'status': 'streaming'
+            })
+            
+            # 更新消息状态
+            await self.update_message_status(ai_message_id, 'streaming')
+            
+            # 启动流式生成任务
+            self.current_streaming_task = asyncio.create_task(
+                self.stream_generation(
+                    parent_message.content or '',
+                    ai_message_id
+                )
+            )
+    
+    async def handle_edit_message(self, data: Dict[str, Any]):
+        """处理编辑消息请求"""
+        message_id = data.get('message_id')
+        new_content = data.get('content', '').strip()
+        
+        if not message_id:
+            await self.send_json({
+                'type': 'error',
+                'message': '消息ID不能为空'
+            })
+            return
+        
+        if not new_content:
+            await self.send_json({
+                'type': 'error',
+                'message': '新消息内容不能为空'
+            })
+            return
+        
+        try:
+            # 获取消息
+            message = await self.get_message(message_id)
+            if not message:
+                await self.send_json({
+                    'type': 'error',
+                    'message': '消息不存在'
+                })
+                return
+            
+            # 只能编辑用户消息
+            if message.role != 'user':
+                await self.send_json({
+                    'type': 'error',
+                    'message': '只能编辑用户消息'
+                })
+                return
+            
+            # 更新消息内容
+            await self.update_message_content(message_id, new_content)
+            
+            # 删除该消息之后的所有消息
+            await self.delete_messages_after(message_id)
+            
+            # 获取更新后的消息列表
+            updated_messages = await self.get_session_history(100)
+            
+            await self.send_json({
+                'type': 'edit_started',
+                'message_id': message_id,
+                'status': 'processing'
+            })
+            
+            # 重置取消标志
+            self.should_cancel = False
+            
+            # 创建新的 AI 消息占位符
+            ai_message_id = await self.create_ai_message_placeholder()
+            self.current_message_id = ai_message_id
+            
+            # 发送消息更新通知
+            await self.send_json({
+                'type': 'messages_updated',
+                'messages': updated_messages
+            })
+            
+            # 开始生成新回复
+            await self.send_json({
+                'type': 'generation_started',
+                'message_id': ai_message_id,
+                'status': 'streaming'
+            })
+            
+            await self.update_message_status(ai_message_id, 'streaming')
+            
+            # 启动流式生成任务
+            self.current_streaming_task = asyncio.create_task(
+                self.stream_generation(new_content, ai_message_id)
+            )
+            
+        except Exception as e:
+            logger.error(f"编辑消息失败: {e}", exc_info=True)
+            await self.send_json({
+                'type': 'error',
+                'message': f'编辑消息时出错: {str(e)}'
+            })
+    
     
     async def stream_generation(self, user_input: str, message_id: int):
         """流式生成 AI 回复"""
@@ -331,3 +492,107 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             历史消息列表
         """
         return self.agent_service.get_session_history(self.session_id, limit)
+    
+    @database_sync_to_async
+    def get_last_user_message(self) -> Optional[Dict]:
+        """
+        获取最后一条用户消息
+        
+        Returns:
+            消息字典或None
+        """
+        try:
+            session = ChatSession.objects.get(session_id=self.session_id)
+            last_msg = ChatMessage.objects.filter(
+                session=session,
+                role='user'
+            ).order_by('-created_at').first()
+            
+            if last_msg:
+                return {
+                    'id': last_msg.id,
+                    'content': last_msg.content,
+                    'created_at': last_msg.created_at.isoformat()
+                }
+            return None
+        except ChatSession.DoesNotExist:
+            return None
+    
+    @database_sync_to_async
+    def get_last_ai_message(self) -> Optional[Dict]:
+        """
+        获取最后一条 AI 消息
+        
+        Returns:
+            消息字典或None
+        """
+        try:
+            session = ChatSession.objects.get(session_id=self.session_id)
+            last_msg = ChatMessage.objects.filter(
+                session=session,
+                role='assistant'
+            ).order_by('-created_at').first()
+            
+            if last_msg:
+                return {
+                    'id': last_msg.id,
+                    'content': last_msg.content,
+                    'created_at': last_msg.created_at.isoformat()
+                }
+            return None
+        except ChatSession.DoesNotExist:
+            return None
+    
+    @database_sync_to_async
+    def get_message(self, message_id: int) -> Optional[ChatMessage]:
+        """获取消息"""
+        try:
+            return ChatMessage.objects.get(id=message_id)
+        except ChatMessage.DoesNotExist:
+            return None
+    
+    @database_sync_to_async
+    def get_parent_user_message(self, message: ChatMessage) -> Optional[ChatMessage]:
+        """获取父用户消息"""
+        if message.parent_message:
+            return message.parent_message
+        # 如果没有父消息，找到前一条用户消息
+        previous_msg = ChatMessage.objects.filter(
+            session=message.session,
+            created_at__lt=message.created_at,
+            role='user'
+        ).order_by('-created_at').first()
+        return previous_msg
+    
+    @database_sync_to_async
+    def delete_message_and_children(self, message_id: int):
+        """删除消息及其所有后续消息"""
+        try:
+            message = ChatMessage.objects.get(id=message_id)
+            session = message.session
+            created_at = message.created_at
+            
+            # 删除该消息及之后的所有消息
+            ChatMessage.objects.filter(
+                session=session,
+                created_at__gte=created_at
+            ).delete()
+        except ChatMessage.DoesNotExist:
+            pass
+    
+    @database_sync_to_async
+    def delete_messages_after(self, message_id: int):
+        """删除指定消息之后的所有消息"""
+        try:
+            message = ChatMessage.objects.get(id=message_id)
+            session = message.session
+            created_at = message.created_at
+            
+            # 删除该消息之后的所有消息（不包括该消息本身）
+            ChatMessage.objects.filter(
+                session=session,
+                created_at__gt=created_at
+            ).delete()
+        except ChatMessage.DoesNotExist:
+            pass
+    

@@ -273,3 +273,73 @@ export const refreshAnalyze = async (
     throw error;
   }
 };
+
+// ============= AI 聊天会话管理 API =============
+
+/**
+ * 会话信息接口
+ */
+export interface ChatSession {
+  session_id: string;
+  summary: string | null;
+  context_symbols: string[];
+  message_count: number;
+  last_message: {
+    role: string;
+    content: string;
+    created_at: string;
+  } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 获取会话列表
+ */
+export const getChatSessions = async (): Promise<ChatSession[]> => {
+  try {
+    const response = await api.get('/api/chat/sessions');
+    return response.data.sessions;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * 创建新会话
+ */
+export const createChatSession = async (): Promise<ChatSession> => {
+  try {
+    const response = await api.post('/api/chat/sessions');
+    return response.data.session;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * 获取会话详情
+ */
+export const getChatSessionDetail = async (sessionId: string) => {
+  try {
+    const response = await api.get(`/api/chat/sessions/${sessionId}`);
+    return response.data.session;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * 删除会话
+ */
+export const deleteChatSession = async (sessionId: string): Promise<void> => {
+  try {
+    await api.delete(`/api/chat/sessions/${sessionId}/delete`);
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};

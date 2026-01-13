@@ -30,6 +30,7 @@ import {
   DeleteOutlined,
   MenuOutlined,
   CloseOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import type { HotStock } from '../types/index';
 import { useStockAnalysis } from '../hooks/useStockAnalysis';
@@ -42,6 +43,8 @@ import { TradingSignals } from '../components/TradingSignals';
 import { FundamentalData } from '../components/FundamentalData';
 import { MarketData } from '../components/MarketData';
 import { IndicatorLabel } from '../components/IndicatorLabel';
+import ChatSessionDrawer from '../components/ChatSessionDrawer';
+import ChatDrawer from '../components/ChatDrawer';
 import './Main.css';
 
 /**
@@ -78,6 +81,9 @@ const MainPage: React.FC = () => {
   const [newsPage, setNewsPage] = useState<number>(1);
   const [pageNavigatorVisible, setPageNavigatorVisible] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth <= 768);
+  const [sessionDrawerOpen, setSessionDrawerOpen] = useState<boolean>(false);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState<boolean>(false);
+  const [currentChatSessionId, setCurrentChatSessionId] = useState<string | undefined>(undefined);
 
   // 标记是否已从 URL 加载过
   const hasLoadedFromUrlRef = useRef<boolean>(false);
@@ -408,7 +414,6 @@ const MainPage: React.FC = () => {
                   options={[
                     { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:cloud' },
                     { label: 'Qwen3 Next 80B', value: 'qwen3-next:80b-cloud' },
-                    { label: 'GPT-OSS 20B', value: 'gpt-oss:20b' },
                     { label: 'GPT-OSS 120B', value: 'gpt-oss:120b-cloud' },
                     { label: 'DeepSeek V3.2', value: 'deepseek-v3.2:cloud' },
                     { label: 'DeepSeek V3.1', value: 'deepseek-v3.1:671b-cloud' },
@@ -451,7 +456,7 @@ const MainPage: React.FC = () => {
           <div style={{ marginTop: 24 }}>
             <Space orientation="vertical" style={{ width: '100%' }} size="small">
               {/* 操作按钮区域 */}
-              <Space style={{ marginBottom: 16 }}>
+              <Space style={{ marginBottom: 16 }} wrap>
                 <Button
                   type="default"
                   icon={<ReloadOutlined />}
@@ -467,6 +472,13 @@ const MainPage: React.FC = () => {
                   onClick={onAiAnalyze}
                 >
                   AI分析
+                </Button>
+                <Button
+                  type="default"
+                  icon={<UnorderedListOutlined />}
+                  onClick={() => setSessionDrawerOpen(true)}
+                >
+                  会话列表
                 </Button>
                 <Button
                   type="default"
@@ -649,6 +661,23 @@ const MainPage: React.FC = () => {
           </Popover>
         </>
       )}
+
+      {/* 会话列表抽屉 */}
+      <ChatSessionDrawer
+        open={sessionDrawerOpen}
+        onClose={() => setSessionDrawerOpen(false)}
+        onSelectSession={(sessionId) => {
+          setCurrentChatSessionId(sessionId);
+          setChatDrawerOpen(true);
+        }}
+      />
+
+      {/* AI 对话抽屉 */}
+      <ChatDrawer
+        open={chatDrawerOpen}
+        onClose={() => setChatDrawerOpen(false)}
+        sessionId={currentChatSessionId}
+      />
     </div>
   );
 };

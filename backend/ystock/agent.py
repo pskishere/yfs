@@ -99,7 +99,7 @@ class StockAIAgent:
     """
     股票分析 AI Agent 服务类，提供对话和分析功能
     """
-    def __init__(self, model_name: str = "qwen2.5:latest", base_url: Optional[str] = None):
+    def __init__(self, model_name: str = "deepseek-v3.2:cloud", base_url: Optional[str] = None):
         """
         初始化 AI Agent 服务
         

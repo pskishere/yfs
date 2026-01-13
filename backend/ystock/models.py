@@ -144,7 +144,9 @@ class ChatMessage(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name='角色')
     content = models.TextField(verbose_name='消息内容')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed', verbose_name='状态')
+    parent_message = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='children', verbose_name='父消息')
     error_message = models.TextField(blank=True, null=True, verbose_name='错误信息')
+    feedback = models.IntegerField(default=0, verbose_name='反馈')  # -1: 点踩, 0: 无, 1: 点赞
     metadata = models.JSONField(default=dict, blank=True, verbose_name='元数据（如引用的股票代码、指标数据等）')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
