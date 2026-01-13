@@ -98,3 +98,65 @@ class StockInfo(models.Model):
 
     class Meta:
         ordering = ("symbol",)
+
+
+class ChatSession(models.Model):
+    """
+    AI 聊天会话模型，用于股票分析对话
+    """
+    session_id = models.CharField(max_length=100, unique=True, verbose_name='会话ID')
+    summary = models.TextField(blank=True, null=True, verbose_name='会话摘要')
+    context_symbols = models.JSONField(default=list, blank=True, verbose_name='会话关注的股票代码列表')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        verbose_name = 'AI聊天会话'
+        verbose_name_plural = 'AI聊天会话'
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['-updated_at']),
+        ]
+
+    def __str__(self):
+        return f"会话 {self.session_id}"
+
+
+class ChatMessage(models.Model):
+    """
+    AI 聊天消息模型，用于存储会话中的消息
+    """
+    ROLE_CHOICES = [
+        ('user', '用户'),
+        ('assistant', 'AI助手'),
+        ('system', '系统'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', '等待中'),
+        ('streaming', '生成中'),
+        ('completed', '已完成'),
+        ('error', '错误'),
+        ('cancelled', '已取消'),
+    ]
+
+    session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages', verbose_name='会话')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name='角色')
+    content = models.TextField(verbose_name='消息内容')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed', verbose_name='状态')
+    error_message = models.TextField(blank=True, null=True, verbose_name='错误信息')
+    metadata = models.JSONField(default=dict, blank=True, verbose_name='元数据（如引用的股票代码、指标数据等）')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        verbose_name = 'AI聊天消息'
+        verbose_name_plural = 'AI聊天消息'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['session', 'created_at']),
+            models.Index(fields=['session', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}"

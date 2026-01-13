@@ -640,3 +640,84 @@ def delete_stock(request, symbol: str) -> JsonResponse:
             "deleted_info": deleted_info,
         }
     )
+
+
+# ============= AI 聊天会话管理 API =============
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def chat_sessions(request) -> JsonResponse:
+    """
+    获取聊天会话列表或创建新会话
+    
+    GET: 返回所有会话列表
+    POST: 创建新会话
+    
+    Args:
+        request: HTTP 请求对象
+        
+    Returns:
+        JSON 响应，包含会话信息
+    """
+    from .models import ChatSession
+    from .serializers import ChatSessionSerializer
+    from .agent import StockAIAgent
+    
+    if request.method == 'GET':
+        sessions = ChatSession.objects.all().order_by('-updated_at')[:20]
+        serializer = ChatSessionSerializer(sessions, many=True)
+        return JsonResponse({'sessions': serializer.data})
+    
+    elif request.method == 'POST':
+        agent = StockAIAgent()
+        session_id = agent.create_new_session()
+        session = ChatSession.objects.get(session_id=session_id)
+        serializer = ChatSessionSerializer(session)
+        return JsonResponse({'session': serializer.data})
+
+
+@csrf_exempt
+@require_GET
+def chat_session_detail(request, session_id: str) -> JsonResponse:
+    """
+    获取聊天会话详情（包含消息列表）
+    
+    Args:
+        request: HTTP 请求对象
+        session_id: 会话ID
+        
+    Returns:
+        JSON 响应，包含会话详情和消息列表
+    """
+    from .models import ChatSession
+    from .serializers import ChatSessionDetailSerializer
+    
+    try:
+        session = ChatSession.objects.get(session_id=session_id)
+        serializer = ChatSessionDetailSerializer(session)
+        return JsonResponse({'session': serializer.data})
+    except ChatSession.DoesNotExist:
+        return JsonResponse({'error': '会话不存在'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_chat_session(request, session_id: str) -> JsonResponse:
+    """
+    删除聊天会话及其所有消息
+    
+    Args:
+        request: HTTP 请求对象
+        session_id: 会话ID
+        
+    Returns:
+        JSON 响应，包含删除结果
+    """
+    from .models import ChatSession
+    
+    try:
+        session = ChatSession.objects.get(session_id=session_id)
+        session.delete()
+        return JsonResponse({'success': True, 'session_id': session_id})
+    except ChatSession.DoesNotExist:
+        return JsonResponse({'error': '会话不存在'}, status=404)

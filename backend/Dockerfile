@@ -11,7 +11,12 @@ RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
 
 # 安装系统依赖
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential python3-dev && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        python3-dev \
+        libffi-dev \
+        curl \
+        netcat-openbsd && \
     rm -rf /var/lib/apt/lists/*
 
 # Python 镜像源
@@ -23,12 +28,7 @@ ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 # 安装依赖
 COPY requirements.txt .
-# 先卸载可能存在的 protobuf C 扩展，然后重新安装纯 Python 版本
-RUN pip uninstall -y protobuf || true && \
-    pip install --no-cache-dir --no-binary protobuf protobuf==4.25.3 && \
-    pip install --no-cache-dir -r requirements.txt && \
-    find /usr/local/lib/python3.14/site-packages/google/_upb -name "*.so" -delete 2>/dev/null || true && \
-    find /usr/local/lib/python3.14/site-packages/google/protobuf/pyext -name "*.so" -delete 2>/dev/null || true
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目
 COPY . /app/

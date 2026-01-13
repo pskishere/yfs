@@ -21,4 +21,9 @@ urlpatterns = [
     path("comprehensive/<str:symbol>", views.comprehensive, name="ystock-comprehensive"),
     path("all-data/<str:symbol>", views.all_data, name="ystock-all-data"),
     path("stocks/<str:symbol>", views.delete_stock, name="ystock-delete-stock"),
+    
+    # AI 聊天会话管理
+    path("chat/sessions", views.chat_sessions, name="ystock-chat-sessions"),
+    path("chat/sessions/<str:session_id>", views.chat_session_detail, name="ystock-chat-session-detail"),
+    path("chat/sessions/<str:session_id>/delete", views.delete_chat_session, name="ystock-delete-chat-session"),
 ]
