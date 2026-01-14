@@ -13,6 +13,7 @@
 		786F6DA311CCBD503109FE54 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CF17D761BC37136EA756A7F /* UIKit.framework */; };
 		900AB14D1FA81ECECE8E2530 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A41A243C0B311D319EDAD7B0 /* MetalKit.framework */; };
 		A30DEC7CBC7A3BD3E5A6E456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2DE650C698DFFB29B1CF3E0 /* Assets.xcassets */; };
+		C3B87E327487BA798F71D098 /* libapp.a in Resources */ = {isa = PBXBuildFile; fileRef = 3283E6587D2FA973DD8259FE /* libapp.a */; };
 		CBD2121B086493E26AFAE967 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 346B51695B596A4FA6B13F73 /* WebKit.framework */; };
 		D9990B36782E3F4685C2B496 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27815CC47F637D560882C10F /* CoreGraphics.framework */; };
 		DBA9C3CA672545450F839B41 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DAE3DE02F8086E65604316 /* Security.framework */; };
@@ -25,6 +26,7 @@
 		1380AEB200B4627836D43B2A /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		27815CC47F637D560882C10F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		2C43ACC45F3BEFD466F1E715 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		3283E6587D2FA973DD8259FE /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		346B51695B596A4FA6B13F73 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		43B533812E63E95C780C6A8C /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		5682D7ACAAB2310E8AAB328E /* tau_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = tau_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -135,11 +137,28 @@
 			path = bindings;
 			sourceTree = "<group>";
 		};
+		B439CDE2E8A8A73A99F066B7 /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+				C57763EFABACB92CF7D461C6 /* debug */,
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
 		BB73DF39CD48C851A3751BF1 /* Externals */ = {
 			isa = PBXGroup;
 			children = (
+				B439CDE2E8A8A73A99F066B7 /* arm64 */,
 			);
 			path = Externals;
+			sourceTree = "<group>";
+		};
+		C57763EFABACB92CF7D461C6 /* debug */ = {
+			isa = PBXGroup;
+			children = (
+				3283E6587D2FA973DD8259FE /* libapp.a */,
+			);
+			path = debug;
 			sourceTree = "<group>";
 		};
 		D2AC23E3551EED8ED828379D /* Sources */ = {
@@ -148,6 +167,13 @@
 				09CF71C5E82BAB237752F4F2 /* tau */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		"TEMP_8672D252-D951-4635-836B-31A0D9A15C2D" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -209,6 +235,7 @@
 				A30DEC7CBC7A3BD3E5A6E456 /* Assets.xcassets in Resources */,
 				6E8656B70ACBC64D01A66D51 /* LaunchScreen.storyboard in Resources */,
 				0E51BD2C85ACFE5DF20B876C /* assets in Resources */,
+				C3B87E327487BA798F71D098 /* libapp.a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,7 +301,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.k.tau;
-				PRODUCT_NAME = "tau";
+				PRODUCT_NAME = tau;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -368,7 +395,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.k.tau;
-				PRODUCT_NAME = "tau";
+				PRODUCT_NAME = tau;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;

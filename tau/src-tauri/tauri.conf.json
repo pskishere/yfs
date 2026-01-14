@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "tau",
-        "width": 800,
-        "height": 600
+        "title": "YSt",
+        "width": 900,
+        "height": 700
       }
     ],
     "security": {

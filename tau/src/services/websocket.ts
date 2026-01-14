@@ -128,8 +128,8 @@ export class WebSocketClient {
       
       let hostWithPort = port ? `${host}:${port}` : host;
       
-      if (host === 'localhost' || host === 'tauri.localhost') {
-        hostWithPort = 'localhost:8086';
+      if (host === 'localhost' || host === 'tauri.localhost' || host === '0.0.0.0') {
+        hostWithPort = `${host}:8086`;
       }
       
       baseUrl = `${protocol}//${hostWithPort}`;
