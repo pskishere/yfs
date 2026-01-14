@@ -151,11 +151,21 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth <= 768);
   const currentStreamingIdRef = useRef<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [api, contextHolder] = notification.useNotification();
+
+  // 监听窗口大小变化
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   /**
    * 自动滚动到底部
@@ -518,7 +528,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
           </Space>
         }
         placement="right"
-        size="large"
+        size={isMobile ? 'large' : 800 as any}
         onClose={onClose}
         open={open}
         styles={{
