@@ -49,13 +49,17 @@ export const useStockAnalysis = () => {
     setOptionsLoading(true);
     try {
       const result = await getOptions(symbol);
+      // 如果接口返回成功，且有数据，则设置数据
       if (result && result.success && result.data) {
         setOptionsData(result.data);
       } else {
+        // 否则设置为 null
         setOptionsData(null);
       }
-    } catch (error) {
-      console.error('获取期权数据失败:', error);
+    } catch (error: any) {
+      // 这里的错误通常是 404 (无期权数据) 或 500
+      // 我们不再使用 console.error 打印错误，而是安静地处理
+      console.log(`${symbol} 期权数据不可用或获取失败`);
       setOptionsData(null);
     } finally {
       setOptionsLoading(false);
@@ -116,7 +120,7 @@ export const useStockAnalysis = () => {
       
       // 如果是进行中状态，开始轮询
       if (aiResult?.status === 'running' || (aiResult as any)?.status === 'running') {
-        setAiStatusMsg('AI分析进行中，等待结果...');
+        setAiStatusMsg('AI分析中...');
         
         let pollCount = 0;
         const maxPolls = 60;
@@ -245,6 +249,7 @@ export const useStockAnalysis = () => {
     setAnalysisLoading(true);
     setAnalysisResult(null);
     setAiAnalysisResult(null);
+    setOptionsData(null);
     setAiStatus('idle');
     setAiStatusMsg('点击AI分析');
 
@@ -319,6 +324,7 @@ export const useStockAnalysis = () => {
     setAnalysisLoading(true);
     setAnalysisResult(null);
     setAiAnalysisResult(null);
+    setOptionsData(null);
     setAiStatus('idle');
     setAiStatusMsg('点击AI分析');
 

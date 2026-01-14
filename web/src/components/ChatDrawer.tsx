@@ -2,7 +2,7 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, Input, Space, notification, Modal, Tooltip, Empty, Flex, Divider, Tag } from 'antd';
+import { Drawer, Button, Input, Space, notification, Modal, Tooltip, Empty, Flex, Divider } from 'antd';
 import { Sender, ThoughtChain } from '@ant-design/x';
 import {
   StopOutlined,

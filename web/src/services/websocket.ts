@@ -38,7 +38,6 @@ export interface WebSocketCallbacks {
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private sessionId: string | null = null;
-  private symbol: string | null = null;
   private model: string | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;

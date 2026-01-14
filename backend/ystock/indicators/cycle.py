@@ -136,9 +136,6 @@ def detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=100):
     return dominant_cycle, cycle_strength
 
 
-
-
-
 @dataclass
 class TurningPoint:
     """转折点数据"""
@@ -171,30 +168,6 @@ def calculate_autocorrelation(prices, max_lag=None):
             lags.append(lag)
     
     return np.array(autocorr), np.array(lags)
-
-
-def detect_cycle_length(autocorr, lags, min_cycle=5, max_cycle=100):
-    """
-    从自相关函数中检测主要周期长度
-    """
-    if len(autocorr) == 0 or len(lags) == 0:
-        return None, 0.0
-    
-    valid_mask = (lags >= min_cycle) & (lags <= max_cycle)
-    if not np.any(valid_mask):
-        return None, 0.0
-    
-    valid_autocorr = autocorr[valid_mask]
-    valid_lags = lags[valid_mask]
-    
-    max_idx = np.argmax(valid_autocorr)
-    dominant_cycle = int(valid_lags[max_idx])
-    cycle_strength = float(valid_autocorr[max_idx])
-    
-    if cycle_strength < 0.3:
-        return None, 0.0
-    
-    return dominant_cycle, cycle_strength
 
 
 def _convert_turning_points(peaks: List[int], troughs: List[int], prices: np.ndarray) -> List[TurningPoint]:
@@ -1071,6 +1044,14 @@ def calculate_cycle_analysis(prices: np.ndarray,
         wavelet_result = wavelet_cycle_analysis(prices)
         result.update(wavelet_result)
     
+    # 如果自相关未找到主周期，尝试从小波分析中获取
+    if dominant_cycle is None and wavelet_result.get('wavelet_available'):
+        dominant_cycle = wavelet_result.get('wavelet_dominant_cycle')
+        cycle_strength = wavelet_result.get('wavelet_cycle_strength', 0.0)
+        if dominant_cycle:
+            result['dominant_cycle'] = dominant_cycle
+            result['cycle_strength'] = cycle_strength
+
     # 7. FFT频域分析
     if len(prices) >= 50:
         try:
@@ -1093,6 +1074,13 @@ def calculate_cycle_analysis(prices: np.ndarray,
                     if 5 <= fft_cycle <= 100:
                         result['fft_cycle'] = fft_cycle
                         result['fft_power'] = float(positive_power[max_power_idx] / np.sum(positive_power))
+                        
+                        # 如果还没找到主周期，使用FFT的结果
+                        if dominant_cycle is None:
+                            dominant_cycle = fft_cycle
+                            cycle_strength = result['fft_power']
+                            result['dominant_cycle'] = dominant_cycle
+                            result['cycle_strength'] = cycle_strength
         except Exception:
             pass
     
@@ -1130,8 +1118,43 @@ def calculate_cycle_analysis(prices: np.ndarray,
     )
     result.update(confidence_result)
     
-    # 10. 当前周期位置分析（保持原有逻辑，略）
-    # ...（这部分保持原有cycle.py的实现）
+    # 10. 当前周期位置分析（补全缺失逻辑）
+    if cycle_periods and dominant_cycle:
+        current_period = cycle_periods[-1]
+        result['cycle_status'] = current_period.get('cycle_type_desc', '未知')
+        
+        # 预测方向和下一个拐点
+        current_duration = current_period.get('duration', 0)
+        cycle_type = current_period.get('cycle_type')
+        
+        # 估算下一个拐点的时间（假设上涨/下跌阶段约为周期的一半）
+        phase_length = dominant_cycle / 2.0
+        
+        if cycle_type == 'rise':
+            if current_duration >= phase_length * 0.8:
+                result['cycle_prediction'] = 'potential_peak'
+                remaining = max(1, int(phase_length - current_duration))
+                result['next_turning_point'] = f"预计 {remaining} 天内可能出现高点"
+            else:
+                result['cycle_prediction'] = 'bullish'
+                remaining = max(1, int(phase_length - current_duration))
+                result['next_turning_point'] = f"预计上涨还可维持 {remaining} 天"
+        elif cycle_type == 'decline':
+            if current_duration >= phase_length * 0.8:
+                result['cycle_prediction'] = 'potential_trough'
+                remaining = max(1, int(phase_length - current_duration))
+                result['next_turning_point'] = f"预计 {remaining} 天内可能出现低点"
+            else:
+                result['cycle_prediction'] = 'bearish'
+                remaining = max(1, int(phase_length - current_duration))
+                result['next_turning_point'] = f"预计下跌还可维持 {remaining} 天"
+        else:  # sideways
+            result['cycle_prediction'] = 'neutral'
+            result['next_turning_point'] = "等待横盘突破"
+    else:
+        result['cycle_status'] = '无明显周期'
+        result['cycle_prediction'] = 'neutral'
+        result['next_turning_point'] = '未知'
     
     # 11. 增强的横盘检测（新增）
     if volumes is not None and len(volumes) >= 20:

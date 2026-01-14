@@ -158,7 +158,7 @@ def get_fundamental_data(symbol: str) -> str:
 @tool
 def get_cycle_analysis(symbol: str) -> str:
     """
-    获取股票的周期分析数据，包括 Hurst 指数、傅里叶分析、年度/月度季节性周期规律。
+    获取股票的周期分析数据，包括主周期长度、周期强度、周期规律以及季节性表现。
     当用户询问长线趋势、周期规律、时间拐点时使用。
     """
     analysis = _get_or_fetch_analysis(symbol)
@@ -168,31 +168,42 @@ def get_cycle_analysis(symbol: str) -> str:
     ind = analysis.indicators
     result = [f"### {symbol} 周期分析报告"]
     
-    # 1. Hurst 指数
-    hurst = ind.get('hurst_exponent')
-    if hurst is not None:
-        hurst_desc = "强趋势性" if hurst > 0.65 else ("随机波动" if hurst < 0.45 else "中等趋势")
-        result.append(f"- Hurst 指数: {hurst:.2f} ({hurst_desc})")
+    # 1. 核心周期指标
+    dominant_cycle = ind.get('dominant_cycle')
+    if dominant_cycle:
+        strength = ind.get('cycle_strength', 0) * 100
+        quality = ind.get('cycle_quality', '未知')
+        result.append(f"- **主周期**: {dominant_cycle:.1f} 天")
+        result.append(f"- **周期强度**: {strength:.1f}% (质量: {quality})")
+    
+    # 2. 周期状态与预测
+    status = ind.get('cycle_status')
+    if status:
+        prediction = ind.get('cycle_prediction', '中性')
+        next_point = ind.get('next_turning_point', '未知')
+        result.append(f"- **当前状态**: {status}")
+        result.append(f"- **预测方向**: {prediction}")
+        result.append(f"- **下个拐点**: {next_point}")
+
+    # 3. 周期总结
+    summary = ind.get('cycle_summary')
+    if summary:
+        result.append(f"- **周期总结**: {summary}")
         
-    # 2. 傅里叶主周期
-    fourier = ind.get('fourier_dominant_period')
-    if fourier:
-        result.append(f"- 傅里叶主周期: {fourier:.1f} 天")
-        
-    # 3. 季节性规律
+    # 4. 季节性规律 (简略版)
     yearly = ind.get('yearly_cycles', [])
     if yearly:
-        result.append("\n**年度季节性表现 (胜率前3个月):**")
-        sorted_yearly = sorted(yearly, key=lambda x: x.get('win_rate', 0), reverse=True)
-        for m in sorted_yearly[:3]:
-            result.append(f"- {m.get('month')}月: 胜率 {m.get('win_rate', 0)*100:.1f}%, 平均涨幅 {m.get('avg_return', 0)*100:.2f}%")
+        result.append("\n**年度历史表现 (最近3年):**")
+        for y in sorted(yearly, key=lambda x: x.get('year', 0), reverse=True)[:3]:
+            change = y.get('first_to_last_change', 0)
+            result.append(f"- {y.get('year')}年: 涨幅 {change:.2f}% (交易日: {y.get('trading_days')}天)")
             
     monthly = ind.get('monthly_cycles', [])
     if monthly:
-        result.append("\n**月内周期表现 (胜率前3天):**")
-        sorted_monthly = sorted(monthly, key=lambda x: x.get('win_rate', 0), reverse=True)
-        for d in sorted_monthly[:3]:
-            result.append(f"- 第 {d.get('day')} 交易日: 胜率 {d.get('win_rate', 0)*100:.1f}%")
+        result.append("\n**最近月度表现:**")
+        for m in sorted(monthly, key=lambda x: x.get('month', ''), reverse=True)[:3]:
+            change = m.get('first_to_last_change', 0)
+            result.append(f"- {m.get('month')}: 涨幅 {change:.2f}%")
             
     return "\n".join(result)
 

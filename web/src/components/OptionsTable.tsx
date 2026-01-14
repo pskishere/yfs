@@ -2,7 +2,7 @@
  * 期权数据表格组件
  */
 import React, { useState } from 'react';
-import { Table, Tabs, Collapse, Typography, Space, Empty, Descriptions, Tag, Select } from 'antd';
+import { Table, Tabs, Collapse, Typography, Descriptions, Tag, Select } from 'antd';
 import { DollarOutlined } from '@ant-design/icons';
 import type { OptionsData } from '../types/index';
 
@@ -11,7 +11,6 @@ const { Option } = Select;
 
 interface OptionsTableProps {
   data: OptionsData;
-  loading?: boolean;
   createIndicatorLabel?: (label: string, indicatorKey: string) => React.ReactNode;
 }
 
@@ -39,15 +38,14 @@ const formatPercent = (value: number | undefined | null) => {
   );
 };
 
-export const OptionsTable: React.FC<OptionsTableProps> = ({ data, loading, createIndicatorLabel }) => {
+export const OptionsTable: React.FC<OptionsTableProps> = ({ data, createIndicatorLabel }) => {
   const [activeDate, setActiveDate] = useState<string | undefined>(
     data?.expiration_dates?.[0]
   );
   const [activeTab, setActiveTab] = useState<string>('calls');
 
   if (!data || !data.expiration_dates || data.expiration_dates.length === 0) {
-    if (loading) return null;
-    return <Empty description="暂无期权数据" />;
+    return null;
   }
 
   const columns = [
@@ -150,7 +148,7 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data, loading, creat
     <div id="section-options">
       <Collapse
         ghost
-        defaultActiveKey={['options']}
+        defaultActiveKey={[]}
         items={[{
           key: 'options',
           label: (

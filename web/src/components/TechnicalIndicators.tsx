@@ -452,6 +452,11 @@ export const TechnicalIndicators: React.FC<TechnicalIndicatorsProps> = ({
     return items;
   };
 
+  const items = renderIndicatorItems();
+  if (items.length === 0) {
+    return null;
+  }
+
   return (
     <div id="section-indicators">
       <Collapse
@@ -471,7 +476,7 @@ export const TechnicalIndicators: React.FC<TechnicalIndicatorsProps> = ({
               column={{ xxl: 4, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}
               size="small"
               layout="vertical"
-              items={renderIndicatorItems()}
+              items={items}
             />
           ),
         }]}

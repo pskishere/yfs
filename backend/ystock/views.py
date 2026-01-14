@@ -312,7 +312,7 @@ def fundamental(request, symbol: str) -> JsonResponse:
     try:
         data = fetch_fundamental(symbol)
         if not data:
-            return JsonResponse({"success": False, "message": f"无法获取 {symbol} 的基本面数据"}, status=404)
+            return JsonResponse({"success": True, "symbol": symbol, "data": None, "message": f"无法获取 {symbol} 的基本面数据"})
         return JsonResponse({"success": True, "symbol": symbol, "data": data})
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"success": False, "message": str(exc)}, status=500)
@@ -385,7 +385,8 @@ def options(request, symbol: str) -> JsonResponse:
     try:
         data = fetch_options(symbol)
         if not data:
-            return JsonResponse({"success": False, "message": f"{symbol} 没有期权数据"}, status=404)
+            # 返回 200 状态码但标记成功为 false，或者返回空数据，以避免前端报 404 错误
+            return JsonResponse({"success": True, "symbol": symbol, "data": None, "message": f"{symbol} 没有期权数据"})
         return JsonResponse({"success": True, "symbol": symbol, "data": data})
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"success": False, "message": str(exc)}, status=500)
@@ -454,8 +455,7 @@ def indicator_info(request) -> JsonResponse:
         info = indicator_info_map.get(indicator_name)
         if not info:
             return JsonResponse(
-                {"success": False, "message": f"未找到指标 {indicator_name}"},
-                status=404,
+                {"success": True, "indicator": indicator_name, "info": None, "message": f"未找到指标 {indicator_name}"}
             )
         return JsonResponse(
             {"success": True, "indicator": indicator_name, "info": info}

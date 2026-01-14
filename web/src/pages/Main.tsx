@@ -74,7 +74,6 @@ const MainPage: React.FC = () => {
     loadIndicatorInfo,
     stopAiPolling,
     optionsData,
-    optionsLoading,
   } = useStockAnalysis();
 
   const [newsPage, setNewsPage] = useState<number>(1);
@@ -297,7 +296,7 @@ const MainPage: React.FC = () => {
     const formValues = analyzeForm.getFieldsValue();
     const duration = formValues.duration || '5y';
     const barSize = formValues.barSize || '1 day';
-    const model = formValues.model || 'deepseek-v3.2:cloud';
+    const model = formValues.model || 'deepseek-v3.1:671b-cloud';
 
     console.log('手动触发AI分析，使用模型:', model);
     runAiAnalysis(currentSymbol, duration, barSize, model, analysisResult);
@@ -405,6 +404,7 @@ const MainPage: React.FC = () => {
                   placeholder="AI 模型"
                   style={{ width: '100%' }}
                   options={[
+                    { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:latest' },
                     { label: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview:cloud' },
                     { label: 'Qwen3 Next 80B', value: 'qwen3-next:80b-cloud' },
                     { label: 'GPT-OSS 120B', value: 'gpt-oss:120b-cloud' },
@@ -531,7 +531,6 @@ const MainPage: React.FC = () => {
                   {optionsData && (
                     <OptionsTable 
                       data={optionsData} 
-                      loading={optionsLoading}
                       createIndicatorLabel={createIndicatorLabel}
                     />
                   )}

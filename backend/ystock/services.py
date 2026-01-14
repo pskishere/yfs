@@ -207,7 +207,7 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str) -> Tuple[D
     currency_code = extra_data.get("currency")
     currency_symbol = extra_data.get("currency_symbol") or extra_data.get("currencySymbol")
 
-    # 如果当天已有 AI 分析结果，直接返回（即使数据是前一天的，也不需要重新分析）
+    # 如果当天已有 AI 分析结果，直接返回
     if record.ai_analysis and record.cached_at and record.cached_at.date() == timezone.now().date():
         # 如果模型相同，直接返回
         if record.model == model:
@@ -222,18 +222,9 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str) -> Tuple[D
                 "currency_symbol": currency_symbol,
                 "extra_data": record.extra_data,
             }, None
-        # 如果模型不同，但已有结果，也返回（避免重复分析相同数据）
-        logger.info(f"使用当天缓存的 AI 分析结果（模型不同但数据相同）: {symbol}, 缓存模型: {record.model}, 请求模型: {model}")
-        return {
-            "success": True,
-            "ai_analysis": record.ai_analysis,
-            "model": record.model,
-            "ai_available": True,
-            "cached": True,
-            "currency": currency_code,
-            "currency_symbol": currency_symbol,
-            "extra_data": record.extra_data,
-        }, None
+        # 如果模型不同，且之前的分析不是错误消息，则重新分析（或者根据需求决定是否允许切换模型重新分析）
+        # 这里改为：如果模型不同，强制重新分析，以支持模型切换
+        logger.info(f"请求模型 ({model}) 与缓存模型 ({record.model}) 不同，将重新执行 AI 分析")
 
     if not check_ollama_available():
         return None, (
