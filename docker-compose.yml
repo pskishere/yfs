@@ -48,7 +48,7 @@ services:
   # 前端服务
   frontend:
     build:
-      context: ./web
+      context: ./tau
       dockerfile: Dockerfile
     container_name: yfs-frontend
     restart: unless-stopped
