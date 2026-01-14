@@ -140,7 +140,7 @@ export const PivotPoints: React.FC<PivotPointsProps> = ({
     <div id="section-pivot">
       <Collapse
         ghost
-        defaultActiveKey={['pivot']}
+        defaultActiveKey={[]}
         items={[{
           key: 'pivot',
           label: (

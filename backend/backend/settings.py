@@ -29,6 +29,16 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
+# 代理 SSL 配置，支持 ngrok 等反向代理
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# CSRF 信任域配置，支持 ngrok 等代理
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.ngrok-free.app",
+    "https://*.ngrok-free.dev",
+    "https://*.ngrok.io",
+]
+
 
 # Application definition
 

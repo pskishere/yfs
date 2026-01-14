@@ -421,16 +421,6 @@ export const translateAction = (action: string | undefined | null): string => {
     'sale': '出售',
     'hold': '持有',
     
-    // 内部交易类型
-    'stock gift': '股票赠与',
-    'option exercise': '期权行使',
-    'stock award': '股票奖励',
-    'stock option exercise': '股票期权行使',
-    'automatic sale': '自动出售',
-    'automatic purchase': '自动购买',
-    'discretionary transaction': '自主交易',
-    'non-discretionary transaction': '非自主交易',
-    
     // 其他
     'change': '变化',
     '変化': '变化', // 日语
@@ -457,23 +447,10 @@ export const translateAction = (action: string | undefined | null): string => {
  * 状态映射配置
  */
 export const statusMaps = {
-  order: {
-    'Filled': { color: 'success', text: '已成交' },
-    'Cancelled': { color: 'default', text: '已取消' },
-    'Submitted': { color: 'processing', text: '已提交' },
-    'PreSubmitted': { color: 'warning', text: '预提交' },
-  },
   trend: {
     'up': { color: 'success', text: '上涨' },
     'down': { color: 'error', text: '下跌' },
     'neutral': { color: 'default', text: '震荡' },
-  },
-  risk: {
-    'very_low': { color: 'success', text: '很低风险' },
-    'low': { color: 'success', text: '低风险' },
-    'medium': { color: 'warning', text: '中等风险' },
-    'high': { color: 'error', text: '高风险' },
-    'very_high': { color: 'error', text: '极高风险' },
   },
   consensus: {
     '1': { text: '强烈买入', color: 'success' },

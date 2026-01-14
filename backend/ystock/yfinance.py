@@ -25,6 +25,8 @@ if 'google._upb' in sys.modules:
 import numpy as np
 import pandas as pd
 import pytz
+import requests
+import xml.etree.ElementTree as ET
 
 # 直接导入 yfinance，如果失败会在导入时抛出异常
 import yfinance as yf
@@ -110,41 +112,7 @@ def get_stock_info(symbol: str):
         return None
 
 
-def _format_financial_dataframe(df):
-    """
-    格式化财务报表DataFrame为列表格式（字典列表）
-    将DataFrame转换为列表，每个元素是一个日期对应的记录
-    """
-    if df is None or df.empty:
-        return []
-    
-    result = []
-    df_transposed = df.T
-    
-    for date in df_transposed.index:
-        if hasattr(date, 'strftime'):
-            date_str = date.strftime('%Y-%m-%d')
-        elif isinstance(date, pd.Timestamp):
-            date_str = date.strftime('%Y-%m-%d')
-        else:
-            date_str = str(date)
-        
-        record = {'index': date_str, 'Date': date_str}
-        for col in df_transposed.columns:
-            value = df_transposed.loc[date, col]
-            if pd.notna(value):
-                if isinstance(value, pd.Timestamp):
-                    record[col] = value.strftime('%Y-%m-%d')
-                elif isinstance(value, (int, float, np.number)):
-                    record[col] = float(value)
-                else:
-                    record[col] = str(value)
-            else:
-                record[col] = None
-        
-        result.append(record)
-    
-    return result
+
 
 
 def get_fundamental_data(symbol: str):
@@ -221,80 +189,17 @@ def get_fundamental_data(symbol: str):
             'EPS': info.get('trailingEps', 0),
             'ForwardEPS': info.get('forwardEps', 0),
             'BookValuePerShare': info.get('bookValue', 0),
-            'DividendPerShare': info.get('dividendRate', 0),
-            
-            'DividendRate': info.get('dividendRate', 0),
-            'DividendYield': info.get('dividendYield', 0),
-            'PayoutRatio': info.get('payoutRatio', 0),
-            'ExDividendDate': info.get('exDividendDate', 0),
             
             'RevenueGrowth': info.get('revenueGrowth', 0),
             'EarningsGrowth': info.get('earningsGrowth', 0),
             'EarningsQuarterlyGrowth': info.get('earningsQuarterlyGrowth', 0),
             'QuarterlyRevenueGrowth': info.get('quarterlyRevenueGrowth', 0),
             
-            'TargetPrice': info.get('targetMeanPrice', 0),
-            'TargetHighPrice': info.get('targetHighPrice', 0),
-            'TargetLowPrice': info.get('targetLowPrice', 0),
-            'ConsensusRecommendation': info.get('recommendationMean', 0),
-            'RecommendationKey': info.get('recommendationKey', ''),
-            'NumberOfAnalystOpinions': info.get('numberOfAnalystOpinions', 0),
-            'ProjectedEPS': info.get('forwardEps', 0),
-            'ProjectedGrowthRate': info.get('earningsQuarterlyGrowth', 0),
-            
             'Beta': info.get('beta', 0),
             'AverageVolume': info.get('averageVolume', 0),
             'AverageVolume10days': info.get('averageVolume10days', 0),
             'FloatShares': info.get('floatShares', 0),
         }
-        
-        try:
-            financials = ticker.financials
-            if financials is not None and not financials.empty:
-                fundamental['Financials'] = _format_financial_dataframe(financials)
-                logger.debug(f"已获取财务报表数据: {symbol}")
-        except Exception as e:
-            logger.debug(f"获取财务报表失败（已跳过）: {symbol}")
-        
-        try:
-            quarterly_financials = ticker.quarterly_financials
-            if quarterly_financials is not None and not quarterly_financials.empty:
-                fundamental['QuarterlyFinancials'] = _format_financial_dataframe(quarterly_financials)
-                logger.debug(f"已获取季度财务报表数据: {symbol}")
-        except Exception as e:
-            logger.debug(f"获取季度财务报表失败（已跳过）: {symbol}")
-        
-        try:
-            balance_sheet = ticker.balance_sheet
-            if balance_sheet is not None and not balance_sheet.empty:
-                fundamental['BalanceSheet'] = _format_financial_dataframe(balance_sheet)
-                logger.debug(f"已获取资产负债表数据: {symbol}")
-        except Exception as e:
-            logger.debug(f"获取资产负债表失败（已跳过）: {symbol}")
-        
-        try:
-            quarterly_balance_sheet = ticker.quarterly_balance_sheet
-            if quarterly_balance_sheet is not None and not quarterly_balance_sheet.empty:
-                fundamental['QuarterlyBalanceSheet'] = _format_financial_dataframe(quarterly_balance_sheet)
-                logger.debug(f"已获取季度资产负债表数据: {symbol}")
-        except Exception as e:
-            logger.debug(f"获取季度资产负债表失败（已跳过）: {symbol}")
-        
-        try:
-            cashflow = ticker.cashflow
-            if cashflow is not None and not cashflow.empty:
-                fundamental['Cashflow'] = _format_financial_dataframe(cashflow)
-                logger.debug(f"已获取现金流量表数据: {symbol}")
-        except Exception as e:
-            logger.debug(f"获取现金流量表失败（已跳过）: {symbol}")
-        
-        try:
-            quarterly_cashflow = ticker.quarterly_cashflow
-            if quarterly_cashflow is not None and not quarterly_cashflow.empty:
-                fundamental['QuarterlyCashflow'] = _format_financial_dataframe(quarterly_cashflow)
-                logger.debug(f"已获取季度现金流量表数据: {symbol}")
-        except Exception as e:
-            logger.debug(f"获取季度现金流量表失败（已跳过）: {symbol}")
         
         return fundamental
         
@@ -462,665 +367,6 @@ def get_historical_data(symbol: str, duration: str = '1 D',
         return None, {'code': 500, 'message': str(e)}
 
 
-def get_dividends(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取股票分红历史
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        dividends = ticker.dividends
-        
-        if dividends is None or dividends.empty:
-            return []
-        
-        result = []
-        for date, value in dividends.items():
-            result.append({
-                'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
-                'dividend': float(value)
-            })
-        
-        logger.info(f"已获取分红历史: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取分红历史失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_splits(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取股票拆分历史
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        splits = ticker.splits
-        
-        if splits is None or splits.empty:
-            return []
-        
-        result = []
-        for date, ratio in splits.items():
-            result.append({
-                'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
-                'ratio': float(ratio)
-            })
-        
-        logger.info(f"已获取股票拆分历史: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取股票拆分历史失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_actions(symbol: str) -> Optional[Dict[str, List[Dict[str, Any]]]]:
-    """
-    获取公司行动（分红+拆分）
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        actions = ticker.actions
-        
-        if actions is None or actions.empty:
-            return {'dividends': [], 'splits': []}
-        
-        result = {'dividends': [], 'splits': []}
-        
-        for date, row in actions.iterrows():
-            date_str = date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date)
-            
-            if 'Dividends' in row and pd.notna(row['Dividends']) and row['Dividends'] > 0:
-                result['dividends'].append({
-                    'date': date_str,
-                    'dividend': float(row['Dividends'])
-                })
-            
-            if 'Stock Splits' in row and pd.notna(row['Stock Splits']) and row['Stock Splits'] > 0:
-                result['splits'].append({
-                    'date': date_str,
-                    'ratio': float(row['Stock Splits'])
-                })
-        
-        logger.info(f"已获取公司行动: {symbol}, 分红{len(result['dividends'])}条, 拆分{len(result['splits'])}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取公司行动失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_institutional_holders(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取机构持股信息
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        holders = ticker.institutional_holders
-        
-        if holders is None or holders.empty:
-            return []
-        
-        result = []
-        for _, row in holders.iterrows():
-            record = {}
-            for col in holders.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取机构持股: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取机构持股失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_major_holders(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取主要持股人摘要
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        holders = ticker.major_holders
-        
-        if holders is None or holders.empty:
-            return {}
-        
-        result = {}
-        for idx, row in holders.iterrows():
-            if len(row) >= 2:
-                key = str(row[1]).replace(' ', '_')
-                result[key] = str(row[0])
-        
-        logger.info(f"已获取主要持股人摘要: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取主要持股人摘要失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_mutualfund_holders(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取共同基金持股信息
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        holders = ticker.mutualfund_holders
-        
-        if holders is None or holders.empty:
-            return []
-        
-        result = []
-        for _, row in holders.iterrows():
-            record = {}
-            for col in holders.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取共同基金持股: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取共同基金持股失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_insider_transactions(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取内部交易信息
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        transactions = ticker.insider_transactions
-        
-        if transactions is None or transactions.empty:
-            return []
-        
-        result = []
-        for _, row in transactions.iterrows():
-            record = {}
-            for col in transactions.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取内部交易: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取内部交易失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_insider_purchases(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取内部人员购买信息
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        purchases = ticker.insider_purchases
-        
-        if purchases is None or purchases.empty:
-            return []
-        
-        result = []
-        for _, row in purchases.iterrows():
-            record = {}
-            for col in purchases.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取内部人员购买: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取内部人员购买失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_insider_roster_holders(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取内部人员名单
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        roster = ticker.insider_roster_holders
-        
-        if roster is None or roster.empty:
-            return []
-        
-        result = []
-        for _, row in roster.iterrows():
-            record = {}
-            for col in roster.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取内部人员名单: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取内部人员名单失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_recommendations(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取分析师推荐历史（评级升降级记录）
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        upgrades = ticker.upgrades_downgrades
-
-        if upgrades is None or upgrades.empty:
-            return []
-
-        result = []
-        for date, row in upgrades.iterrows():
-            record = {}
-            
-            if hasattr(date, 'strftime'):
-                record['Date'] = date.strftime('%Y-%m-%d')
-            else:
-                record['Date'] = str(date)
-            
-            for col in upgrades.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            
-            if 'ToGrade' in record:
-                record['To Grade'] = record['ToGrade']
-            if 'FromGrade' in record:
-                record['From Grade'] = record['FromGrade']
-                
-            result.append(record)
-
-        logger.info(f"已获取分析师推荐历史: {symbol}, 共{len(result)}条")
-        return result
-
-    except Exception as e:
-        logger.error(f"获取分析师推荐历史失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_recommendations_summary(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取分析师推荐摘要
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        summary = ticker.recommendations_summary
-        
-        if summary is None or summary.empty:
-            return {}
-        
-        result = {}
-        for col in summary.columns:
-            if col == 'period':
-                result[col] = str(summary[col].iloc[0])
-            else:
-                result[col] = int(summary[col].iloc[0]) if pd.notna(summary[col].iloc[0]) else 0
-        
-        logger.info(f"已获取分析师推荐摘要: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取分析师推荐摘要失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_upgrades_downgrades(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取评级升降级历史
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        upgrades = ticker.upgrades_downgrades
-        
-        if upgrades is None or upgrades.empty:
-            return []
-        
-        result = []
-        for date, row in upgrades.iterrows():
-            record = {'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date)}
-            for col in upgrades.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取评级升降级历史: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取评级升降级历史失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_earnings(symbol: str) -> Optional[Dict[str, List[Dict[str, Any]]]]:
-    """
-    获取收益数据（年度和季度）
-    注意：ticker.earnings 已废弃，如果获取不到数据就返回空
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        
-        result = {'yearly': [], 'quarterly': []}
-        
-        try:
-            import warnings
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=DeprecationWarning)
-                earnings = ticker.earnings
-                if earnings is not None and not earnings.empty:
-                    for year, row in earnings.iterrows():
-                        record = {'year': str(year)}
-                        for col in earnings.columns:
-                            value = row[col]
-                            if pd.notna(value):
-                                record[col] = float(value) if isinstance(value, (int, float, np.number)) else str(value)
-                            else:
-                                record[col] = None
-                        result['yearly'].append(record)
-        except Exception as e:
-            logger.debug(f"获取年度收益失败（已跳过）: {symbol}")
-        
-        try:
-            import warnings
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=DeprecationWarning)
-                quarterly_earnings = ticker.quarterly_earnings
-                if quarterly_earnings is not None and not quarterly_earnings.empty:
-                    for quarter, row in quarterly_earnings.iterrows():
-                        record = {'quarter': str(quarter)}
-                        for col in quarterly_earnings.columns:
-                            value = row[col]
-                            if pd.notna(value):
-                                record[col] = float(value) if isinstance(value, (int, float, np.number)) else str(value)
-                            else:
-                                record[col] = None
-                        result['quarterly'].append(record)
-        except Exception as e:
-            logger.debug(f"获取季度收益失败（已跳过）: {symbol}")
-        
-        if not result['yearly'] and not result['quarterly']:
-            return None
-        
-        logger.debug(f"已获取收益数据: {symbol}, 年度{len(result['yearly'])}条, 季度{len(result['quarterly'])}条")
-        return result
-        
-    except Exception as e:
-        logger.debug(f"获取收益数据失败（已跳过）: {symbol}")
-        return None
-
-
-def get_earnings_dates(symbol: str, limit: int = 12) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取收益日期（过去和未来的财报日期）
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        earnings_dates = ticker.earnings_dates
-        
-        if earnings_dates is None or earnings_dates.empty:
-            return None
-        
-        result = []
-        for date, row in earnings_dates.head(limit).iterrows():
-            record = {'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date)}
-            for col in earnings_dates.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        if not result:
-            return None
-        
-        logger.debug(f"已获取收益日期: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.debug(f"获取收益日期失败（已跳过）: {symbol}")
-        return None
-
-
-def get_earnings_history(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取历史收益（实际vs预期）
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        history = ticker.earnings_history
-        
-        if history is None or history.empty:
-            return None
-        
-        result = []
-        for _, row in history.iterrows():
-            record = {}
-            for col in history.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        if not result:
-            return None
-        
-        logger.debug(f"已获取历史收益: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.debug(f"获取历史收益失败（已跳过）: {symbol}")
-        return None
-
-
-def get_calendar(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取公司日历（收益日期等）
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        calendar = ticker.calendar
-        
-        if calendar is None or calendar.empty:
-            return {}
-        
-        result = {}
-        if isinstance(calendar, pd.DataFrame):
-            for col in calendar.columns:
-                value = calendar[col].iloc[0] if len(calendar) > 0 else None
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        result[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        result[col] = float(value)
-                    else:
-                        result[col] = str(value)
-                else:
-                    result[col] = None
-        elif isinstance(calendar, dict):
-            result = calendar
-        
-        logger.info(f"已获取公司日历: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取公司日历失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_sustainability(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取ESG（环境、社会、治理）可持续性评分
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        sustainability = ticker.sustainability
-        
-        if sustainability is None or sustainability.empty:
-            return {}
-        
-        result = {}
-        for idx in sustainability.index:
-            value = sustainability.loc[idx].iloc[0]
-            if pd.notna(value):
-                if isinstance(value, (int, float, np.number)):
-                    result[idx] = float(value)
-                else:
-                    result[idx] = str(value)
-            else:
-                result[idx] = None
-        
-        logger.info(f"已获取ESG数据: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取ESG数据失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_analyst_price_target(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取分析师价格目标
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        target = ticker.analyst_price_target
-        
-        if target is None or target.empty:
-            return {}
-        
-        result = {}
-        for key in target.index:
-            value = target.loc[key].iloc[0]
-            if pd.notna(value):
-                if isinstance(value, (int, float, np.number)):
-                    result[key] = float(value)
-                else:
-                    result[key] = str(value)
-            else:
-                result[key] = None
-        
-        logger.info(f"已获取分析师价格目标: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取分析师价格目标失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_revenue_forecasts(symbol: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    获取收入预测
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        forecasts = ticker.revenue_forecasts
-        
-        if forecasts is None or forecasts.empty:
-            return []
-        
-        result = []
-        for _, row in forecasts.iterrows():
-            record = {}
-            for col in forecasts.columns:
-                value = row[col]
-                if pd.notna(value):
-                    if isinstance(value, pd.Timestamp):
-                        record[col] = value.strftime('%Y-%m-%d')
-                    elif isinstance(value, (int, float, np.number)):
-                        record[col] = float(value)
-                    else:
-                        record[col] = str(value)
-                else:
-                    record[col] = None
-            result.append(record)
-        
-        logger.info(f"已获取收入预测: {symbol}, 共{len(result)}条")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取收入预测失败: {symbol}, 错误: {e}")
-        return None
-
-
 def get_options(symbol: str) -> Optional[Dict[str, Any]]:
     """
     获取期权数据（所有到期日的期权链）
@@ -1196,188 +442,134 @@ def get_options(symbol: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_news(symbol: str, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
+def get_news(symbol: str, count: int = 30) -> List[Dict[str, Any]]:
     """
-    获取股票相关新闻（默认50条）
-    使用ticker.get_news(count=...)来获取更多新闻，而不是ticker.news（默认只返回10条）
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        if hasattr(ticker, 'get_news') and callable(getattr(ticker, 'get_news', None)):
-            try:
-                news = ticker.get_news(count=limit)
-            except Exception as e:
-                # 移除新闻日志
-                news = ticker.news
-                news = news[:limit] if news else []
-        else:
-            news = ticker.news
-            news = news[:limit] if news else []
-        
-        if not news:
-            return []
-        
-        result = []
-        for idx, item in enumerate(news):
-            if not isinstance(item, dict):
-                continue
-            
-            if 'content' in item and isinstance(item['content'], dict):
-                content = item['content']
-            else:
-                content = item
-            
-            news_item = {}
-            
-            title = content.get('title') or content.get('headline') or content.get('summary') or ''
-            news_item['title'] = str(title).strip() if title else None
-            
-            publisher = (content.get('publisher') or 
-                        content.get('publisherName') or 
-                        content.get('provider') or 
-                        content.get('contentProvider', {}).get('displayName') if isinstance(content.get('contentProvider'), dict) else None or
-                        '')
-            news_item['publisher'] = str(publisher).strip() if publisher else None
-            
-            link = content.get('link') or content.get('url') or content.get('canonicalUrl', {}).get('url') if isinstance(content.get('canonicalUrl'), dict) else None or ''
-            news_item['link'] = str(link).strip() if link else None
-            
-            provider_publish_time = content.get('pubDate') or content.get('providerPublishTime') or content.get('publishTime')
-            if provider_publish_time:
-                if isinstance(provider_publish_time, (int, float)):
-                    news_item['providerPublishTime'] = datetime.fromtimestamp(provider_publish_time).strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    news_item['providerPublishTime'] = str(provider_publish_time)
-            else:
-                news_item['providerPublishTime'] = None
-            
-            if news_item.get('title') or news_item.get('link'):
-                result.append(news_item)
-        
-        return result
-        
-    except Exception as e:
-        # 移除新闻错误日志
-        return None
-
-
-def get_fast_info(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取快速实时信息（价格、市值等）
-    使用fast_info属性获取更快的实时数据
+    获取股票新闻，合并 yfinance 和 RSS 源以获取更多数据 (目标 30 条)
     """
     try:
-        ticker = yf.Ticker(symbol)
-        fast_info = ticker.fast_info
-        
-        if not fast_info:
-            return {}
-        
-        result = {}
-        # fast_info是一个特殊对象，需要遍历其属性
-        for attr in dir(fast_info):
-            if not attr.startswith('_'):
-                try:
-                    value = getattr(fast_info, attr)
-                    if not callable(value):
-                        if isinstance(value, (int, float, np.number)):
-                            result[attr] = float(value)
+        formatted_news = []
+        seen_links = set()
+        seen_titles = set()
+
+        # 1. 尝试从 yfinance 获取
+        try:
+            ticker = yf.Ticker(symbol)
+            yf_news = ticker.news
+            if yf_news:
+                logger.info(f"yfinance 返回了 {len(yf_news)} 条原始新闻数据: {symbol}")
+                for item in yf_news:
+                    if not isinstance(item, dict):
+                        continue
+                        
+                    content = item.get('content') or {}
+                    uuid = item.get('uuid') or item.get('id')
+                    title = item.get('title') or content.get('title')
+                    link = item.get('link')
+                    if not link:
+                        click_through = content.get('clickThroughUrl') or {}
+                        link = click_through.get('url') if isinstance(click_through, dict) else None
+                    
+                    if not title or not link:
+                        continue
+                        
+                    if link in seen_links or title in seen_titles:
+                        continue
+
+                    # 安全地获取发布者
+                    publisher = item.get('publisher')
+                    if not publisher:
+                        provider = content.get('provider') or {}
+                        publisher = provider.get('displayName') if isinstance(provider, dict) else None
+                    
+                    # 处理发布时间
+                    publish_time = item.get('providerPublishTime')
+                    if publish_time is None:
+                        pub_date_str = content.get('pubDate')
+                        if pub_date_str:
+                            try:
+                                dt = datetime.strptime(pub_date_str, '%Y-%m-%dT%H:%M:%SZ')
+                                publish_time = int(dt.timestamp())
+                            except Exception:
+                                publish_time = 0
                         else:
-                            result[attr] = str(value) if value is not None else None
-                except Exception:
-                    continue
+                            publish_time = 0
 
-        currency_code = result.get('currency')
-        if currency_code:
-            result['currencySymbol'] = _resolve_currency_symbol(currency_code)
-        
-        logger.info(f"已获取快速实时信息: {symbol}")
-        return result
-        
+                    formatted_item = {
+                        'uuid': uuid,
+                        'title': title,
+                        'publisher': publisher,
+                        'link': link,
+                        'provider_publish_time': publish_time,
+                        'type': item.get('type') or content.get('contentType'),
+                        'thumbnail': item.get('thumbnail') or content.get('thumbnail')
+                    }
+                    formatted_news.append(formatted_item)
+                    seen_links.add(link)
+                    seen_titles.add(title)
+        except Exception as e:
+            logger.warning(f"从 yfinance 获取新闻失败: {symbol}, 错误: {e}")
+
+        # 2. 如果不足 count 条，尝试从 RSS 获取补充
+        if len(formatted_news) < count:
+            try:
+                rss_url = f"https://finance.yahoo.com/rss/headline?s={symbol}"
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                response = requests.get(rss_url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    root = ET.fromstring(response.content)
+                    rss_items = root.findall('.//item')
+                    logger.info(f"RSS 返回了 {len(rss_items)} 条新闻数据: {symbol}")
+                    
+                    for item in rss_items:
+                        if len(formatted_news) >= count:
+                            break
+                            
+                        title = item.find('title').text if item.find('title') is not None else ""
+                        link = item.find('link').text if item.find('link') is not None else ""
+                        
+                        if not title or not link:
+                            continue
+                            
+                        if link in seen_links or title in seen_titles:
+                            continue
+                            
+                        # 解析发布时间 (RSS 格式通常是: Mon, 13 Jan 2026 16:30:50 +0000)
+                        pub_date_str = item.find('pubDate').text if item.find('pubDate') is not None else ""
+                        publish_time = 0
+                        if pub_date_str:
+                            try:
+                                # 去掉末尾的时区部分或简单处理
+                                # email.utils.parsedate_to_datetime 是处理这种格式的好方法
+                                import email.utils
+                                dt = email.utils.parsedate_to_datetime(pub_date_str)
+                                publish_time = int(dt.timestamp())
+                            except Exception:
+                                publish_time = 0
+                                
+                        # 获取描述作为类型参考或保持为空
+                        description = item.find('description').text if item.find('description') is not None else ""
+                        
+                        formatted_item = {
+                            'uuid': f"rss-{hash(link)}",
+                            'title': title,
+                            'publisher': "Yahoo Finance (RSS)",
+                            'link': link,
+                            'provider_publish_time': publish_time,
+                            'type': 'STORY',
+                            'thumbnail': None
+                        }
+                        formatted_news.append(formatted_item)
+                        seen_links.add(link)
+                        seen_titles.add(title)
+            except Exception as e:
+                logger.warning(f"从 RSS 获取新闻失败: {symbol}, 错误: {e}")
+
+        # 按时间倒序排序
+        formatted_news.sort(key=lambda x: x['provider_publish_time'], reverse=True)
+        return formatted_news[:count]
     except Exception as e:
-        logger.error(f"获取快速实时信息失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_history_metadata(symbol: str) -> Optional[Dict[str, Any]]:
-    """
-    获取历史数据元信息
-    """
-    try:
-        ticker = yf.Ticker(symbol)
-        metadata = ticker.history_metadata
-        
-        if not metadata:
-            return {}
-        
-        result = {}
-        for key, value in metadata.items():
-            if isinstance(value, (int, float, np.number)):
-                result[key] = float(value)
-            elif isinstance(value, pd.Timestamp):
-                result[key] = value.strftime('%Y-%m-%d')
-            else:
-                result[key] = str(value) if value is not None else None
-        
-        logger.info(f"已获取历史数据元信息: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取历史数据元信息失败: {symbol}, 错误: {e}")
-        return None
-
-
-def get_all_data(symbol: str, include_options: bool = False, 
-                include_news: bool = True, news_limit: int = 10) -> Optional[Dict[str, Any]]:
-    """
-    获取股票的所有可用数据（一站式获取）
-    
-    参数:
-        symbol: 股票代码
-        include_options: 是否包含期权数据（数据量大，默认False）
-        include_news: 是否包含新闻（默认True）
-        news_limit: 新闻数量限制（默认10）
-    """
-    try:
-        logger.info(f"开始获取完整数据: {symbol}")
-        
-        result = {
-            'symbol': symbol,
-            'info': get_stock_info(symbol),
-            'fundamental': get_fundamental_data(symbol),
-            'fast_info': get_fast_info(symbol),
-            'dividends': get_dividends(symbol),
-            'splits': get_splits(symbol),
-            'actions': get_actions(symbol),
-            'institutional_holders': get_institutional_holders(symbol),
-            'major_holders': get_major_holders(symbol),
-            'mutualfund_holders': get_mutualfund_holders(symbol),
-            'insider_transactions': get_insider_transactions(symbol),
-            'insider_purchases': get_insider_purchases(symbol),
-            'insider_roster': get_insider_roster_holders(symbol),
-            'recommendations': get_recommendations(symbol),
-            'recommendations_summary': get_recommendations_summary(symbol),
-            'upgrades_downgrades': get_upgrades_downgrades(symbol),
-            'earnings': get_earnings(symbol),
-            'earnings_dates': get_earnings_dates(symbol),
-            'earnings_history': get_earnings_history(symbol),
-            'calendar': get_calendar(symbol),
-            'sustainability': get_sustainability(symbol),
-            'analyst_price_target': get_analyst_price_target(symbol),
-            'revenue_forecasts': get_revenue_forecasts(symbol),
-            'history_metadata': get_history_metadata(symbol),
-        }
-        
-        if include_options:
-            result['options'] = get_options(symbol)
-        
-        if include_news:
-            result['news'] = get_news(symbol, limit=news_limit)
-        
-        logger.info(f"完整数据获取完成: {symbol}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"获取完整数据失败: {symbol}, 错误: {e}")
-        return None
+        logger.error(f"获取股票新闻总流程失败: {symbol}, 错误: {e}")
+        return []
 

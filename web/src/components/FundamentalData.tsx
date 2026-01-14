@@ -2,9 +2,13 @@
  * 基本面数据组件
  */
 import React from 'react';
-import { Collapse, Descriptions, Space, Tag, Tabs } from 'antd';
-import { DatabaseOutlined, FileTextOutlined } from '@ant-design/icons';
-import type { AnalysisResult } from '../types/index';
+import { Collapse, Descriptions, Space, Tag, Tabs, Typography, Pagination } from 'antd';
+import { 
+  DatabaseOutlined, 
+  FileTextOutlined,
+  RightOutlined
+} from '@ant-design/icons';
+import type { AnalysisResult, NewsItem } from '../types/index';
 import { formatValue, formatLargeNumber, statusMaps } from '../utils/formatters';
 import { FinancialTable } from './FinancialTable';
 
@@ -12,6 +16,8 @@ interface FundamentalDataProps {
   analysisResult: AnalysisResult;
   currencySymbol: string;
   createIndicatorLabel: (label: string, indicatorKey: string) => React.ReactNode;
+  newsPage?: number;
+  setNewsPage?: (page: number) => void;
 }
 
 /**
@@ -21,11 +27,29 @@ export const FundamentalData: React.FC<FundamentalDataProps> = ({
   analysisResult,
   currencySymbol,
   createIndicatorLabel,
+  newsPage: propsNewsPage,
+  setNewsPage: propsSetNewsPage,
 }) => {
+  const [internalNewsPage, setInternalNewsPage] = React.useState<number>(1);
+  const newsPage = propsNewsPage !== undefined ? propsNewsPage : internalNewsPage;
+  const setNewsPage = propsSetNewsPage !== undefined ? propsSetNewsPage : setInternalNewsPage;
+  const newsPageSize = 30;
+
   const formatCurrency = (value?: number, decimals: number = 2) =>
     `${currencySymbol}${formatValue(value ?? 0, decimals)}`;
 
+  const formatDateTime = (timestamp: number) => {
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(timestamp * 1000));
+  };
+
   const fd = analysisResult.indicators.fundamental_data;
+  const newsData = analysisResult.indicators.news_data || [];
 
   // 检查是否有基本面数据
   if (!fd || typeof fd !== 'object' || fd.raw_xml || Object.keys(fd).length === 0) {
@@ -142,13 +166,6 @@ export const FundamentalData: React.FC<FundamentalDataProps> = ({
       items.push({
         label: createIndicatorLabel('每股现金', 'fundamental'),
         children: formatCurrency(parseFloat(String(fd.CashPerShare || 0)), 2),
-      });
-    }
-
-    if (fd.DividendPerShare) {
-      items.push({
-        label: createIndicatorLabel('每股股息', 'fundamental'),
-        children: formatCurrency(parseFloat(String(fd.DividendPerShare || 0)), 3),
       });
     }
 
@@ -335,12 +352,78 @@ export const FundamentalData: React.FC<FundamentalDataProps> = ({
     }
   }
 
+  // 添加新闻面板
+  if (newsData && newsData.length > 0) {
+    const currentNews = newsData.slice((newsPage - 1) * newsPageSize, newsPage * newsPageSize);
+    
+    collapseItems.push({
+      key: 'news',
+      label: (
+        <span>
+          <FileTextOutlined style={{ marginRight: 8 }} />
+          <span>最新新闻</span>
+          <span style={{ color: '#8c8c8c', fontSize: '13px', marginLeft: 8 }}>
+            ({newsData.length}条)
+          </span>
+        </span>
+      ),
+      children: (
+        <div style={{ padding: '0 8px' }}>
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {currentNews.map((item: NewsItem, index: number) => (
+              <div 
+                key={index} 
+                style={{ 
+                  paddingBottom: 12, 
+                  borderBottom: index === currentNews.length - 1 ? 'none' : '1px solid #f0f0f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start'
+                }}
+              >
+                <div style={{ flex: 1, marginRight: 16 }}>
+                  <Typography.Link 
+                    href={item.link} 
+                    target="_blank" 
+                    style={{ fontSize: '15px', fontWeight: 500, display: 'block', marginBottom: 4 }}
+                  >
+                    {item.title}
+                  </Typography.Link>
+                  <Space split={<span style={{ color: '#d9d9d9' }}>|</span>} style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                    <span>{item.publisher}</span>
+                    <span>{formatDateTime(item.provider_publish_time)}</span>
+                  </Space>
+                </div>
+                <RightOutlined style={{ color: '#bfbfbf', marginTop: 4 }} />
+              </div>
+            ))}
+          </Space>
+          
+          {newsData.length > newsPageSize && (
+            <div style={{ textAlign: 'right', marginTop: 16 }}>
+              <Pagination
+                size="small"
+                current={newsPage}
+                total={newsData.length}
+                pageSize={newsPageSize}
+                onChange={(page) => setNewsPage(page)}
+                showSizeChanger={false}
+              />
+            </div>
+          )}
+        </div>
+      ),
+    });
+  }
+
   return (
-    <Collapse
-      ghost
-      defaultActiveKey={[]}
-      items={collapseItems}
-      style={{ marginTop: 0 }}
-    />
+    <div id="section-fundamental">
+      <Collapse
+        ghost
+        defaultActiveKey={[]}
+        items={collapseItems}
+        style={{ marginTop: 0 }}
+      />
+    </div>
   );
 };

@@ -18,6 +18,7 @@ interface ChatSessionDrawerProps {
   open: boolean;
   onClose: () => void;
   onSelectSession?: (sessionId: string) => void;
+  symbol?: string; // 当前选中的股票代码
 }
 
 /**
@@ -27,6 +28,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   open,
   onClose,
   onSelectSession,
+  symbol,
 }) => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,11 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
     setLoading(true);
     try {
       const data = await getChatSessions();
-      setSessions(data);
+      // 如果提供了 symbol，则过滤会话列表
+      const filteredData = symbol 
+        ? data.filter(s => s.context_symbols && s.context_symbols.some(sym => sym.toUpperCase() === symbol.toUpperCase()))
+        : data;
+      setSessions(filteredData);
     } catch (error) {
       console.error('加载会话列表失败:', error);
       message.error('加载会话列表失败');
@@ -52,7 +58,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
    */
   const handleCreateSession = async () => {
     try {
-      const newSession = await createChatSession();
+      const newSession = await createChatSession(symbol);
       message.success('新会话创建成功');
       onClose();
       onSelectSession?.(newSession.session_id);

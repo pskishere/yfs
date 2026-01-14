@@ -2,13 +2,12 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, Input, Space, notification, Modal, Tooltip, Empty, Flex, Divider } from 'antd';
+import { Drawer, Button, Input, Space, notification, Modal, Tooltip, Empty, Flex, Divider, Tag } from 'antd';
 import { Sender } from '@ant-design/x';
 import {
   StopOutlined,
   EditOutlined,
   ReloadOutlined,
-  SendOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
 import ReactMarkdown from 'react-markdown';
@@ -18,6 +17,8 @@ interface ChatDrawerProps {
   open: boolean;
   onClose: () => void;
   sessionId?: string;
+  symbol?: string; // 当前选中的股票代码
+  model?: string; // 当前选中的 AI 模型
 }
 
 interface MessageItem {
@@ -48,7 +49,7 @@ const MessageBubble: React.FC<{
         gap: 8,
       }}
     >
-      <div style={{ maxWidth: '75%', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+      <div style={{ maxWidth: isUser ? '75%' : '100%', width: isUser ? 'auto' : '100%', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
         {/* 消息气泡 */}
         <div
           style={{
@@ -56,16 +57,24 @@ const MessageBubble: React.FC<{
             borderRadius: 12,
             background: isUser ? '#e6f7ff' : '#f5f5f5',
             wordBreak: 'break-word',
+            flex: isUser ? '0 1 auto' : '1 1 auto',
           }}
         >
           {message.role === 'assistant' ? (
             <div className="markdown-content">
-              <ReactMarkdown>{message.content || '正在思考...'}</ReactMarkdown>
-              {message.status === 'streaming' && !message.content && (
-                <span style={{ opacity: 0.5 }}>思考中...</span>
-              )}
-              {message.status === 'streaming' && message.content && (
-                <span style={{ opacity: 0.5 }}>│</span>
+              {(message.status === 'streaming' || message.status === 'pending') && !message.content ? (
+                <div className="thinking-dots">
+                  <span className="thinking-dot"></span>
+                  <span className="thinking-dot"></span>
+                  <span className="thinking-dot"></span>
+                </div>
+              ) : (
+                <>
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                  {message.status === 'streaming' && message.content && (
+                    <span className="streaming-cursor"></span>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -106,12 +115,12 @@ const MessageBubble: React.FC<{
 /**
  * 聊天抽屉组件
  */
-const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => {
+const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbol, model }) => {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [currentStreamingId, setCurrentStreamingId] = useState<string | null>(null);
+  const currentStreamingIdRef = useRef<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -138,6 +147,10 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
 
     const initConnection = async () => {
       try {
+        // 切换会话时，先清空当前消息列表，避免显示旧会话内容
+        setMessages([]);
+        setIsConnected(false);
+
         // 设置回调函数
         wsClient.setCallbacks({
           onConnect: (wsSessionId) => {
@@ -155,16 +168,58 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           },
           onMessageCreated: (data) => {
             console.log('消息已创建:', data);
+            const userServerId = data.user_message_id?.toString();
+            const aiServerId = data.ai_message_id?.toString();
+            
+            if (userServerId || aiServerId) {
+              setMessages((prev) =>
+                prev.map((msg) => {
+                  // 如果是用户消息且没有正式 ID，更新为服务器返回的 user_message_id
+                  if (msg.role === 'user' && msg.id.startsWith('user-') && userServerId) {
+                    return { ...msg, id: userServerId };
+                  }
+                  // 如果是当前正在等待的 AI 消息，更新为服务器返回的 ai_message_id
+                  if (msg.id === currentStreamingIdRef.current && aiServerId) {
+                    currentStreamingIdRef.current = aiServerId;
+                    return { ...msg, id: aiServerId };
+                  }
+                  return msg;
+                })
+              );
+            }
           },
           onGenerationStarted: (data) => {
             console.log('开始生成:', data);
             setIsStreaming(true);
-            setCurrentStreamingId(data.message_id?.toString() || null);
+            const serverId = data.message_id?.toString() || null;
+            if (serverId) {
+              setMessages((prev) => {
+                const exists = prev.some((msg) => msg.id === serverId);
+                if (exists) {
+                  return prev.map((msg) =>
+                    msg.id === currentStreamingIdRef.current ? { ...msg, id: serverId } : msg
+                  );
+                } else {
+                  // 如果消息不存在（如编辑后重新生成），则添加新消息
+                  return [
+                    ...prev,
+                    {
+                      id: serverId,
+                      role: 'assistant',
+                      content: '',
+                      status: 'streaming',
+                    },
+                  ];
+                }
+              });
+              currentStreamingIdRef.current = serverId;
+            }
           },
           onToken: (data) => {
+            const targetId = data.message_id?.toString() || currentStreamingIdRef.current || '';
             setMessages((prev) =>
               prev.map((msg) => {
-                if (msg.id === data.message_id?.toString()) {
+                if (msg.id === targetId) {
                   return {
                     ...msg,
                     content: msg.content + data.token,
@@ -177,7 +232,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           },
           onGenerationCompleted: (data) => {
             setIsStreaming(false);
-            setCurrentStreamingId(null);
             setMessages((prev) =>
               prev.map((msg) => {
                 if (msg.id === data.message_id?.toString()) {
@@ -193,7 +247,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           },
           onGenerationCancelled: (data) => {
             setIsStreaming(false);
-            setCurrentStreamingId(null);
             setMessages((prev) =>
               prev.map((msg) => {
                 if (msg.id === data.message_id?.toString()) {
@@ -208,7 +261,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           },
           onGenerationError: (data) => {
             setIsStreaming(false);
-            setCurrentStreamingId(null);
             api.error({
               message: '生成失败',
               description: data.error || '未知错误',
@@ -256,6 +308,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           },
           onEditStarted: (data) => {
             console.log('开始编辑:', data);
+            setIsStreaming(true);
             api.info({
               message: '正在重新生成回复',
               duration: 2,
@@ -264,7 +317,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           onRegenerationStarted: (data) => {
             console.log('开始重新生成:', data);
             setIsStreaming(true);
-            setCurrentStreamingId(data.message_id?.toString() || null);
 
             // 添加AI消息占位符
             const aiPlaceholder: MessageItem = {
@@ -280,12 +332,13 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
           },
         });
 
-        await wsClient.connect(sessionId || undefined);
+        // 连接 WebSocket
+        await wsClient.connect(sessionId, symbol, model);
       } catch (error) {
-        console.error('连接失败:', error);
+        console.error('连接 WebSocket 失败:', error);
         api.error({
           message: '连接失败',
-          description: '无法连接到服务器，请重试',
+          description: '无法连接到聊天服务器',
         });
       }
     };
@@ -295,43 +348,35 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
     return () => {
       wsClient.disconnect();
     };
-  }, [open, sessionId]);
+  }, [open, sessionId, symbol]);
 
   /**
    * 发送消息
    */
-  const handleSendMessage = (message: string) => {
-    if (!message.trim() || !isConnected) {
-      return;
-    }
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim() || !isConnected) return;
 
-    // 先添加用户消息到界面
-    const tempUserId = `user-${Date.now()}`;
     const userMessage: MessageItem = {
-      id: tempUserId,
+      id: `user-${Date.now()}`,
       role: 'user',
       content: message,
       status: 'completed',
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-
-    // 添加 AI 消息占位符
-    const tempAiId = `ai-${Date.now()}`;
     const aiPlaceholder: MessageItem = {
-      id: tempAiId,
+      id: `ai-pending-${Date.now()}`,
       role: 'assistant',
       content: '',
-      status: 'streaming',
+      status: 'pending',
     };
 
-    setMessages((prev) => [...prev, aiPlaceholder]);
+    setMessages((prev) => [...prev, userMessage, aiPlaceholder]);
+    currentStreamingIdRef.current = aiPlaceholder.id;
     setIsStreaming(true);
-    setCurrentStreamingId(tempAiId);
+    setInputText('');
 
     // 发送到服务器
     wsClient.sendMessage(message);
-    setInputText('');
   };
 
   /**
@@ -362,7 +407,17 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
       return;
     }
 
+    // 尝试解析消息 ID，如果失败则报错
     const messageId = parseInt(editingMessageId);
+    if (isNaN(messageId)) {
+      console.error('无效的消息 ID:', editingMessageId);
+      api.error({
+        message: '编辑失败',
+        description: '消息 ID 无效，无法编辑',
+      });
+      return;
+    }
+
     wsClient.editMessage(messageId, editingContent.trim());
 
     // 关闭编辑框
@@ -389,7 +444,16 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
     <>
       {contextHolder}
       <Drawer
-        title="AI 对话"
+        title={
+          <Space>
+            <span>AI 对话</span>
+            {symbol && (
+              <Tag color="blue" style={{ marginLeft: 8 }}>
+                {symbol}
+              </Tag>
+            )}
+          </Space>
+        }
         placement="right"
         size="large"
         onClose={onClose}
@@ -414,12 +478,12 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
         >
           {messages.length === 0 ? (
             <Empty
-              description="开始对话吧"
+              description={symbol ? `开始关于 ${symbol} 的对话吧` : "开始对话吧"}
               style={{ marginTop: 60 }}
               imageStyle={{ height: 80 }}
             >
               <p style={{ color: '#999', fontSize: 14 }}>
-                输入消息询问股票相关问题
+                {symbol ? `输入消息，询问关于 ${symbol} 的股票问题` : "输入消息询问股票相关问题"}
               </p>
             </Empty>
           ) : (
@@ -442,7 +506,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
         <div
           style={{
             borderTop: '1px solid #f0f0f0',
-            padding: '16px',
+            padding: '12px 16px',
             background: '#fff',
           }}
         >
@@ -455,8 +519,8 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId }) => 
             disabled={!isConnected}
             loading={isStreaming}
             submitType="enter"
-            autoSize={{ minRows: 2, maxRows: 6 }}
-            footer={(actionNode) => {
+            autoSize={{ minRows: 1, maxRows: 6 }}
+            footer={(actionNode: React.ReactNode) => {
               return (
                 <Flex justify="space-between" align="center">
                   <Flex gap="small" align="center">

@@ -4,11 +4,10 @@
 import axios, { type AxiosResponse } from 'axios';
 import type {
   ApiResponse,
-  Position,
-  Order,
   AnalysisResult,
   HotStock,
   IndicatorInfoResponse,
+  NewsItem,
 } from '../types/index';
 
 // API基础URL - 在Docker环境中使用相对路径通过nginx反向代理
@@ -62,34 +61,6 @@ const handleError = (error: any): never => {
     throw new Error(error.message || '请求失败');
   }
 };
-
-/**
- * 获取持仓列表
- */
-export const getPositions = async (): Promise<ApiResponse<Position[]>> => {
-  try {
-    const response = await api.get<ApiResponse<Position[]>>('/api/positions');
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 获取订单列表
- */
-export const getOrders = async (): Promise<ApiResponse<Order[]>> => {
-  try {
-    const response = await api.get<ApiResponse<Order[]>>('/api/orders');
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-
 
 /**
  * 技术分析 - 获取数据并保存到数据库（不包含AI分析）
@@ -294,6 +265,19 @@ export interface ChatSession {
 }
 
 /**
+ * 获取股票新闻
+ */
+export const getNews = async (symbol: string): Promise<ApiResponse<NewsItem[]>> => {
+  try {
+    const response = await api.get<ApiResponse<NewsItem[]>>(`/api/news/${symbol.toUpperCase()}`);
+    return handleResponse(response);
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
  * 获取会话列表
  */
 export const getChatSessions = async (): Promise<ChatSession[]> => {
@@ -308,10 +292,11 @@ export const getChatSessions = async (): Promise<ChatSession[]> => {
 
 /**
  * 创建新会话
+ * @param symbol - 关联的股票代码（可选）
  */
-export const createChatSession = async (): Promise<ChatSession> => {
+export const createChatSession = async (symbol?: string): Promise<ChatSession> => {
   try {
-    const response = await api.post('/api/chat/sessions');
+    const response = await api.post('/api/chat/sessions', { symbol });
     return response.data.session;
   } catch (error) {
     handleError(error);

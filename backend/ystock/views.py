@@ -14,17 +14,11 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from .models import StockAnalysis, StockInfo
 from .services import (
-    perform_ai,
     perform_analysis,
+    perform_ai,
     fetch_fundamental,
-    fetch_institutional,
-    fetch_insider,
-    fetch_recommendations,
-    fetch_earnings,
-    fetch_news,
     fetch_options,
-    fetch_all_data,
-    fetch_comprehensive,
+    fetch_news,
 )
 from .utils import clean_nan_values
 
@@ -81,9 +75,7 @@ def _serialize_record(record: StockAnalysis) -> Dict[str, Any]:
         "stock_name": stock_name,
         "status": record.status,
         "indicators": record.indicators,
-        "signals": record.signals,
         "candles": record.candles,
-        "extra_data": record.extra_data,
         "ai_analysis": record.ai_analysis,
         "ai_available": bool(record.ai_analysis),
         "model": record.model,
@@ -377,107 +369,6 @@ def analysis_status(request, symbol: str) -> JsonResponse:
 
 
 @require_GET
-def institutional(request, symbol: str) -> JsonResponse:
-    """
-    获取机构持仓
-    
-    Args:
-        request: HTTP 请求对象
-        symbol: 股票代码
-        
-    Returns:
-        JSON 响应，包含机构持仓数据
-    """
-    symbol = symbol.upper()
-    try:
-        holders = fetch_institutional(symbol) or []
-        return JsonResponse({"success": True, "symbol": symbol, "data": holders})
-    except Exception as exc:  # noqa: BLE001
-        return JsonResponse({"success": False, "message": str(exc)}, status=500)
-
-
-@require_GET
-def insider(request, symbol: str) -> JsonResponse:
-    """
-    获取内部交易
-    
-    Args:
-        request: HTTP 请求对象
-        symbol: 股票代码
-        
-    Returns:
-        JSON 响应，包含内部交易数据
-    """
-    symbol = symbol.upper()
-    try:
-        data = fetch_insider(symbol) or []
-        return JsonResponse({"success": True, "symbol": symbol, "data": data})
-    except Exception as exc:  # noqa: BLE001
-        return JsonResponse({"success": False, "message": str(exc)}, status=500)
-
-
-@require_GET
-def recommendations(request, symbol: str) -> JsonResponse:
-    """
-    获取分析师推荐
-    
-    Args:
-        request: HTTP 请求对象
-        symbol: 股票代码
-        
-    Returns:
-        JSON 响应，包含分析师推荐数据
-    """
-    symbol = symbol.upper()
-    try:
-        data = fetch_recommendations(symbol) or []
-        return JsonResponse({"success": True, "symbol": symbol, "data": data})
-    except Exception as exc:  # noqa: BLE001
-        return JsonResponse({"success": False, "message": str(exc)}, status=500)
-
-
-@require_GET
-def earnings(request, symbol: str) -> JsonResponse:
-    """
-    获取收益数据
-    
-    Args:
-        request: HTTP 请求对象
-        symbol: 股票代码
-        
-    Returns:
-        JSON 响应，包含收益数据
-    """
-    symbol = symbol.upper()
-    try:
-        data = fetch_earnings(symbol) or {}
-        return JsonResponse({"success": True, "symbol": symbol, "data": data})
-    except Exception as exc:  # noqa: BLE001
-        return JsonResponse({"success": False, "message": str(exc)}, status=500)
-
-
-@require_GET
-def news(request, symbol: str) -> JsonResponse:
-    """
-    获取股票新闻
-    
-    Args:
-        request: HTTP 请求对象
-        symbol: 股票代码
-        
-    Returns:
-        JSON 响应，包含新闻数据
-    """
-    symbol = symbol.upper()
-    limit = int(request.GET.get("limit", 50))
-    try:
-        data = fetch_news(symbol, limit=limit) or []
-        return JsonResponse({"success": True, "symbol": symbol, "data": data})
-    except Exception as exc:  # noqa: BLE001
-        return JsonResponse({"success": False, "message": str(exc)}, status=500)
-
-
-@require_GET
 def options(request, symbol: str) -> JsonResponse:
     """
     获取期权数据
@@ -500,50 +391,20 @@ def options(request, symbol: str) -> JsonResponse:
 
 
 @require_GET
-def comprehensive(request, symbol: str) -> JsonResponse:
+def news(request, symbol: str) -> JsonResponse:
     """
-    全面股票分析
+    获取新闻数据
     
     Args:
         request: HTTP 请求对象
         symbol: 股票代码
         
     Returns:
-        JSON 响应，包含综合分析结果
+        JSON 响应，包含新闻数据
     """
     symbol = symbol.upper()
-    include_options = request.GET.get("include_options", "false").lower() == "true"
-    include_news = request.GET.get("include_news", "true").lower() == "true"
-    news_limit = int(request.GET.get("news_limit", 50))
     try:
-        analysis = fetch_comprehensive(symbol, include_options, include_news, news_limit)
-        if not analysis:
-            return JsonResponse({"success": False, "message": f"无法获取 {symbol} 的数据"}, status=404)
-        return JsonResponse({"success": True, "symbol": symbol, "analysis": analysis})
-    except Exception as exc:  # noqa: BLE001
-        return JsonResponse({"success": False, "message": str(exc)}, status=500)
-
-
-@require_GET
-def all_data(request, symbol: str) -> JsonResponse:
-    """
-    获取股票所有原始数据
-    
-    Args:
-        request: HTTP 请求对象
-        symbol: 股票代码
-        
-    Returns:
-        JSON 响应，包含所有原始数据
-    """
-    symbol = symbol.upper()
-    include_options = request.GET.get("include_options", "false").lower() == "true"
-    include_news = request.GET.get("include_news", "true").lower() == "true"
-    news_limit = int(request.GET.get("news_limit", 50))
-    try:
-        data = fetch_all_data(symbol, include_options, include_news, news_limit)
-        if not data:
-            return JsonResponse({"success": False, "message": f"无法获取 {symbol} 的数据"}, status=404)
+        data = fetch_news(symbol)
         return JsonResponse({"success": True, "symbol": symbol, "data": data})
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"success": False, "message": str(exc)}, status=500)
@@ -602,15 +463,11 @@ def index(_: object) -> JsonResponse:
                 "hot": "/api/hot-stocks",
                 "indicator_info": "/api/indicator-info",
                 "fundamental": "/api/fundamental/<symbol>",
-                "institutional": "/api/institutional/<symbol>",
-                "insider": "/api/insider/<symbol>",
-                "recommendations": "/api/recommendations/<symbol>",
-                "earnings": "/api/earnings/<symbol>",
-                "news": "/api/news/<symbol>",
                 "options": "/api/options/<symbol>",
-                "comprehensive": "/api/comprehensive/<symbol>",
-                "all_data": "/api/all-data/<symbol>",
+                "news": "/api/news/<symbol>",
                 "delete_stock": "/api/stocks/<symbol>",
+                "chat_sessions": "/api/chat/sessions",
+                "chat_detail": "/api/chat/sessions/<session_id>",
             },
         }
     )
@@ -669,8 +526,16 @@ def chat_sessions(request) -> JsonResponse:
         return JsonResponse({'sessions': serializer.data})
     
     elif request.method == 'POST':
+        import json
+        symbol = None
+        try:
+            data = json.loads(request.body)
+            symbol = data.get('symbol')
+        except (json.JSONDecodeError, AttributeError):
+            pass
+            
         agent = StockAIAgent()
-        session_id = agent.create_new_session()
+        session_id = agent.create_new_session(symbol=symbol)
         session = ChatSession.objects.get(session_id=session_id)
         serializer = ChatSessionSerializer(session)
         return JsonResponse({'session': serializer.data})

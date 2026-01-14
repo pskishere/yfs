@@ -10,37 +10,6 @@ export interface ApiResponse<T = any> {
 }
 
 /**
- * 持仓数据
- */
-export interface Position {
-  symbol: string;
-  position: number;
-  avg_cost: number;
-  market_price: number;
-  market_value: number;
-  unrealized_pnl: number;
-  realized_pnl: number;
-}
-
-/**
- * 订单数据
- */
-export interface Order {
-  orderId: number;
-  symbol: string;
-  action: 'BUY' | 'SELL';
-  orderType: string;
-  totalQuantity: number;
-  lmtPrice?: number;
-  auxPrice?: number;
-  status: string;
-  filled?: number;
-  remaining?: number;
-  avg_fill_price?: number;
-  [key: string]: any; // 允许其他字段
-}
-
-/**
  * K线数据
  */
 export interface Candle {
@@ -135,6 +104,7 @@ export interface Indicators {
   pivot_s2?: number;
   pivot_s3?: number;
   fundamental_data?: FundamentalData;
+  news_data?: NewsItem[];
   resistance_20d_high?: number;
   support_20d_low?: number;
   // 周期分析
@@ -144,7 +114,6 @@ export interface Indicators {
   cycle_position?: number;
   cycle_phase?: 'early_rise' | 'mid_rise' | 'late_rise' | 'decline';
   cycle_phase_desc?: string;
-  cycle_suggestion?: string;
   avg_cycle_length?: number;
   std_cycle_length?: number;
   cycle_consistency?: number;
@@ -184,7 +153,6 @@ export interface Indicators {
   // 横盘判断
   sideways_market?: boolean;
   sideways_strength?: number;
-  sideways_reasons?: string[];
   sideways_price_range_pct?: number;
   sideways_price_change_pct?: number;
   sideways_volatility?: number;
@@ -266,14 +234,7 @@ export interface Indicators {
  * 交易信号
  */
 export interface Signals {
-  buy?: boolean;
-  sell?: boolean;
-  score?: number;
-  recommendation?: string;
-  risk?: {
-    level: string;
-    score: number;
-  };
+  signals: string[];
   [key: string]: any;
 }
 
@@ -285,13 +246,12 @@ export interface AnalysisResult {
   message?: string;
   error_code?: number;  // 错误代码（如200表示证券不存在）
   indicators: Indicators;
-  signals: Signals;
+  signals?: Signals;
   candles?: Candle[];
   ai_analysis?: string;
   ai_available?: boolean;
   model?: string;
   ai_error?: string;
-  extra_data?: ExtraAnalysisData;  // 额外数据（股息、机构持仓等）
   [key: string]: any;
 }
 
@@ -345,8 +305,7 @@ export interface FundamentalData {
   ForwardEPS?: number;
   BookValuePerShare?: number;
   CashPerShare?: number;
-  DividendPerShare?: number;
-  
+
   // 估值指标
   PE?: number;
   ForwardPE?: number;
@@ -373,12 +332,7 @@ export interface FundamentalData {
   Cashflow?: CashflowRecord[];  // 年度现金流量表
   QuarterlyCashflow?: CashflowRecord[];  // 季度现金流量表
   
-  // 持有人信息
-  MajorHolders?: HolderRecord[];
-  InstitutionalHolders?: InstitutionalHolderRecord[];
-  
   // 历史数据
-  DividendHistory?: Record<string, number>;  // 日期 -> 股息金额
   StockSplits?: Record<string, number>;  // 日期 -> 分割比例
   
   // 其他字段
@@ -413,33 +367,6 @@ export interface CashflowRecord {
 }
 
 /**
- * 持有人记录
- */
-export interface HolderRecord {
-  Holder?: string;
-  Name?: string;
-  Shares?: number | string;
-  Value?: number | string;
-  '% Out'?: number | string;
-  Percent?: number | string;
-  [key: string]: any;
-}
-
-/**
- * 机构持有人记录
- */
-export interface InstitutionalHolderRecord {
-  Holder?: string;
-  Name?: string;
-  Shares?: number | string;
-  Value?: number | string;
-  '% Out'?: number | string;
-  Percent?: number | string;
-  DateReported?: string;
-  [key: string]: any;
-}
-
-/**
  * 指标信息响应
  */
 export interface IndicatorInfoResponse {
@@ -451,65 +378,21 @@ export interface IndicatorInfoResponse {
 }
 
 /**
- * 内部交易记录
- */
-export interface InsiderTransaction {
-  Insider?: string;
-  Transaction?: string;
-  Shares?: number;
-  Value?: number;
-  Date?: string;
-  [key: string]: any;
-}
-
-/**
- * 分析师推荐记录
- */
-export interface AnalystRecommendation {
-  Firm?: string;
-  'To Grade'?: string;
-  'From Grade'?: string;
-  Action?: string;
-  Date?: string;
-  [key: string]: any;
-}
-
-/**
- * 收益数据
- */
-export interface EarningsData {
-  yearly?: Array<{
-    year: string;
-    Revenue?: number;
-    Earnings?: number;
-    [key: string]: any;
-  }>;
-  quarterly?: Array<{
-    quarter: string;
-    Revenue?: number;
-    Earnings?: number;
-    [key: string]: any;
-  }>;
-}
-
-/**
- * 新闻记录
+ * 股票新闻项
  */
 export interface NewsItem {
-  title?: string;
-  publisher?: string;
-  link?: string;
-  providerPublishTime?: string;
-  [key: string]: any;
-}
-
-/**
- * 额外分析数据
- */
-export interface ExtraAnalysisData {
-  institutional_holders?: InstitutionalHolderRecord[];
-  insider_transactions?: InsiderTransaction[];
-  analyst_recommendations?: AnalystRecommendation[];
-  earnings?: EarningsData;
-  news?: NewsItem[];
+  uuid: string;
+  title: string;
+  publisher: string;
+  link: string;
+  provider_publish_time: number;
+  type: string;
+  thumbnail?: {
+    resolutions: Array<{
+      url: string;
+      width: number;
+      height: number;
+      tag: string;
+    }>;
+  };
 }

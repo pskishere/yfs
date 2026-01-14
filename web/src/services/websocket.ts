@@ -47,11 +47,11 @@ export class WebSocketClient {
   /**
    * 连接到 WebSocket 服务器
    */
-  connect(sessionId?: string): Promise<string> {
+  connect(sessionId?: string, symbol?: string, model?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
         this.isManualClose = false;
-        const wsUrl = this.getWebSocketUrl(sessionId);
+        const wsUrl = this.getWebSocketUrl(sessionId, symbol, model);
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -96,13 +96,35 @@ export class WebSocketClient {
   /**
    * 获取 WebSocket URL
    */
-  private getWebSocketUrl(sessionId?: string): string {
+  private getWebSocketUrl(sessionId?: string, symbol?: string, model?: string): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname;
-    const port = import.meta.env.DEV ? '8000' : window.location.port;
-    const path = sessionId ? `ws/stock-chat/${sessionId}/` : 'ws/stock-chat/';
+    const port = window.location.port;
     
-    const url = `${protocol}//${host}:${port}/${path}`;
+    // 优先使用当前页面的 host 和 port
+    // 这样无论是通过 Vite 代理、Nginx 代理还是 ngrok 转发，都能正确路由
+    let hostWithPort = port ? `${host}:${port}` : host;
+    
+    // 特殊处理：如果是 ngrok 域名，通常不带端口（ngrok 会映射 80/443 到本地）
+    if (host.includes('ngrok-free.dev') || host.includes('ngrok-free.app')) {
+      hostWithPort = host;
+    }
+    
+    let path = sessionId ? `ws/stock-chat/${sessionId}/` : 'ws/stock-chat/';
+    const params = new URLSearchParams();
+    if (symbol) {
+      params.append('symbol', symbol);
+    }
+    if (model) {
+      params.append('model', model);
+    }
+    
+    const queryString = params.toString();
+    if (queryString) {
+      path += `?${queryString}`;
+    }
+    
+    const url = `${protocol}//${hostWithPort}/${path}`;
     console.log('WebSocket URL:', url);
     return url;
   }

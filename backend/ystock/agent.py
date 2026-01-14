@@ -5,7 +5,8 @@
 import os
 import uuid
 import logging
-from typing import Optional, Dict, Any
+import re
+from typing import Optional, Dict, Any, List
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
 from langgraph.graph import StateGraph, START, END
@@ -121,24 +122,28 @@ class StockAIAgent:
         
         # 创建股票分析专用提示模板
         self.prompt_template = PromptTemplate(
-            input_variables=["history", "stock_data", "input"],
-            template="""你是一个专业的股票分析助手，擅长技术分析和市场解读。
+            input_variables=["stock_data", "input", "history"],
+            template="""你是一个极度专业且资深的股票技术分析专家和市场策略师。你擅长通过复杂的技术指标组合和周期分析理论（如波浪理论、赫斯特周期等）来解读市场走势。
 
-以下是历史对话记录：
+【上下文信息】
+对话历史：
 {history}
 
-相关股票数据和分析结果：
+详细股票分析数据（包含技术指标、周期分析、市场状态、最新新闻等）：
 {stock_data}
 
+【当前任务】
 用户问题：{input}
 
-请基于提供的数据给出专业、客观的分析建议。回答时注意：
-1. 结合技术指标进行分析
-2. 解释关键指标的含义和信号
-3. 提供风险提示
-4. 语言简洁专业，避免过度承诺
+【分析要求】
+1. **深度指标解读**：不要简单列举数据，要分析指标间的共振或背离。例如：RSI超买时，趋势强度(ADX)是否依然强劲？
+2. **结合最新新闻**：基于提供的“最新新闻 (Recent News)”数据，分析近期新闻事件（如财报、重大合同、行业动态等）对股价走势、市场情绪的潜在影响，并判断新闻面与技术面是否共振。
+3. **重点关注周期分析**：基于提供的“周期分析 (Cycle Analysis)”数据，指出当前处于周期的什么阶段，预测可能的拐点，并结合年度/月度周期规律给出见解。
+4. **形态与支撑阻力**：结合横盘检测、Pivot Points和斐波那契回撤位，给出具体的关键价位分析。
+5. **风险管理建议**：基于波动率(ATR)给出专业的风险提示，不要给出确定性的买卖建议，而是提供概率性的市场展望。
+6. **专业性**：保持回答的逻辑严密、专业术语准确，且必须基于提供的 {stock_data} 数据进行分析。如果数据中某项缺失，请客观说明。
 
-助手回复："""
+请开始你的深度分析："""
         )
         
         # 初始化工作流
@@ -184,6 +189,11 @@ class StockAIAgent:
                 stock_data=stock_data,
                 input=user_input
             )
+            
+            # 打印提示词以供调试
+            logger.info("=" * 50)
+            logger.info(f"发送给 LLM 的提示词:\n{prompt}")
+            logger.info("=" * 50)
             
             try:
                 response = self.llm.invoke(prompt).content
@@ -234,36 +244,61 @@ class StockAIAgent:
             symbols = session.context_symbols or []
             
             # 从用户输入中提取可能的股票代码
-            words = user_input.upper().split()
-            for word in words:
-                # 简单判断：如果是全大写且包含字母，可能是股票代码
-                if word.isalnum() and any(c.isalpha() for c in word):
-                    if word not in symbols:
-                        symbols.append(word)
+            # 使用正则匹配：2-10位大写字母（可能带点或连字符）
+            extracted_symbols = re.findall(r'\b[A-Z]{2,10}\b', user_input.upper())
+            for symbol in extracted_symbols:
+                if symbol not in symbols:
+                    symbols.append(symbol)
             
-            # 更新会话的股票代码列表
-            session.context_symbols = symbols[:5]  # 最多保存5个
-            session.save()
+            logger.info(f"会话 {session_id} 的关注股票: {symbols}")
+            if symbols:
+                session.context_symbols = list(set(symbols))[:5]  # 去重并最多保存5个
+                session.save()
             
             # 获取这些股票的最新分析数据
             stock_data_parts = []
-            for symbol in symbols[:3]:  # 最多加载3个股票的数据
+            # 优先加载当前选中的股票数据
+            load_symbols = []
+            for s in symbols:
+                if s.upper() not in [ls.upper() for ls in load_symbols]:
+                    load_symbols.append(s)
+            load_symbols = load_symbols[:5]
+            
+            logger.info(f"正在为以下股票加载上下文数据: {load_symbols}")
+            
+            for symbol in load_symbols:
                 try:
+                    logger.info(f"正在尝试加载股票 {symbol} 的分析数据...")
+                    # 查找最新的成功分析记录，放宽匹配条件（不区分大小写，且使用最新的记录）
                     analysis = StockAnalysis.objects.filter(
-                        symbol=symbol,
-                        status=StockAnalysis.Status.SUCCESS
+                        symbol__iexact=symbol.strip(),
+                        status='success'
                     ).order_by('-updated_at').first()
                     
                     if analysis:
+                        logger.info(f"成功找到股票 {symbol} 的分析数据 (ID: {analysis.id}, 更新于: {analysis.updated_at})")
                         data_summary = self._format_stock_analysis(analysis)
-                        stock_data_parts.append(f"【{symbol}】\n{data_summary}")
+                        stock_data_parts.append(f"【{symbol.upper()}】\n{data_summary}")
+                    else:
+                        logger.warning(f"未找到股票 {symbol} 的成功分析记录 (status='success')")
+                        # 如果没有成功记录，尝试找找看有没有任何记录
+                        any_analysis = StockAnalysis.objects.filter(
+                            symbol__iexact=symbol.strip()
+                        ).order_by('-updated_at').first()
+                        
+                        if any_analysis:
+                            logger.info(f"找到股票 {symbol} 的记录，但状态为: {any_analysis.status}")
+                            stock_data_parts.append(f"【{symbol.upper()}】\n（该股票分析状态为 {any_analysis.status}，请先在详情页完成分析）")
+                        else:
+                            logger.info(f"数据库中完全没有股票 {symbol} 的分析记录")
+                            stock_data_parts.append(f"【{symbol.upper()}】\n（暂无分析数据，请先对该股票进行一次技术分析）")
                 except Exception as e:
                     logger.warning(f"加载股票 {symbol} 数据失败: {e}")
             
             if stock_data_parts:
                 return '\n\n'.join(stock_data_parts)
             else:
-                return "（暂无相关股票数据）"
+                return "（暂无相关股票数据，请确保已对该股票进行了技术分析）"
                 
         except Exception as e:
             logger.error(f"加载股票数据失败: {e}")
@@ -271,63 +306,116 @@ class StockAIAgent:
     
     def _format_stock_analysis(self, analysis: StockAnalysis) -> str:
         """
-        格式化股票分析数据为文本
-        
-        Args:
-            analysis: 股票分析记录
-            
-        Returns:
-            格式化的分析数据文本
+        格式化分析记录中的详细数据，供 LLM 使用
         """
-        parts = []
-        
-        # 添加基本信息
-        if analysis.extra_data:
-            stock_name = analysis.extra_data.get('stock_name', '')
-            currency = analysis.extra_data.get('currency', '')
-            if stock_name:
-                parts.append(f"名称: {stock_name}")
-            if currency:
-                parts.append(f"货币: {currency}")
-        
-        # 添加技术指标摘要
-        if analysis.indicators:
-            indicators = analysis.indicators
-            indicator_parts = []
+        try:
+            # 获取指标
+            indicators = analysis.indicators or {}
             
-            # 添加关键指标
-            if 'ma' in indicators:
-                ma_data = indicators['ma']
-                if ma_data and len(ma_data) > 0:
-                    latest = ma_data[-1]
-                    indicator_parts.append(f"MA: {latest.get('ma5', 'N/A'):.2f} / {latest.get('ma20', 'N/A'):.2f}")
+            import json
             
-            if 'rsi' in indicators:
-                rsi_data = indicators['rsi']
-                if rsi_data and len(rsi_data) > 0:
-                    latest_rsi = rsi_data[-1].get('rsi', 0)
-                    indicator_parts.append(f"RSI: {latest_rsi:.2f}")
+            # 基本信息
+            symbol = analysis.symbol.upper()
+            extra = analysis.extra_data or {}
+            currency_symbol = extra.get("currency_symbol") or extra.get("currencySymbol") or "$"
             
-            if 'macd' in indicators:
-                macd_data = indicators['macd']
-                if macd_data and len(macd_data) > 0:
-                    latest_macd = macd_data[-1]
-                    indicator_parts.append(f"MACD: {latest_macd.get('macd', 0):.2f}")
+            def fmt_price(val):
+                if val is None: return "N/A"
+                try:
+                    return f"{currency_symbol}{float(val):.2f}"
+                except:
+                    return f"{currency_symbol}{val}"
+
+            sections = []
             
-            if indicator_parts:
-                parts.append("技术指标: " + ", ".join(indicator_parts))
-        
-        # 添加交易信号
-        if analysis.signals:
-            signals = analysis.signals
-            if 'overall_signal' in signals:
-                parts.append(f"综合信号: {signals['overall_signal']}")
-        
-        # 添加 AI 分析（如果有）
-        if analysis.ai_analysis:
-            parts.append(f"AI分析: {analysis.ai_analysis[:200]}...")
-        
-        return '\n'.join(parts) if parts else "无详细数据"
+            # 1. 概览
+            header = [
+                f"# 股票代码: {symbol}",
+                f"当前价格: {fmt_price(indicators.get('current_price'))}",
+                f"价格涨跌: {indicators.get('price_change_pct', 0):.2f}%",
+                f"分析时间: {analysis.updated_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                ""
+            ]
+            sections.append("\n".join(header))
+
+            # 2. 最新新闻 (Recent News) - 新增
+            news_data = indicators.get('news_data', [])
+            if news_data:
+                news_lines = ["## 最新新闻 (Recent News)", ""]
+                for item in news_data[:30]:  # 提供前30条新闻
+                    title = item.get('title', '无标题')
+                    publisher = item.get('publisher', '未知来源')
+                    pub_time = item.get('provider_publish_time_fmt', '')
+                    time_str = f" [{pub_time}]" if pub_time else ""
+                    news_lines.append(f"- **{title}** ({publisher}){time_str}")
+                news_lines.append("")
+                sections.append("\n".join(news_lines))
+
+            # 3. 技术指标 (Technical Indicators)
+            tech_sections = [
+                "## 技术指标 (Technical Indicators)",
+                "",
+                "### 趋势指标 (Trend Indicators)",
+                f"- 移动平均线: MA5={fmt_price(indicators.get('ma5'))}, MA20={fmt_price(indicators.get('ma20'))}, MA50={fmt_price(indicators.get('ma50'))}, MA200={fmt_price(indicators.get('ma200'))}",
+                f"- EMA: EMA12={fmt_price(indicators.get('ema12'))}, EMA26={fmt_price(indicators.get('ema26'))}",
+                f"- 趋势方向: {indicators.get('trend_direction', 'neutral')}",
+                f"- 趋势强度: {indicators.get('trend_strength', 0):.0f}%",
+                f"- ADX: {indicators.get('adx', 0):.1f} (+DI={indicators.get('plus_di', 0):.1f}, -DI={indicators.get('minus_di', 0):.1f})",
+                f"- SuperTrend: {fmt_price(indicators.get('supertrend'))} (方向: {indicators.get('supertrend_direction')})",
+                f"- Ichimoku云层: {indicators.get('ichimoku_status', 'unknown')}",
+                "",
+                "### 动量指标 (Momentum Indicators)",
+                f"- RSI (14): {indicators.get('rsi', 0):.1f}",
+                f"- MACD: {indicators.get('macd', 0):.4f} (信号线: {indicators.get('macd_signal', 0):.4f}, 柱状图: {indicators.get('macd_histogram', 0):.4f})",
+                f"- KDJ: K={indicators.get('kdj_k', 0):.1f}, D={indicators.get('kdj_d', 0):.1f}, J={indicators.get('kdj_j', 0):.1f}",
+                f"- Williams %R: {indicators.get('williams_r', 0):.1f}",
+                "",
+                "### 波幅与成交量 (Volatility & Volume)",
+                f"- 布林带 (Bollinger Bands): 上轨={fmt_price(indicators.get('bb_upper'))}, 中轨={fmt_price(indicators.get('bb_middle'))}, 下轨={fmt_price(indicators.get('bb_lower'))}",
+                f"- ATR: {indicators.get('atr', 0):.4f} ({indicators.get('atr_percent', 0):.2f}%)",
+                f"- 成交量比率: {indicators.get('volume_ratio', 0):.2f} (20日均量: {indicators.get('avg_volume_20', 0):.0f})",
+                "",
+                "### 支撑与阻力 (Support & Resistance)",
+                f"- Pivot Point: {fmt_price(indicators.get('pivot'))}",
+                f"- 阻力位: R1={fmt_price(indicators.get('pivot_r1'))}, R2={fmt_price(indicators.get('pivot_r2'))}, R3={fmt_price(indicators.get('pivot_r3'))}",
+                f"- 支撑位: S1={fmt_price(indicators.get('pivot_s1'))}, S2={fmt_price(indicators.get('pivot_s2'))}, S3={fmt_price(indicators.get('pivot_s3'))}",
+                f"- 50日高低点: 高={fmt_price(indicators.get('resistance_50d_high'))}, 低={fmt_price(indicators.get('support_50d_low'))}",
+                ""
+            ]
+            sections.append("\n".join(tech_sections))
+
+            # 3. 周期分析 (Cycle Analysis)
+            cycle_sections = [
+                "## 周期分析 (Cycle Analysis)",
+                "",
+                f"- 总体周期强度: {indicators.get('cycle_strength', 0):.2f}",
+                f"- 周期一致性: {indicators.get('cycle_consistency', 0):.2f}",
+                f"- 主导周期长度: {indicators.get('dominant_cycle', 'N/A')} 天",
+                f"- 周期质量: {indicators.get('cycle_quality', 'N/A')}",
+                f"- 年度周期 (Yearly Cycles): {json.dumps(indicators.get('yearly_cycles', []), ensure_ascii=False)}",
+                f"- 月度周期 (Monthly Cycles): {json.dumps(indicators.get('monthly_cycles', []), ensure_ascii=False)}",
+                f"- 周期总结: {indicators.get('cycle_summary', '暂无周期总结')}",
+                ""
+            ]
+            sections.append("\n".join(cycle_sections))
+
+            # 4. 形态与状态 (Patterns & Status)",
+            status_sections = [
+                "## 市场形态与状态 (Market Patterns & Status)",
+                "",
+                f"- 横盘检测: {'是' if indicators.get('sideways_market') else '否'} (强度: {indicators.get('sideways_strength', 0):.0f}%)",
+                f"- 横盘类型: {indicators.get('sideways_type_desc', 'N/A')}",
+                f"- 连续涨跌天数: {indicators.get('consecutive_up_days', 0)}天涨 / {indicators.get('consecutive_down_days', 0)}天跌",
+                f"- 斐波那契回撤: 23.6%={fmt_price(indicators.get('fib_23.6'))}, 38.2%={fmt_price(indicators.get('fib_38.2'))}, 50%={fmt_price(indicators.get('fib_50.0'))}, 61.8%={fmt_price(indicators.get('fib_61.8'))}",
+                ""
+            ]
+            sections.append("\n".join(status_sections))
+
+            return "\n".join(sections)
+                
+        except Exception as e:
+            logger.error(f"格式化股票分析数据失败: {e}")
+            return f"（格式化数据时出错: {str(e)}）"
     
     def chat(self, session_id: str, user_input: str) -> str:
         """
@@ -380,10 +468,12 @@ class StockAIAgent:
                 memory = StockMemory(session_id)
                 memory.save_context({'input': user_input}, {'response': full_response})
         
-        # 加载历史记录和股票数据
+        # 加载股票数据
+        stock_data = await load_stock_data()
+        
+        # 加载历史记录
         memory_vars = await load_memory()
         history = memory_vars.get('history', '')
-        stock_data = await load_stock_data()
         
         # 构建提示
         prompt = self.prompt_template.format(
@@ -391,6 +481,11 @@ class StockAIAgent:
             stock_data=stock_data,
             input=user_input
         )
+        
+        # 打印提示词以供调试
+        logger.info("=" * 50)
+        logger.info(f"发送给 LLM 的流式提示词:\n{prompt}")
+        logger.info("=" * 50)
         
         # 流式调用 LLM
         full_response = ""
@@ -403,15 +498,22 @@ class StockAIAgent:
         # 保存完整回复
         await save_memory_context(full_response)
     
-    def create_new_session(self) -> str:
+    def create_new_session(self, symbol: Optional[str] = None) -> str:
         """
-        创建新的会话
-        
+        创建一个新的聊天会话
+
+        Args:
+            symbol: 关联的股票代码
+
         Returns:
-            新的会话ID
+            会话ID
         """
         session_id = str(uuid.uuid4())
-        ChatSession.objects.create(session_id=session_id)
+        context_symbols = [symbol] if symbol else []
+        ChatSession.objects.create(
+            session_id=session_id,
+            context_symbols=context_symbols
+        )
         return session_id
     
     def get_session_history(self, session_id: str, limit: int = 50) -> list:

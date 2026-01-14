@@ -115,8 +115,8 @@ def create_error_response(error_info: Dict) -> Tuple[Dict, int]:
 
 def create_success_response(
     indicators: Dict,
-    signals: Dict,
-    candles: List[Dict],
+    signals: Optional[Dict] = None,
+    candles: List[Dict] = None,
     ai_analysis: Optional[str] = None,
     model: Optional[str] = None
 ) -> Dict:
@@ -125,7 +125,7 @@ def create_success_response(
     
     Args:
         indicators: 技术指标
-        signals: 交易信号
+        signals: 交易信号 (可选)
         candles: K线数据
         ai_analysis: AI分析结果（可选）
         model: AI模型名称（可选）
@@ -136,9 +136,11 @@ def create_success_response(
     result = {
         'success': True,
         'indicators': indicators,
-        'signals': signals,
-        'candles': candles
+        'candles': candles or []
     }
+    
+    if signals:
+        result['signals'] = signals
     
     if ai_analysis:
         result['ai_analysis'] = ai_analysis

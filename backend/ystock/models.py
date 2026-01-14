@@ -65,7 +65,6 @@ class StockAnalysis(models.Model):
         """
         # 清洗数据中的 NaN/inf 值，确保 JSON 字段有效
         self.indicators = clean_nan_values(payload.get("indicators"))
-        self.signals = clean_nan_values(payload.get("signals"))
         self.candles = clean_nan_values(payload.get("candles"))
         self.extra_data = clean_nan_values(payload.get("extra_data"))
         self.ai_analysis = payload.get("ai_analysis")

@@ -75,6 +75,11 @@
   line-height: 30px !important;
 }
 
+/* 隐藏操作按钮容器的滚动条 */
+.action-buttons-container::-webkit-scrollbar {
+  display: none;
+}
+
 /* 移动端响应式样式 */
 @media (max-width: 768px) {
   .main-page {

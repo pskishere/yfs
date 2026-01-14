@@ -36,9 +36,26 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         """
         self.session_id = self.scope['url_route']['kwargs'].get('session_id')
         
+        # 获取查询参数中的 symbol 和 model
+        from urllib.parse import parse_qs
+        query_string = self.scope.get('query_string', b'').decode('utf-8')
+        query_params = parse_qs(query_string)
+        symbol = query_params.get('symbol', [None])[0]
+        model = query_params.get('model', [None])[0]
+        
+        # 如果提供了 model，初始化 agent_service 时使用它
+        if model:
+            logger.info(f"WebSocket 连接请求使用模型: {model}")
+            self.agent_service = StockAIAgent(model_name=model)
+        else:
+            self.agent_service = StockAIAgent()
+        
         # 如果没有 session_id，创建新会话
         if not self.session_id:
-            self.session_id = await self.create_new_session()
+            self.session_id = await self.create_new_session(symbol=symbol)
+        elif symbol:
+            # 如果有 session_id 且提供了 symbol，更新会话的关注股票
+            await self.update_session_symbols(self.session_id, symbol)
         
         # 创建房间组名
         self.room_group_name = f'stock_chat_{self.session_id}'
@@ -421,15 +438,34 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(data, ensure_ascii=False))
     
     @database_sync_to_async
-    def create_new_session(self) -> str:
+    def create_new_session(self, symbol: Optional[str] = None) -> str:
         """
         创建新会话
         
+        Args:
+            symbol: 关联的股票代码
+            
         Returns:
             会话ID
         """
-        return self.agent_service.create_new_session()
+        return self.agent_service.create_new_session(symbol=symbol)
     
+    @database_sync_to_async
+    def update_session_symbols(self, session_id: str, symbol: str):
+        """更新会话的关注股票代码"""
+        try:
+            session = ChatSession.objects.get(session_id=session_id)
+            symbols = session.context_symbols or []
+            if symbol.upper() not in [s.upper() for s in symbols]:
+                symbols.append(symbol.upper())
+                session.context_symbols = list(set(symbols))[:5]
+                session.save()
+                logger.info(f"更新会话 {session_id} 的关注股票为: {session.context_symbols}")
+        except ChatSession.DoesNotExist:
+            pass
+        except Exception as e:
+            logger.error(f"更新会话股票代码失败: {e}")
+
     @database_sync_to_async
     def save_user_message(self, content: str) -> int:
         """
@@ -453,18 +489,23 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         return message.id
     
     @database_sync_to_async
-    def create_ai_message_placeholder(self) -> int:
+    def create_ai_message_placeholder(self, parent_id: Optional[int] = None) -> int:
         """创建 AI 消息占位符"""
         session, _ = ChatSession.objects.get_or_create(
             session_id=self.session_id
         )
         
-        message = ChatMessage.objects.create(
-            session=session,
-            role='assistant',
-            content='',
-            status='pending'
-        )
+        params = {
+            'session': session,
+            'role': 'assistant',
+            'content': '',
+            'status': 'pending'
+        }
+        
+        if parent_id:
+            params['parent_message_id'] = parent_id
+            
+        message = ChatMessage.objects.create(**params)
         return message.id
     
     @database_sync_to_async

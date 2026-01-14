@@ -39,7 +39,6 @@ import { ChartSection } from '../components/ChartSection';
 import { TechnicalIndicators } from '../components/TechnicalIndicators';
 import { CycleAnalysis } from '../components/CycleAnalysis';
 import { PivotPoints } from '../components/PivotPoints';
-import { TradingSignals } from '../components/TradingSignals';
 import { FundamentalData } from '../components/FundamentalData';
 import { MarketData } from '../components/MarketData';
 import { IndicatorLabel } from '../components/IndicatorLabel';
@@ -77,7 +76,6 @@ const MainPage: React.FC = () => {
     stopAiPolling,
   } = useStockAnalysis();
 
-  // 新闻分页状态
   const [newsPage, setNewsPage] = useState<number>(1);
   const [pageNavigatorVisible, setPageNavigatorVisible] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth <= 768);
@@ -526,24 +524,19 @@ const MainPage: React.FC = () => {
                     createIndicatorLabel={createIndicatorLabel}
                   />
 
-                  {analysisResult.signals && (
-                    <TradingSignals
-                      analysisResult={analysisResult}
-                      currencySymbol={currencySymbol}
-                    />
-                  )}
-
                   <FundamentalData
                     analysisResult={analysisResult}
                     currencySymbol={currencySymbol}
                     createIndicatorLabel={createIndicatorLabel}
+                    newsPage={newsPage}
+                    setNewsPage={setNewsPage}
                   />
 
                   {analysisResult.extra_data && (
                     <MarketData
                       analysisResult={analysisResult}
-                      newsPage={newsPage}
-                      setNewsPage={setNewsPage}
+                      currencySymbol={currencySymbol}
+                      createIndicatorLabel={createIndicatorLabel}
                     />
                   )}
                 </div>
@@ -602,6 +595,7 @@ const MainPage: React.FC = () => {
                     'indicators': 'section-indicators',
                     'cycle': 'section-cycle',
                     'pivot': 'section-pivot',
+                    'fundamental': 'section-fundamental',
                   };
                   const sectionId = sectionMap[key];
                   if (sectionId) {
@@ -634,6 +628,11 @@ const MainPage: React.FC = () => {
                     label: '关键价位',
                     icon: <WarningOutlined />,
                   }] : [],
+                  {
+                    key: 'fundamental',
+                    label: '基本面/新闻',
+                    icon: <UnorderedListOutlined />,
+                  },
                 ]}
               />
             }

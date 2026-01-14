@@ -9,10 +9,8 @@ from django.utils import timezone
 
 from .analysis import (
     calculate_technical_indicators,
-    generate_signals,
     check_ollama_available,
     perform_ai_analysis,
-    create_comprehensive_analysis,
 )
 from .models import StockAnalysis, StockInfo
 from .utils import (
@@ -26,13 +24,8 @@ from .yfinance import (
     get_stock_info,
     get_historical_data,
     get_fundamental_data,
-    get_all_data,
     get_options,
     get_news,
-    get_institutional_holders,
-    get_insider_transactions,
-    get_recommendations,
-    get_earnings,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +58,7 @@ def save_stock_info_if_available(symbol: str) -> Dict[str, Any] | None:
 
 def get_extra_analysis_data(symbol: str) -> Dict[str, Any]:
     """
-    获取额外分析数据（机构、内部、推荐、收益、新闻）
+    获取额外分析数据
     
     Args:
         symbol: 股票代码
@@ -73,34 +66,7 @@ def get_extra_analysis_data(symbol: str) -> Dict[str, Any]:
     Returns:
         包含额外分析数据的字典
     """
-    extra_data: Dict[str, Any] = {}
-    try:
-        # 不再获取机构持仓和内部交易数据
-        # institutional = get_institutional_holders(symbol)
-        # if institutional:
-        #     extra_data["institutional_holders"] = institutional[:20]
-
-        # insider = get_insider_transactions(symbol)
-        # if insider:
-        #     extra_data["insider_transactions"] = insider[:15]
-
-        recommendations = get_recommendations(symbol)
-        if recommendations:
-            extra_data["analyst_recommendations"] = recommendations[:10]
-
-        earnings = get_earnings(symbol)
-        if earnings:
-            extra_data["earnings"] = earnings
-
-        news = get_news(symbol, limit=30)
-        if news and len(news) > 0:
-            extra_data["news"] = news
-            # 移除新闻日志
-
-        logger.info(f"已获取额外分析数据: {symbol}, 模块: {list(extra_data.keys())}")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(f"获取额外数据失败: {symbol}, 错误: {exc}")
-    return extra_data
+    return {}
 
 
 def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool = True) -> Tuple[Dict[str, Any] | None, Tuple[Dict[str, Any], int] | None]:
@@ -128,10 +94,24 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
         and record.cached_at.date() == timezone.now().date()
     ):
         logger.info(f"使用当天缓存的分析结果: {symbol}, 缓存时间: {record.cached_at}")
+        
+        indicators = record.indicators or {}
+        # 如果缓存中没有新闻数据，尝试补充
+        if 'news_data' not in indicators or not indicators.get('news_data'):
+            try:
+                from .yfinance import get_news
+                news_data = get_news(symbol)
+                if news_data:
+                    indicators['news_data'] = news_data
+                    record.indicators = indicators
+                    record.save(update_fields=['indicators'])
+                    logger.info(f"为缓存结果补充了新闻数据: {symbol}")
+            except Exception as e:
+                logger.warning(f"补充新闻数据失败: {symbol}, 错误: {e}")
+
         return {
             "success": True,
             "indicators": record.indicators,
-            "signals": record.signals,
             "candles": record.candles,
             "extra_data": record.extra_data,
             "ai_analysis": record.ai_analysis,
@@ -160,7 +140,6 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
         # 有数据但指标计算失败，返回空指标结构
         indicators = {"symbol": symbol, "current_price": 0, "data_points": len(hist_data) if hist_data else 0}
 
-    signals = generate_signals(indicators)
     formatted_candles = format_candle_data(hist_data)
     extra_data = get_extra_analysis_data(symbol)
     currency_code = stock_info.get("currency") if stock_info else None
@@ -176,7 +155,7 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
         payload_extra["stock_name"] = stock_name
 
     # 构建响应结果
-    result = create_success_response(indicators, signals, formatted_candles, None, None)
+    result = create_success_response(indicators, None, formatted_candles, None, None)
     if currency_code:
         result["currency"] = currency_code
     if currency_symbol:
@@ -189,7 +168,6 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
     with transaction.atomic():
         # 清洗数据中的 NaN/inf 值，确保 JSON 字段有效
         record.indicators = clean_nan_values(result.get("indicators"))
-        record.signals = clean_nan_values(result.get("signals"))
         record.candles = clean_nan_values(result.get("candles"))
         record.extra_data = clean_nan_values(result.get("extra_data"))
         record.status = StockAnalysis.Status.SUCCESS
@@ -269,7 +247,6 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str) -> Tuple[D
         ai_analysis, ai_prompt = perform_ai_analysis(
             symbol,
             record.indicators,
-            record.signals,
             duration,
             model,
             extra_data,
@@ -305,130 +282,19 @@ def perform_ai(symbol: str, duration: str, bar_size: str, model: str) -> Tuple[D
 def fetch_fundamental(symbol: str) -> Dict[str, Any] | None:
     """
     获取基本面数据
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        基本面数据字典，如果获取失败则返回 None
     """
     return get_fundamental_data(symbol)
-
-
-def fetch_institutional(symbol: str) -> list | None:
-    """
-    获取机构持仓
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        机构持仓列表，如果获取失败则返回 None
-    """
-    return get_institutional_holders(symbol)
-
-
-def fetch_insider(symbol: str) -> list | None:
-    """
-    获取内部交易
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        内部交易列表，如果获取失败则返回 None
-    """
-    return get_insider_transactions(symbol)
-
-
-def fetch_recommendations(symbol: str) -> list | None:
-    """
-    获取分析师推荐
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        分析师推荐列表，如果获取失败则返回 None
-    """
-    return get_recommendations(symbol)
-
-
-def fetch_earnings(symbol: str) -> Dict[str, Any] | None:
-    """
-    获取收益数据
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        收益数据字典，如果获取失败则返回 None
-    """
-    return get_earnings(symbol)
-
-
-def fetch_news(symbol: str, limit: int = 50) -> list | None:
-    """
-    获取新闻
-    
-    Args:
-        symbol: 股票代码
-        limit: 新闻数量限制
-        
-    Returns:
-        新闻列表，如果获取失败则返回 None
-    """
-    return get_news(symbol, limit=limit)
 
 
 def fetch_options(symbol: str) -> Dict[str, Any] | None:
     """
     获取期权数据
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        期权数据字典，如果获取失败则返回 None
     """
     return get_options(symbol)
 
 
-def fetch_all_data(symbol: str, include_options: bool, include_news: bool, news_limit: int) -> Dict[str, Any] | None:
+def fetch_news(symbol: str) -> list[Dict[str, Any]]:
     """
-    获取股票所有数据
-    
-    Args:
-        symbol: 股票代码
-        include_options: 是否包含期权数据
-        include_news: 是否包含新闻
-        news_limit: 新闻数量限制
-        
-    Returns:
-        完整数据字典，如果获取失败则返回 None
+    获取新闻数据
     """
-    return get_all_data(
-        symbol,
-        include_options=include_options,
-        include_news=include_news,
-        news_limit=news_limit,
-    )
-
-
-def fetch_comprehensive(symbol: str, include_options: bool, include_news: bool, news_limit: int) -> Dict[str, Any] | None:
-    """
-    获取综合分析
-    
-    Args:
-        symbol: 股票代码
-        include_options: 是否包含期权数据
-        include_news: 是否包含新闻
-        news_limit: 新闻数量限制
-        
-    Returns:
-        综合分析结果字典，如果获取失败则返回 None
-    """
-    all_data = fetch_all_data(symbol, include_options, include_news, news_limit)
-    if not all_data:
-        return None
-    return create_comprehensive_analysis(symbol, all_data)
+    return get_news(symbol)

@@ -114,14 +114,6 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
                   波动范围: {indicators.sideways_price_range_pct.toFixed(2)}%
                 </div>
               )}
-              {indicators.sideways_reasons && indicators.sideways_reasons.length > 0 && (
-                <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                  <div style={{ fontWeight: 500, marginBottom: 4 }}>判断依据:</div>
-                  {indicators.sideways_reasons.map((reason, idx) => (
-                    <div key={idx} style={{ marginLeft: 8 }}>• {reason}</div>
-                  ))}
-                </div>
-              )}
             </Space>
           ),
         });
@@ -156,11 +148,6 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
                       (距低点{indicators.days_from_last_trough}天)
                     </span>
                   )}
-                </div>
-              )}
-              {indicators.cycle_suggestion && (
-                <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                  {indicators.cycle_suggestion}
                 </div>
               )}
             </Space>
@@ -198,11 +185,6 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
                     (距低点{indicators.days_from_last_trough}天)
                   </span>
                 )}
-              </div>
-            )}
-            {indicators.cycle_suggestion && (
-              <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                {indicators.cycle_suggestion}
               </div>
             )}
           </Space>
