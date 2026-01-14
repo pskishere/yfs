@@ -342,7 +342,7 @@ class StockAIAgent:
             news_data = indicators.get('news_data', [])
             if news_data:
                 news_lines = ["## 最新新闻 (Recent News)", ""]
-                for item in news_data[:30]:  # 提供前30条新闻
+                for item in news_data:
                     title = item.get('title', '无标题')
                     publisher = item.get('publisher', '未知来源')
                     pub_time = item.get('provider_publish_time_fmt', '')
@@ -498,12 +498,13 @@ class StockAIAgent:
         # 保存完整回复
         await save_memory_context(full_response)
     
-    def create_new_session(self, symbol: Optional[str] = None) -> str:
+    def create_new_session(self, symbol: Optional[str] = None, model: Optional[str] = None) -> str:
         """
         创建一个新的聊天会话
 
         Args:
             symbol: 关联的股票代码
+            model: 使用的模型名称
 
         Returns:
             会话ID
@@ -512,7 +513,8 @@ class StockAIAgent:
         context_symbols = [symbol] if symbol else []
         ChatSession.objects.create(
             session_id=session_id,
-            context_symbols=context_symbols
+            context_symbols=context_symbols,
+            model=model
         )
         return session_id
     

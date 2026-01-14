@@ -528,14 +528,16 @@ def chat_sessions(request) -> JsonResponse:
     elif request.method == 'POST':
         import json
         symbol = None
+        model = None
         try:
             data = json.loads(request.body)
             symbol = data.get('symbol')
+            model = data.get('model')
         except (json.JSONDecodeError, AttributeError):
             pass
             
         agent = StockAIAgent()
-        session_id = agent.create_new_session(symbol=symbol)
+        session_id = agent.create_new_session(symbol=symbol, model=model)
         session = ChatSession.objects.get(session_id=session_id)
         serializer = ChatSessionSerializer(session)
         return JsonResponse({'session': serializer.data})

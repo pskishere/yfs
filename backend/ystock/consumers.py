@@ -52,7 +52,7 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         
         # 如果没有 session_id，创建新会话
         if not self.session_id:
-            self.session_id = await self.create_new_session(symbol=symbol)
+            self.session_id = await self.create_new_session(symbol=symbol, model=model)
         elif symbol:
             # 如果有 session_id 且提供了 symbol，更新会话的关注股票
             await self.update_session_symbols(self.session_id, symbol)
@@ -438,17 +438,18 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(data, ensure_ascii=False))
     
     @database_sync_to_async
-    def create_new_session(self, symbol: Optional[str] = None) -> str:
+    def create_new_session(self, symbol: Optional[str] = None, model: Optional[str] = None) -> str:
         """
         创建新会话
         
         Args:
             symbol: 关联的股票代码
+            model: 使用的模型名称
             
         Returns:
             会话ID
         """
-        return self.agent_service.create_new_session(symbol=symbol)
+        return self.agent_service.create_new_session(symbol=symbol, model=model)
     
     @database_sync_to_async
     def update_session_symbols(self, session_id: str, symbol: str):

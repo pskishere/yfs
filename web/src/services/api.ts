@@ -253,6 +253,7 @@ export const refreshAnalyze = async (
 export interface ChatSession {
   session_id: string;
   summary: string | null;
+  model: string | null;
   context_symbols: string[];
   message_count: number;
   last_message: {
@@ -293,10 +294,11 @@ export const getChatSessions = async (): Promise<ChatSession[]> => {
 /**
  * 创建新会话
  * @param symbol - 关联的股票代码（可选）
+ * @param model - 使用的模型名称（可选）
  */
-export const createChatSession = async (symbol?: string): Promise<ChatSession> => {
+export const createChatSession = async (symbol?: string, model?: string): Promise<ChatSession> => {
   try {
-    const response = await api.post('/api/chat/sessions', { symbol });
+    const response = await api.post('/api/chat/sessions', { symbol, model });
     return response.data.session;
   } catch (error) {
     handleError(error);

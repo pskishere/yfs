@@ -672,6 +672,8 @@ const MainPage: React.FC = () => {
           setCurrentChatSessionId(sessionId);
           setChatDrawerOpen(true);
         }}
+        symbol={currentSymbol}
+        model={selectedModel}
       />
 
       {/* AI 对话抽屉 */}

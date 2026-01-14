@@ -580,8 +580,8 @@ def perform_ai_analysis(symbol, indicators, duration, model=DEFAULT_AI_MODEL, ex
         news_data = indicators.get('news_data', [])
         news_text = ""
         if news_data:
-            news_text = "## 最新新闻 (前30条)\n"
-            for item in news_data[:30]:  # 修改为取最近30条
+            news_text = "## 最新新闻\n"
+            for item in news_data:
                 title = item.get('title', '无标题')
                 publisher = item.get('publisher', '未知来源')
                 pub_time = item.get('provider_publish_time_fmt', '')

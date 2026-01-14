@@ -442,9 +442,9 @@ def get_options(symbol: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_news(symbol: str, count: int = 30) -> List[Dict[str, Any]]:
+def get_news(symbol: str, count: int = 100) -> List[Dict[str, Any]]:
     """
-    获取股票新闻，合并 yfinance 和 RSS 源以获取更多数据 (目标 30 条)
+    获取股票新闻，合并 yfinance 和 RSS 源以获取更多数据 (目标 100 条)
     """
     try:
         formatted_news = []
@@ -568,7 +568,7 @@ def get_news(symbol: str, count: int = 30) -> List[Dict[str, Any]]:
 
         # 按时间倒序排序
         formatted_news.sort(key=lambda x: x['provider_publish_time'], reverse=True)
-        return formatted_news[:count]
+        return formatted_news
     except Exception as e:
         logger.error(f"获取股票新闻总流程失败: {symbol}, 错误: {e}")
         return []

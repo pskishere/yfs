@@ -19,6 +19,7 @@ interface ChatSessionDrawerProps {
   onClose: () => void;
   onSelectSession?: (sessionId: string) => void;
   symbol?: string; // 当前选中的股票代码
+  model?: string; // 当前选中的 AI 模型
 }
 
 /**
@@ -29,6 +30,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   onClose,
   onSelectSession,
   symbol,
+  model,
 }) => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,7 +60,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
    */
   const handleCreateSession = async () => {
     try {
-      const newSession = await createChatSession(symbol);
+      const newSession = await createChatSession(symbol, model);
       message.success('新会话创建成功');
       onClose();
       onSelectSession?.(newSession.session_id);
@@ -98,12 +100,16 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
       return session.summary;
     }
     if (session.context_symbols && session.context_symbols.length > 0) {
-      return `关于 ${session.context_symbols.join(', ')} 的对话`;
+      let title = `关于 ${session.context_symbols.join(', ')} 的对话`;
+      if (session.model) {
+        title += ` (${session.model})`;
+      }
+      return title;
     }
     if (session.last_message) {
       return session.last_message.content.slice(0, 30) + '...';
     }
-    return '新对话';
+    return session.model ? `新对话 (${session.model})` : '新对话';
   };
 
   useEffect(() => {

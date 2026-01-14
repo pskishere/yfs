@@ -105,6 +105,7 @@ class ChatSession(models.Model):
     """
     session_id = models.CharField(max_length=100, unique=True, verbose_name='会话ID')
     summary = models.TextField(blank=True, null=True, verbose_name='会话摘要')
+    model = models.CharField(max_length=100, blank=True, null=True, verbose_name='模型名称')
     context_symbols = models.JSONField(default=list, blank=True, verbose_name='会话关注的股票代码列表')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
