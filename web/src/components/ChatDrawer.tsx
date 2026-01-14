@@ -348,7 +348,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
     return () => {
       wsClient.disconnect();
     };
-  }, [open, sessionId, symbol]);
+  }, [open, sessionId, symbol, model]);
 
   /**
    * 发送消息
@@ -452,6 +452,11 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
                 {symbol}
               </Tag>
             )}
+            {model && (
+              <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
+                ({model})
+              </span>
+            )}
           </Space>
         }
         placement="right"
@@ -548,11 +553,9 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                        }}
-                      >
-                        停止
-                      </Button>
-                    ) : (
+                      }}
+                    />
+                  ) : (
                       <>
                         <Divider type="vertical" />
                         {actionNode}

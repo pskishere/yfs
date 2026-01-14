@@ -83,6 +83,9 @@ const MainPage: React.FC = () => {
   const [chatDrawerOpen, setChatDrawerOpen] = useState<boolean>(false);
   const [currentChatSessionId, setCurrentChatSessionId] = useState<string | undefined>(undefined);
 
+  // 监听模型变化
+  const selectedModel = Form.useWatch('model', analyzeForm);
+
   // 标记是否已从 URL 加载过
   const hasLoadedFromUrlRef = useRef<boolean>(false);
 
@@ -676,6 +679,8 @@ const MainPage: React.FC = () => {
         open={chatDrawerOpen}
         onClose={() => setChatDrawerOpen(false)}
         sessionId={currentChatSessionId}
+        symbol={currentSymbol}
+        model={selectedModel}
       />
     </div>
   );

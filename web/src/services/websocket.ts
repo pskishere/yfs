@@ -37,6 +37,8 @@ export interface WebSocketCallbacks {
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private sessionId: string | null = null;
+  private symbol: string | null = null;
+  private model: string | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -51,6 +53,9 @@ export class WebSocketClient {
     return new Promise((resolve, reject) => {
       try {
         this.isManualClose = false;
+        this.sessionId = sessionId || null;
+        this.symbol = symbol || null;
+        this.model = model || null;
         const wsUrl = this.getWebSocketUrl(sessionId, symbol, model);
         this.ws = new WebSocket(wsUrl);
 
@@ -137,7 +142,7 @@ export class WebSocketClient {
     console.log(`尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
     
     setTimeout(() => {
-      this.connect(this.sessionId || undefined);
+      this.connect(this.sessionId || undefined, this.symbol || undefined, this.model || undefined);
     }, this.reconnectDelay);
   }
 
@@ -342,9 +347,9 @@ export class WebSocketClient {
   /**
    * 切换会话（断开当前连接并连接到新会话）
    */
-  async switchSession(sessionId: string): Promise<void> {
+  async switchSession(sessionId: string, symbol?: string, model?: string): Promise<void> {
     this.disconnect();
-    await this.connect(sessionId);
+    await this.connect(sessionId, symbol, model);
   }
 }
 
