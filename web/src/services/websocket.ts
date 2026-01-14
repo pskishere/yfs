@@ -19,6 +19,7 @@ export interface WebSocketCallbacks {
   onHistory?: (messages: any[]) => void;
   onMessageCreated?: (data: any) => void;
   onToken?: (data: any) => void;
+  onThought?: (data: any) => void;
   onGenerationStarted?: (data: any) => void;
   onGenerationCompleted?: (data: any) => void;
   onGenerationCancelled?: (data: any) => void;
@@ -49,14 +50,13 @@ export class WebSocketClient {
   /**
    * 连接到 WebSocket 服务器
    */
-  connect(sessionId?: string, symbol?: string, model?: string): Promise<string> {
+  connect(sessionId?: string, model?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
         this.isManualClose = false;
         this.sessionId = sessionId || null;
-        this.symbol = symbol || null;
         this.model = model || null;
-        const wsUrl = this.getWebSocketUrl(sessionId, symbol, model);
+        const wsUrl = this.getWebSocketUrl(sessionId, model);
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -101,7 +101,7 @@ export class WebSocketClient {
   /**
    * 获取 WebSocket URL
    */
-  private getWebSocketUrl(sessionId?: string, symbol?: string, model?: string): string {
+  private getWebSocketUrl(sessionId?: string, model?: string): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname;
     const port = window.location.port;
@@ -117,9 +117,6 @@ export class WebSocketClient {
     
     let path = sessionId ? `ws/stock-chat/${sessionId}/` : 'ws/stock-chat/';
     const params = new URLSearchParams();
-    if (symbol) {
-      params.append('symbol', symbol);
-    }
     if (model) {
       params.append('model', model);
     }
@@ -142,7 +139,7 @@ export class WebSocketClient {
     console.log(`尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
     
     setTimeout(() => {
-      this.connect(this.sessionId || undefined, this.symbol || undefined, this.model || undefined);
+      this.connect(this.sessionId || undefined, this.model || undefined);
     }, this.reconnectDelay);
   }
 
@@ -238,6 +235,12 @@ export class WebSocketClient {
       case 'token':
         if (this.callbacks.onToken) {
           this.callbacks.onToken(data);
+        }
+        break;
+
+      case 'thought':
+        if (this.callbacks.onThought) {
+          this.callbacks.onThought(data);
         }
         break;
 
@@ -347,9 +350,9 @@ export class WebSocketClient {
   /**
    * 切换会话（断开当前连接并连接到新会话）
    */
-  async switchSession(sessionId: string, symbol?: string, model?: string): Promise<void> {
+  async switchSession(sessionId: string, model?: string): Promise<void> {
     this.disconnect();
-    await this.connect(sessionId, symbol, model);
+    await this.connect(sessionId, model);
   }
 }
 

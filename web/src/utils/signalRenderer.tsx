@@ -24,8 +24,8 @@ export const renderSignalWithIcon = (signal: string): React.ReactNode => {
   const emojiMap: Array<{ pattern: RegExp; icon: React.ReactElement }> = [
     // 上升趋势图表 (看涨信号) - 红色
     { pattern: /📈/g, icon: <RiseOutlined style={{ color: '#cf1322', marginRight: 4 }} /> },
-    // 柱状图 (看跌信号) - 蓝色
-    { pattern: /📊/g, icon: <BarChartOutlined style={{ color: '#1890ff', marginRight: 4 }} /> },
+    // 柱状图 (看跌信号) - 蓝色改成青绿色
+    { pattern: /📊/g, icon: <BarChartOutlined style={{ color: '#00b96b', marginRight: 4 }} /> },
     // 绿色圆圈 (看涨/成功)
     { pattern: /🟢/g, icon: <CheckCircleOutlined style={{ color: '#3f8600', marginRight: 4 }} /> },
     // 红色圆圈 (看跌/警告)
@@ -37,7 +37,7 @@ export const renderSignalWithIcon = (signal: string): React.ReactNode => {
     // 云 (盘整)
     { pattern: /☁️/g, icon: <CloudOutlined style={{ color: '#8c8c8c', marginRight: 4 }} /> },
     // 灰色圆圈 (中性) - 使用简单的圆点
-    { pattern: /⚪|⚫|🔘/g, icon: <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '0', backgroundColor: '#d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> },
+    { pattern: /⚪|⚫|🔘/g, icon: <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> },
   ];
 
   // 查找所有 emoji 的位置

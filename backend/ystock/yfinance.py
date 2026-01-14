@@ -112,6 +112,37 @@ def get_stock_info(symbol: str):
         return None
 
 
+def search_symbols(query: str) -> List[Dict[str, Any]]:
+    """
+    通过查询关键词搜索股票代码 (从 Yahoo Finance)
+    
+    Args:
+        query: 关键词，如 "Apple", "腾讯", "AAPL"
+        
+    Returns:
+        匹配的股票列表
+    """
+    try:
+        search = yf.Search(query, max_results=10)
+        results = []
+        
+        if search.quotes:
+            for quote in search.quotes:
+                results.append({
+                    'symbol': quote.get('symbol'),
+                    'name': quote.get('longname') or quote.get('shortname'),
+                    'exchange': quote.get('exchange'),
+                    'type': quote.get('quoteType'),
+                    'category': quote.get('quoteType', 'Unknown'),
+                    'score': quote.get('score', 0)
+                })
+        
+        return results
+    except Exception as e:
+        logger.error(f"搜索股票代码失败: {query}, 错误: {e}")
+        return []
+
+
 
 
 

@@ -52,10 +52,7 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         
         # 如果没有 session_id，创建新会话
         if not self.session_id:
-            self.session_id = await self.create_new_session(symbol=symbol, model=model)
-        elif symbol:
-            # 如果有 session_id 且提供了 symbol，更新会话的关注股票
-            await self.update_session_symbols(self.session_id, symbol)
+            self.session_id = await self.create_new_session(model=model)
         
         # 创建房间组名
         self.room_group_name = f'stock_chat_{self.session_id}'
@@ -379,7 +376,7 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         try:
             full_response = ""
             
-            async for token in self.agent_service.stream_chat(
+            async for chunk in self.agent_service.stream_chat(
                 session_id=self.session_id,
                 user_input=user_input,
                 skip_save_context=True  # 消息已由 consumer 管理
@@ -387,14 +384,25 @@ class StockChatConsumer(AsyncWebsocketConsumer):
                 if self.should_cancel:
                     break
                 
-                full_response += token
-                
-                await self.send_json({
-                    'type': 'token',
-                    'message_id': message_id,
-                    'token': token,
-                    'status': 'streaming'
-                })
+                if chunk["type"] == "token":
+                    token = chunk["content"]
+                    full_response += token
+                    
+                    await self.send_json({
+                        'type': 'token',
+                        'message_id': message_id,
+                        'token': token,
+                        'status': 'streaming'
+                    })
+                elif chunk["type"] == "thought":
+                    # 发送思维链/工具调用信息
+                    await self.send_json({
+                        'type': 'thought',
+                        'message_id': message_id,
+                        'thought': chunk["content"],
+                        'status': chunk["status"],
+                        'tool': chunk.get("tool")
+                    })
             
             if not self.should_cancel:
                 # 保存完整回复
@@ -438,35 +446,18 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(data, ensure_ascii=False))
     
     @database_sync_to_async
-    def create_new_session(self, symbol: Optional[str] = None, model: Optional[str] = None) -> str:
+    def create_new_session(self, model: Optional[str] = None) -> str:
         """
         创建新会话
         
         Args:
-            symbol: 关联的股票代码
             model: 使用的模型名称
             
         Returns:
             会话ID
         """
-        return self.agent_service.create_new_session(symbol=symbol, model=model)
+        return self.agent_service.create_new_session(model=model)
     
-    @database_sync_to_async
-    def update_session_symbols(self, session_id: str, symbol: str):
-        """更新会话的关注股票代码"""
-        try:
-            session = ChatSession.objects.get(session_id=session_id)
-            symbols = session.context_symbols or []
-            if symbol.upper() not in [s.upper() for s in symbols]:
-                symbols.append(symbol.upper())
-                session.context_symbols = list(set(symbols))[:5]
-                session.save()
-                logger.info(f"更新会话 {session_id} 的关注股票为: {session.context_symbols}")
-        except ChatSession.DoesNotExist:
-            pass
-        except Exception as e:
-            logger.error(f"更新会话股票代码失败: {e}")
-
     @database_sync_to_async
     def save_user_message(self, content: str) -> int:
         """

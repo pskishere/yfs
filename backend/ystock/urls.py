@@ -14,6 +14,7 @@ urlpatterns = [
     path("fundamental/<str:symbol>", views.fundamental, name="ystock-fundamental"),
     path("options/<str:symbol>", views.options, name="ystock-options"),
     path("news/<str:symbol>", views.news, name="ystock-news"),
+    path("search", views.search_stocks, name="ystock-search"),
     path("stocks/<str:symbol>", views.delete_stock, name="ystock-delete-stock"),
     
     # AI 聊天会话管理

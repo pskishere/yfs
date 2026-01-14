@@ -26,6 +26,7 @@ from .yfinance import (
     get_fundamental_data,
     get_options,
     get_news,
+    search_symbols,
 )
 
 logger = logging.getLogger(__name__)
@@ -298,3 +299,10 @@ def fetch_news(symbol: str) -> list[Dict[str, Any]]:
     获取新闻数据
     """
     return get_news(symbol)
+
+
+def search_stocks(query: str) -> list[Dict[str, Any]]:
+    """
+    搜索股票代码
+    """
+    return search_symbols(query)

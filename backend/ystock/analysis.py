@@ -9,7 +9,7 @@ import numpy as np
 import os
 import logging
 from typing import Any, Dict, List, Optional, Tuple
-from .yfinance import get_historical_data, get_fundamental_data, get_news
+from .yfinance import get_historical_data, get_fundamental_data, get_news, get_options
 
 from .indicators import (
     calculate_ma, calculate_rsi, calculate_bollinger, calculate_macd,
@@ -179,6 +179,17 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
         logger.warning(f"获取新闻数据失败: {symbol}, 错误: {e}")
         result['news_data'] = []
 
+    try:
+        options_data = get_options(symbol)
+        if options_data:
+            result['options_data'] = options_data
+            logger.info(f"已获取期权数据: {symbol}")
+        else:
+            result['options_data'] = None
+    except Exception as e:
+        logger.warning(f"获取期权数据失败: {symbol}, 错误: {e}")
+        result['options_data'] = None
+
     if len(closes) >= 30:
         # 获取时间戳信息用于周期分析
         # 从hist_data中获取date字段，如果没有则从formatted_candles中获取time字段
@@ -280,6 +291,42 @@ def perform_ai_analysis(symbol, indicators, duration, model=DEFAULT_AI_MODEL, ex
                           'raw_xml' not in fundamental_data and
                           len(fundamental_data) > 0)
         
+        # 格式化期权数据
+        options_data = indicators.get('options_data')
+        options_text = ""
+        if options_data and options_data.get('expiration_dates'):
+            options_text = "\n## 7. 期权数据\n"
+            exp_dates = options_data.get('expiration_dates', [])
+            options_text += f"- 可用到期日: {', '.join(exp_dates[:5])}等\n"
+            
+            # 取第一个到期日的数据作为示例分析
+            first_exp = exp_dates[0] if exp_dates else None
+            if first_exp:
+                chain = options_data.get('chains', {}).get(first_exp, {})
+                calls = chain.get('calls', [])
+                puts = chain.get('puts', [])
+                
+                if calls or puts:
+                    options_text += f"- 最近到期日 ({first_exp}) 概况:\n"
+                    if calls:
+                        try:
+                            max_oi_call = max(calls, key=lambda x: x.get('openInterest') or 0)
+                            options_text += f"  - 看涨期权(Calls): 共{len(calls)}档, 最大未平仓量行权价: {max_oi_call.get('strike')}\n"
+                        except: pass
+                    if puts:
+                        try:
+                            max_oi_put = max(puts, key=lambda x: x.get('openInterest') or 0)
+                            options_text += f"  - 看跌期权(Puts): 共{len(puts)}档, 最大未平仓量行权价: {max_oi_put.get('strike')}\n"
+                        except: pass
+                    
+                    # 计算 PCR (Put-Call Ratio) 如果可能
+                    try:
+                        call_oi = sum(c.get('openInterest') or 0 for c in calls)
+                        put_oi = sum(p.get('openInterest') or 0 for p in puts)
+                        if call_oi > 0:
+                            options_text += f"  - Put/Call OI Ratio: {put_oi/call_oi:.2f}\n"
+                    except: pass
+
         if has_fundamental:
             fundamental_sections = []
             
@@ -640,6 +687,8 @@ def perform_ai_analysis(symbol, indicators, duration, model=DEFAULT_AI_MODEL, ex
    - 连续上涨天数: {indicators.get('consecutive_up_days', 0)}
    - 连续下跌天数: {indicators.get('consecutive_down_days', 0)}
 
+{options_text}
+
 {news_text}
 
 {f'# 基本面数据{chr(10)}{fundamental_text}{chr(10)}' if fundamental_text else ''}# 市场数据
@@ -822,6 +871,8 @@ def perform_ai_analysis(symbol, indicators, duration, model=DEFAULT_AI_MODEL, ex
 ## 7. 其他指标
    - 连续上涨天数: {indicators.get('consecutive_up_days', 0)}
    - 连续下跌天数: {indicators.get('consecutive_down_days', 0)}
+
+{options_text}
 
 {news_text}
 

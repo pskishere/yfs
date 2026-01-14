@@ -4,10 +4,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Button,
   Space,
-  Tag,
   Form,
   Select,
   AutoComplete,
@@ -15,7 +15,6 @@ import {
   message,
   Drawer,
   Modal,
-  Popover,
   Menu,
 } from 'antd';
 import {
@@ -29,8 +28,8 @@ import {
   WarningOutlined,
   DeleteOutlined,
   MenuOutlined,
-  CloseOutlined,
   UnorderedListOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import type { HotStock } from '../types/index';
 import { useStockAnalysis } from '../hooks/useStockAnalysis';
@@ -41,6 +40,7 @@ import { CycleAnalysis } from '../components/CycleAnalysis';
 import { PivotPoints } from '../components/PivotPoints';
 import { FundamentalData } from '../components/FundamentalData';
 import { MarketData } from '../components/MarketData';
+import { OptionsTable } from '../components/OptionsTable';
 import { IndicatorLabel } from '../components/IndicatorLabel';
 import ChatSessionDrawer from '../components/ChatSessionDrawer';
 import ChatDrawer from '../components/ChatDrawer';
@@ -71,9 +71,10 @@ const MainPage: React.FC = () => {
     handleRefreshAnalyze,
     handleDeleteStock,
     loadHotStocks,
-    debouncedRefreshHotStocks,
     loadIndicatorInfo,
     stopAiPolling,
+    optionsData,
+    optionsLoading,
   } = useStockAnalysis();
 
   const [newsPage, setNewsPage] = useState<number>(1);
@@ -88,14 +89,6 @@ const MainPage: React.FC = () => {
 
   // 标记是否已从 URL 加载过
   const hasLoadedFromUrlRef = useRef<boolean>(false);
-
-  // AI 状态颜色映射
-  const aiStatusColorMap: Record<typeof aiStatus, 'default' | 'processing' | 'success' | 'error'> = {
-    idle: 'default',
-    running: 'processing',
-    success: 'success',
-    error: 'error',
-  };
 
   // 货币符号
   const currencySymbol = useMemo(() => {
@@ -397,7 +390,6 @@ const MainPage: React.FC = () => {
                   }}
                   onChange={(value) => {
                     analyzeForm.setFieldsValue({ symbol: value.toUpperCase() });
-                    debouncedRefreshHotStocks(renderStockOption);
                   }}
                   onFocus={() => {
                     loadHotStocks(renderStockOption);
@@ -469,17 +461,11 @@ const MainPage: React.FC = () => {
                 <Button
                   type="default"
                   icon={<RobotOutlined />}
-                  disabled={!currentSymbol || aiStatus === 'running' || !analysisResult}
+                  loading={aiStatus === 'running'}
+                  disabled={!currentSymbol || !analysisResult}
                   onClick={onAiAnalyze}
                 >
-                  AI分析
-                </Button>
-                <Button
-                  type="default"
-                  icon={<UnorderedListOutlined />}
-                  onClick={() => setSessionDrawerOpen(true)}
-                >
-                  会话列表
+                  {aiStatus === 'running' ? aiStatusMsg : 'AI分析'}
                 </Button>
                 <Button
                   type="default"
@@ -489,7 +475,6 @@ const MainPage: React.FC = () => {
                 >
                   分享
                 </Button>
-                <Tag color={aiStatusColorMap[aiStatus]}>{aiStatusMsg}</Tag>
               </Space>
 
               {/* 技术分析组件 */}
@@ -542,6 +527,14 @@ const MainPage: React.FC = () => {
                       createIndicatorLabel={createIndicatorLabel}
                     />
                   )}
+
+                  {optionsData && (
+                    <OptionsTable 
+                      data={optionsData} 
+                      loading={optionsLoading}
+                      createIndicatorLabel={createIndicatorLabel}
+                    />
+                  )}
                 </div>
               )}
             </Space>
@@ -573,94 +566,114 @@ const MainPage: React.FC = () => {
         }}
       >
         {aiAnalysisResult && aiAnalysisResult.ai_analysis && (
-          <div style={{
+          <div className="markdown-content" style={{
             fontSize: 14,
             lineHeight: '1.8',
             padding: '8px',
           }}>
-            <ReactMarkdown>{aiAnalysisResult.ai_analysis}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiAnalysisResult.ai_analysis}</ReactMarkdown>
           </div>
         )}
       </Drawer>
 
-      {/* 浮动页面定位器 */}
+      {/* 浮动操作按钮 */}
+      <div style={{ 
+        position: 'fixed', 
+        right: 24, 
+        bottom: analysisResult ? 70 : 24, 
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12
+      }}>
+        <Button
+          type="primary"
+          shape="circle"
+          size="large"
+          icon={<MessageOutlined />}
+          onClick={() => setSessionDrawerOpen(true)}
+          style={{
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            width: 48,
+            height: 48,
+          }}
+          title="聊天会话"
+        />
+      </div>
+
+      {/* 侧边导航抽屉 */}
       {analysisResult && (
         <>
-          <Popover
-            content={
-              <Menu
-                mode="vertical"
-                style={{ border: 'none', minWidth: 160 }}
-                onClick={({ key }) => {
-                  const sectionMap: Record<string, string> = {
-                    'price-info': 'section-price-info',
-                    'chart': 'section-chart',
-                    'indicators': 'section-indicators',
-                    'cycle': 'section-cycle',
-                    'pivot': 'section-pivot',
-                    'fundamental': 'section-fundamental',
-                  };
-                  const sectionId = sectionMap[key];
-                  if (sectionId) {
-                    scrollToSection(sectionId);
-                  }
-                }}
-                items={[
-                  {
-                    key: 'price-info',
-                    label: '价格信息',
-                    icon: <DollarOutlined />,
-                  },
-                  {
-                    key: 'chart',
-                    label: 'K线图',
-                    icon: <BarChartOutlined />,
-                  },
-                  {
-                    key: 'indicators',
-                    label: '技术指标',
-                    icon: <ThunderboltOutlined />,
-                  },
-                  ...(analysisResult?.indicators?.dominant_cycle !== undefined || analysisResult?.indicators?.avg_cycle_length !== undefined) ? [{
-                    key: 'cycle',
-                    label: '周期分析',
-                    icon: <CloudOutlined />,
-                  }] : [],
-                  ...(analysisResult?.indicators?.pivot || analysisResult?.indicators?.pivot_r1 || analysisResult?.indicators?.resistance_20d_high) ? [{
-                    key: 'pivot',
-                    label: '关键价位',
-                    icon: <WarningOutlined />,
-                  }] : [],
-                  {
-                    key: 'fundamental',
-                    label: '基本面/新闻',
-                    icon: <UnorderedListOutlined />,
-                  },
-                ]}
-              />
-            }
-            trigger="click"
+          <Drawer
+            title="页面导航"
+            placement="right"
+            onClose={() => setPageNavigatorVisible(false)}
             open={pageNavigatorVisible}
-            onOpenChange={setPageNavigatorVisible}
-            placement="leftTop"
+            width={200}
+            styles={{ body: { padding: 0 } }}
           >
-            <div style={{ 
-              position: 'fixed', 
-              right: isMobile ? 8 : 24, 
-              bottom: 16, 
-              zIndex: 1000 
-            }}>
-              <Button
-                type="primary"
-                size="small"
-                icon={pageNavigatorVisible ? <CloseOutlined /> : <MenuOutlined />}
-                style={{
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                }}
-                title="页面导航"
-              />
+            <Menu
+              mode="vertical"
+              style={{ border: 'none' }}
+              onClick={({ key }) => {
+                const sectionMap: Record<string, string> = {
+                  'price-info': 'section-price-info',
+                  'chart': 'section-chart',
+                  'indicators': 'section-indicators',
+                  'cycle': 'section-cycle',
+                  'pivot': 'section-pivot',
+                  'fundamental': 'section-fundamental',
+                };
+                const sectionId = sectionMap[key];
+                if (sectionId) {
+                  scrollToSection(sectionId);
+                  if (isMobile) setPageNavigatorVisible(false);
+                }
+              }}
+              items={[
+                {
+                  key: 'price-info',
+                  label: '价格信息',
+                  icon: <DollarOutlined />,
+                },
+                {
+                  key: 'chart',
+                  label: 'K线图',
+                  icon: <BarChartOutlined />,
+                },
+                {
+                  key: 'indicators',
+                  label: '技术指标',
+                  icon: <ThunderboltOutlined />,
+                },
+                ...(analysisResult?.indicators?.dominant_cycle !== undefined || analysisResult?.indicators?.avg_cycle_length !== undefined) ? [{
+                  key: 'cycle',
+                  label: '周期分析',
+                  icon: <CloudOutlined />,
+                }] : [],
+                ...(analysisResult?.indicators?.pivot || analysisResult?.indicators?.pivot_r1 || analysisResult?.indicators?.resistance_20d_high) ? [{
+                  key: 'pivot',
+                  label: '关键价位',
+                  icon: <WarningOutlined />,
+                }] : [],
+                {
+                  key: 'fundamental',
+                  label: '基本面/新闻',
+                  icon: <UnorderedListOutlined />,
+                },
+              ]}
+            />
+          </Drawer>
+
+          {/* 抽屉唤起手柄 */}
+          {!pageNavigatorVisible && !chatDrawerOpen && !sessionDrawerOpen && !aiAnalysisDrawerVisible && (
+            <div 
+              className="nav-drawer-handle"
+              onClick={() => setPageNavigatorVisible(true)}
+            >
+              <MenuOutlined />
             </div>
-          </Popover>
+          )}
         </>
       )}
 
@@ -672,7 +685,6 @@ const MainPage: React.FC = () => {
           setCurrentChatSessionId(sessionId);
           setChatDrawerOpen(true);
         }}
-        symbol={currentSymbol}
         model={selectedModel}
       />
 
@@ -681,7 +693,6 @@ const MainPage: React.FC = () => {
         open={chatDrawerOpen}
         onClose={() => setChatDrawerOpen(false)}
         sessionId={currentChatSessionId}
-        symbol={currentSymbol}
         model={selectedModel}
       />
     </div>

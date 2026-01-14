@@ -47,6 +47,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
     ma20: false,
     ma50: false,
     bb: false,
+    volume: true,
   });
 
   /**
@@ -221,7 +222,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
         bottom: 0.05, // 底部留5%空间
       },
       entireTextOnly: false,
-      visible: true,
+      visible: indicatorVisibility.volume,
       borderColor: theme === 'light' ? '#e1e3eb' : '#2a2e39',
       autoScale: true,
     });
@@ -368,7 +369,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
     const maPeriods = [
       { period: 5, value: indicators.ma5, color: '#ff9800', visible: indicatorVisibility.ma5 },
-      { period: 10, value: indicators.ma10, color: '#2196f3', visible: indicatorVisibility.ma10 },
+      { period: 10, value: indicators.ma10, color: '#3f51b5', visible: indicatorVisibility.ma10 },
       { period: 20, value: indicators.ma20, color: '#9c27b0', visible: indicatorVisibility.ma20 },
       { period: 50, value: indicators.ma50, color: '#f44336', visible: indicatorVisibility.ma50 },
     ].filter(ma => ma.value !== undefined);
@@ -506,7 +507,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
       // 绘制上轨
       const upperSeries = chartRef.current.addSeries(LineSeries, {
-        color: '#2196f3',
+        color: '#FF6B6B',
         lineWidth: 1,
         lineStyle: 2, // 虚线
         title: 'BB Upper',
@@ -517,7 +518,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
       // 绘制中轨
       const middleSeries = chartRef.current.addSeries(LineSeries, {
-        color: '#9c27b0',
+        color: '#FFD93D',
         lineWidth: 1,
         title: 'BB Middle',
         priceScaleId: 'left',
@@ -527,7 +528,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
       // 绘制下轨
       const lowerSeries = chartRef.current.addSeries(LineSeries, {
-        color: '#2196f3',
+        color: '#6BCB77',
         lineWidth: 1,
         lineStyle: 2, // 虚线
         title: 'BB Lower',
@@ -574,7 +575,7 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
         marginBottom: '12px',
         padding: '8px 12px',
         backgroundColor: theme === 'light' ? '#f5f5f5' : '#1e1e1e',
-        borderRadius: '0',
+        borderRadius: '6px',
         display: 'flex',
         flexWrap: 'wrap',
         gap: '8px',
@@ -593,10 +594,10 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
           style={{
             padding: '4px 8px',
             fontSize: '12px',
-            border: `1px solid ${indicatorVisibility.ma5 ? '#2196f3' : '#ccc'}`,
-            backgroundColor: indicatorVisibility.ma5 ? '#2196f3' : 'transparent',
+            border: `1px solid ${indicatorVisibility.ma5 ? '#00b96b' : '#ccc'}`,
+            backgroundColor: indicatorVisibility.ma5 ? '#00b96b' : 'transparent',
             color: indicatorVisibility.ma5 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '0',
+            borderRadius: '4px',
             cursor: 'pointer',
           }}
         >
@@ -607,10 +608,10 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
           style={{
             padding: '4px 8px',
             fontSize: '12px',
-            border: `1px solid ${indicatorVisibility.ma10 ? '#2196f3' : '#ccc'}`,
-            backgroundColor: indicatorVisibility.ma10 ? '#2196f3' : 'transparent',
+            border: `1px solid ${indicatorVisibility.ma10 ? '#00b96b' : '#ccc'}`,
+            backgroundColor: indicatorVisibility.ma10 ? '#00b96b' : 'transparent',
             color: indicatorVisibility.ma10 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '0',
+            borderRadius: '4px',
             cursor: 'pointer',
           }}
         >
@@ -621,10 +622,10 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
           style={{
             padding: '4px 8px',
             fontSize: '12px',
-            border: `1px solid ${indicatorVisibility.ma20 ? '#2196f3' : '#ccc'}`,
-            backgroundColor: indicatorVisibility.ma20 ? '#2196f3' : 'transparent',
+            border: `1px solid ${indicatorVisibility.ma20 ? '#00b96b' : '#ccc'}`,
+            backgroundColor: indicatorVisibility.ma20 ? '#00b96b' : 'transparent',
             color: indicatorVisibility.ma20 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '0',
+            borderRadius: '4px',
             cursor: 'pointer',
           }}
         >
@@ -635,10 +636,10 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
           style={{
             padding: '4px 8px',
             fontSize: '12px',
-            border: `1px solid ${indicatorVisibility.ma50 ? '#2196f3' : '#ccc'}`,
-            backgroundColor: indicatorVisibility.ma50 ? '#2196f3' : 'transparent',
+            border: `1px solid ${indicatorVisibility.ma50 ? '#00b96b' : '#ccc'}`,
+            backgroundColor: indicatorVisibility.ma50 ? '#00b96b' : 'transparent',
             color: indicatorVisibility.ma50 ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '0',
+            borderRadius: '4px',
             cursor: 'pointer',
           }}
         >
@@ -649,14 +650,28 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({
           style={{
             padding: '4px 8px',
             fontSize: '12px',
-            border: `1px solid ${indicatorVisibility.bb ? '#2196f3' : '#ccc'}`,
-            backgroundColor: indicatorVisibility.bb ? '#2196f3' : 'transparent',
+            border: `1px solid ${indicatorVisibility.bb ? '#00b96b' : '#ccc'}`,
+            backgroundColor: indicatorVisibility.bb ? '#00b96b' : 'transparent',
             color: indicatorVisibility.bb ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
-            borderRadius: '0',
+            borderRadius: '4px',
             cursor: 'pointer',
           }}
         >
           布林线
+        </button>
+        <button
+          onClick={() => toggleIndicator('volume')}
+          style={{
+            padding: '4px 8px',
+            fontSize: '12px',
+            border: `1px solid ${indicatorVisibility.volume ? '#00b96b' : '#ccc'}`,
+            backgroundColor: indicatorVisibility.volume ? '#00b96b' : 'transparent',
+            color: indicatorVisibility.volume ? '#fff' : (theme === 'light' ? '#333' : '#ccc'),
+            borderRadius: '4px',
+            cursor: 'pointer',
+          }}
+        >
+          成交量
         </button>
       </div>
       <div

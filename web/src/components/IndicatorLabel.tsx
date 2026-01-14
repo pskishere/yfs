@@ -100,7 +100,7 @@ export const IndicatorLabel: React.FC<IndicatorLabelProps> = ({ label, indicator
       <span>{label}</span>
         <QuestionCircleOutlined
           style={{
-            color: '#1890ff',
+            color: '#00b96b',
             cursor: 'pointer',
             fontSize: 12,
           }}

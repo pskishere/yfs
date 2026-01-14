@@ -194,7 +194,86 @@
     font-size: 12px;
     padding: 8px 4px !important;
   }
+}
 
+/* Markdown 内容样式优化 */
+.markdown-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #333;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  border: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 8px 12px;
+  border: 1px solid #f0f0f0;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #fafafa;
+  font-weight: 600;
+}
+
+.markdown-content tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.markdown-content p {
+  margin-bottom: 12px;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.markdown-content li {
+  margin-bottom: 4px;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+.markdown-content h3 {
+  font-size: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 8px;
+}
+
+.markdown-content blockquote {
+  padding: 0 1em;
+  color: #666;
+  border-left: 0.25em solid #dfe2e5;
+  margin: 0 0 16px 0;
+}
+
+.markdown-content code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(27, 31, 35, 0.05);
+  border-radius: 3px;
+  font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+/* 响应式样式补充 */
+@media (max-width: 768px) {
   /* 所有 Descriptions 紧凑布局 */
   .main-page :global(.ant-descriptions-item-label),
   .main-page :global(.ant-descriptions-item-content) {
@@ -241,13 +320,13 @@
   .main-page :global(.ant-float-btn-primary),
   .main-page :global(.ant-float-btn-primary:hover),
   .main-page :global(.ant-float-btn-primary:focus) {
-    background-color: #1890ff !important;
+    background-color: #00b96b !important;
   }
   
   .main-page :global(.ant-float-btn-primary .ant-float-btn-body),
   .main-page :global(.ant-float-btn-primary:hover .ant-float-btn-body),
   .main-page :global(.ant-float-btn-primary:focus .ant-float-btn-body) {
-    background-color: #1890ff !important;
+    background-color: #00b96b !important;
   }
   
   .main-page :global(.ant-float-btn-primary .ant-float-btn-icon),
@@ -290,7 +369,7 @@
   
   /* 移动端卡片优化 */
   :global(.ant-card) {
-    border-radius: 0;
+    border-radius: 6px;
     margin-bottom: 12px;
   }
   
@@ -378,36 +457,63 @@
 /* 确保 Descriptions 组件背景色为白色 */
 .main-page :global(.ant-descriptions) {
   background: #fff !important;
-  border-radius: 0 !important;
 }
 
 .main-page :global(.ant-descriptions-view) {
   background: #fff !important;
-  border-radius: 0 !important;
 }
 
 .main-page :global(.ant-descriptions-table) {
   background: #fff !important;
-  border-radius: 0 !important;
 }
 
 .main-page :global(.ant-descriptions-bordered) {
-  border-radius: 0 !important;
 }
 
 .main-page :global(.ant-descriptions-bordered .ant-descriptions-view) {
-  border-radius: 0 !important;
+}
+
+/* 侧边导航抽屉手柄 */
+.nav-drawer-handle {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #00b96b;
+  color: #fff;
+  width: 32px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1001;
+  border-radius: 6px 0 0 6px;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+  font-size: 18px;
+}
+
+.nav-drawer-handle:hover {
+  width: 40px;
+  background: #00d98b;
+}
+
+@media (max-width: 768px) {
+  .nav-drawer-handle {
+    width: 28px;
+    height: 36px;
+    font-size: 16px;
+  }
 }
 
 .main-page :global(.ant-descriptions-bordered .ant-descriptions-item-label),
 .main-page :global(.ant-descriptions-bordered .ant-descriptions-item-content) {
-  border-radius: 0 !important;
 }
 
 .main-page ::global(.ant-descriptions-item-label),
 .main-page ::global(.ant-descriptions-item-content) {
   background: #fff !important;
-  border-radius: 0 !important;
 }
 
 /* 确保浮动按钮有颜色 - 所有状态和所有可能的类名 */
@@ -416,7 +522,7 @@
 :global(.ant-float-btn-primary:focus),
 :global(.ant-float-btn-primary:active),
 :global(.ant-float-btn-primary:not(:hover):not(:focus)) {
-  background-color: #1890ff !important;
+  background-color: #00b96b !important;
 }
 
 :global(.ant-float-btn-primary .ant-float-btn-body),
@@ -424,8 +530,8 @@
 :global(.ant-float-btn-primary:focus .ant-float-btn-body),
 :global(.ant-float-btn-primary:active .ant-float-btn-body),
 :global(.ant-float-btn-primary:not(:hover):not(:focus) .ant-float-btn-body) {
-  background-color: #1890ff !important;
-  border-color: #1890ff !important;
+  background-color: #00b96b !important;
+  border-color: #00b96b !important;
 }
 
 :global(.ant-float-btn-primary .ant-float-btn-icon),
@@ -439,7 +545,7 @@
 /* 确保按钮圆形部分有颜色 */
 :global(.ant-float-btn-primary .ant-float-btn-circle),
 :global(.ant-float-btn-primary .ant-float-btn-circle .ant-float-btn-body) {
-  background-color: #1890ff !important;
+  background-color: #00b96b !important;
 }
 
 :global(.ant-float-btn-primary .ant-float-btn-circle .ant-float-btn-icon) {

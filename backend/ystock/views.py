@@ -19,6 +19,7 @@ from .services import (
     fetch_fundamental,
     fetch_options,
     fetch_news,
+    search_stocks as service_search_stocks,
 )
 from .utils import clean_nan_values
 
@@ -411,6 +412,29 @@ def news(request, symbol: str) -> JsonResponse:
 
 
 @require_GET
+def search_stocks(request) -> JsonResponse:
+    """
+    搜索股票代码
+    
+    Args:
+        request: HTTP 请求对象
+        
+    Returns:
+        JSON 响应，包含搜索结果
+    """
+    query = request.GET.get("q", "").strip()
+    if not query:
+        return JsonResponse({"success": False, "message": "搜索关键词不能为空"}, status=400)
+    
+    try:
+        results = service_search_stocks(query)
+        return JsonResponse({"success": True, "query": query, "results": results})
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"搜索股票失败: {query}, 错误: {exc}")
+        return JsonResponse({"success": False, "message": str(exc)}, status=500)
+
+
+@require_GET
 def indicator_info(request) -> JsonResponse:
     """
     返回指标说明，可按名称过滤
@@ -465,6 +489,7 @@ def index(_: object) -> JsonResponse:
                 "fundamental": "/api/fundamental/<symbol>",
                 "options": "/api/options/<symbol>",
                 "news": "/api/news/<symbol>",
+                "search": "/api/search?q=<query>",
                 "delete_stock": "/api/stocks/<symbol>",
                 "chat_sessions": "/api/chat/sessions",
                 "chat_detail": "/api/chat/sessions/<session_id>",
@@ -527,17 +552,15 @@ def chat_sessions(request) -> JsonResponse:
     
     elif request.method == 'POST':
         import json
-        symbol = None
         model = None
         try:
             data = json.loads(request.body)
-            symbol = data.get('symbol')
             model = data.get('model')
         except (json.JSONDecodeError, AttributeError):
             pass
             
         agent = StockAIAgent()
-        session_id = agent.create_new_session(symbol=symbol, model=model)
+        session_id = agent.create_new_session(model=model)
         session = ChatSession.objects.get(session_id=session_id)
         serializer = ChatSessionSerializer(session)
         return JsonResponse({'session': serializer.data})

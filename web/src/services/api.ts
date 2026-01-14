@@ -8,6 +8,7 @@ import type {
   HotStock,
   IndicatorInfoResponse,
   NewsItem,
+  OptionsData,
 } from '../types/index';
 
 // API基础URL - 在Docker环境中使用相对路径通过nginx反向代理
@@ -266,6 +267,19 @@ export interface ChatSession {
 }
 
 /**
+ * 获取期权数据
+ */
+export const getOptions = async (symbol: string): Promise<ApiResponse<OptionsData>> => {
+  try {
+    const response = await api.get<ApiResponse<OptionsData>>(`/api/options/${symbol.toUpperCase()}`);
+    return handleResponse(response);
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
  * 获取股票新闻
  */
 export const getNews = async (symbol: string): Promise<ApiResponse<NewsItem[]>> => {
@@ -279,7 +293,23 @@ export const getNews = async (symbol: string): Promise<ApiResponse<NewsItem[]>> 
 };
 
 /**
- * 获取会话列表
+ * 搜索股票代码
+ * @param query - 关键词
+ */
+export const searchStocks = async (query: string): Promise<{ success: boolean; results: any[] }> => {
+  try {
+    const params = new URLSearchParams({ q: query });
+    const response = await api.get(`/api/search?${params.toString()}`);
+    const data = handleResponse(response);
+    return { success: data.success, results: data.results || [] };
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * 获取热门股票列表（仅美股）
  */
 export const getChatSessions = async (): Promise<ChatSession[]> => {
   try {
@@ -293,12 +323,11 @@ export const getChatSessions = async (): Promise<ChatSession[]> => {
 
 /**
  * 创建新会话
- * @param symbol - 关联的股票代码（可选）
  * @param model - 使用的模型名称（可选）
  */
-export const createChatSession = async (symbol?: string, model?: string): Promise<ChatSession> => {
+export const createChatSession = async (model?: string): Promise<ChatSession> => {
   try {
-    const response = await api.post('/api/chat/sessions', { symbol, model });
+    const response = await api.post('/api/chat/sessions', { model });
     return response.data.session;
   } catch (error) {
     handleError(error);

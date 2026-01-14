@@ -3,7 +3,7 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
-import type { AnalysisResult, HotStock, IndicatorInfo } from '../types/index';
+import type { AnalysisResult, HotStock, IndicatorInfo, OptionsData } from '../types/index';
 import {
   analyze,
   aiAnalyze,
@@ -12,6 +12,7 @@ import {
   refreshAnalyze,
   getAnalysisStatus,
   deleteStock,
+  getOptions,
 } from '../services/api';
 
 export interface StockOption {
@@ -37,6 +38,29 @@ export const useStockAnalysis = () => {
   const [hotStocks, setHotStocks] = useState<HotStock[]>([]);
   const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
   const [indicatorInfoMap, setIndicatorInfoMap] = useState<Record<string, IndicatorInfo>>({});
+  const [optionsData, setOptionsData] = useState<OptionsData | null>(null);
+  const [optionsLoading, setOptionsLoading] = useState<boolean>(false);
+
+  /**
+   * 获取期权数据
+   */
+  const loadOptions = async (symbol: string) => {
+    if (!symbol) return;
+    setOptionsLoading(true);
+    try {
+      const result = await getOptions(symbol);
+      if (result && result.success && result.data) {
+        setOptionsData(result.data);
+      } else {
+        setOptionsData(null);
+      }
+    } catch (error) {
+      console.error('获取期权数据失败:', error);
+      setOptionsData(null);
+    } finally {
+      setOptionsLoading(false);
+    }
+  };
 
   // 定时器与轮询引用
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -273,6 +297,8 @@ export const useStockAnalysis = () => {
       setAnalysisResult(dataResult);
       setCurrentSymbol(symbol);
       setAnalysisLoading(false);
+      // 异步加载期权数据，不阻塞主分析结果
+      loadOptions(symbol);
     } catch (error: any) {
       console.error('异常错误:', error);
       message.error(error.message || '分析失败');
@@ -302,6 +328,8 @@ export const useStockAnalysis = () => {
       if (result && result.success) {
         setAnalysisResult(result);
         setAnalysisLoading(false);
+        // 异步加载期权数据
+        loadOptions(symbol);
       } else {
         setAnalysisLoading(false);
         let errorMsg = result?.message || '刷新失败';
@@ -434,5 +462,7 @@ export const useStockAnalysis = () => {
     debouncedRefreshHotStocks,
     loadIndicatorInfo,
     stopAiPolling,
+    optionsData,
+    optionsLoading,
   };
 };

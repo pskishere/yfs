@@ -3,22 +3,30 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { Drawer, Button, Input, Space, notification, Modal, Tooltip, Empty, Flex, Divider, Tag } from 'antd';
-import { Sender } from '@ant-design/x';
+import { Sender, ThoughtChain } from '@ant-design/x';
 import {
   StopOutlined,
   EditOutlined,
   ReloadOutlined,
+  CheckCircleOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './ChatDrawer.css';
 
 interface ChatDrawerProps {
   open: boolean;
   onClose: () => void;
   sessionId?: string;
-  symbol?: string; // 当前选中的股票代码
   model?: string; // 当前选中的 AI 模型
+}
+
+interface ThoughtItem {
+  key: string;
+  title: string;
+  status: 'loading' | 'success' | 'error' | 'pending';
 }
 
 interface MessageItem {
@@ -26,6 +34,7 @@ interface MessageItem {
   role: 'user' | 'assistant';
   content: string;
   status?: 'pending' | 'streaming' | 'completed' | 'cancelled' | 'error';
+  thoughts?: ThoughtItem[];
 }
 
 /**
@@ -49,64 +58,81 @@ const MessageBubble: React.FC<{
         gap: 8,
       }}
     >
-      <div style={{ maxWidth: isUser ? '75%' : '100%', width: isUser ? 'auto' : '100%', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-        {/* 消息气泡 */}
-        <div
-          style={{
-            padding: '8px 12px',
-            borderRadius: 12,
-            background: isUser ? '#e6f7ff' : '#f5f5f5',
-            wordBreak: 'break-word',
-            flex: isUser ? '0 1 auto' : '1 1 auto',
-          }}
-        >
-          {message.role === 'assistant' ? (
-            <div className="markdown-content">
-              {(message.status === 'streaming' || message.status === 'pending') && !message.content ? (
-                <div className="thinking-dots">
-                  <span className="thinking-dot"></span>
-                  <span className="thinking-dot"></span>
-                  <span className="thinking-dot"></span>
-                </div>
-              ) : (
-                <>
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                  {message.status === 'streaming' && message.content && (
-                    <span className="streaming-cursor"></span>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            <div>{message.content}</div>
+      <div style={{ maxWidth: isUser ? '75%' : '100%', width: isUser ? 'auto' : '100%', display: 'flex', alignItems: 'flex-end', gap: 8, flexDirection: 'column' }}>
+        <div style={{ display: 'flex', width: '100%', justifyContent: isUser ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 8 }}>
+          {/* 消息气泡 */}
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 12,
+              background: isUser ? '#e6f7ff' : '#f5f5f5',
+              wordBreak: 'break-word',
+              flex: isUser ? '0 1 auto' : '1 1 auto',
+            }}
+          >
+            {message.role === 'assistant' ? (
+              <div className="markdown-content">
+                {/* 思维链展示 */}
+                {message.thoughts && message.thoughts.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <ThoughtChain 
+                      items={message.thoughts.map(t => ({
+                        key: t.key,
+                        title: t.title,
+                        status: t.status === 'pending' ? 'loading' : t.status,
+                        icon: t.status === 'loading' ? <LoadingOutlined spin /> : 
+                               t.status === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : undefined
+                      }))} 
+                    />
+                  </div>
+                )}
+
+                {(message.status === 'streaming' || message.status === 'pending') && !message.content && (!message.thoughts || message.thoughts.length === 0) ? (
+                  <div className="thinking-dots">
+                    <span className="thinking-dot"></span>
+                    <span className="thinking-dot"></span>
+                    <span className="thinking-dot"></span>
+                  </div>
+                ) : (
+                  <>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    {message.status === 'streaming' && message.content && (
+                      <span className="streaming-cursor"></span>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div>{message.content}</div>
+            )}
+          </div>
+
+          {/* 用户消息：编辑按钮 */}
+          {isUser && isCompleted && onEdit && (
+            <Tooltip title="编辑">
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => onEdit(message)}
+                style={{ flexShrink: 0 }}
+              />
+            </Tooltip>
+          )}
+
+          {/* AI消息：重新生成按钮 */}
+          {!isUser && isCompleted && onRegenerate && !isStreaming && (
+            <Tooltip title="重新生成">
+              <Button
+                type="text"
+                size="small"
+                icon={<ReloadOutlined />}
+                onClick={() => onRegenerate(message.id)}
+                style={{ flexShrink: 0 }}
+              />
+            </Tooltip>
           )}
         </div>
-
-        {/* 用户消息：编辑按钮 */}
-        {isUser && isCompleted && onEdit && (
-          <Tooltip title="编辑">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => onEdit(message)}
-              style={{ flexShrink: 0 }}
-            />
-          </Tooltip>
-        )}
-
-        {/* AI消息：重新生成按钮 */}
-        {!isUser && isCompleted && onRegenerate && !isStreaming && (
-          <Tooltip title="重新生成">
-            <Button
-              type="text"
-              size="small"
-              icon={<ReloadOutlined />}
-              onClick={() => onRegenerate(message.id)}
-              style={{ flexShrink: 0 }}
-            />
-          </Tooltip>
-        )}
       </div>
     </div>
   );
@@ -115,7 +141,12 @@ const MessageBubble: React.FC<{
 /**
  * 聊天抽屉组件
  */
-const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbol, model }) => {
+const ChatDrawer: React.FC<ChatDrawerProps> = ({
+  open,
+  onClose,
+  sessionId,
+  model,
+}) => {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -230,6 +261,38 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
               })
             );
           },
+          onThought: (data) => {
+            const targetId = data.message_id?.toString() || currentStreamingIdRef.current || '';
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.id === targetId) {
+                  const thoughts = [...(msg.thoughts || [])];
+                  const existingThoughtIndex = thoughts.findIndex(t => t.key === data.tool);
+                  
+                  if (existingThoughtIndex > -1) {
+                    thoughts[existingThoughtIndex] = {
+                      ...thoughts[existingThoughtIndex],
+                      title: data.thought,
+                      status: data.status,
+                    };
+                  } else {
+                    thoughts.push({
+                      key: data.tool,
+                      title: data.thought,
+                      status: data.status,
+                    });
+                  }
+                  
+                  return {
+                    ...msg,
+                    thoughts,
+                    status: 'streaming',
+                  };
+                }
+                return msg;
+              })
+            );
+          },
           onGenerationCompleted: (data) => {
             setIsStreaming(false);
             setMessages((prev) =>
@@ -333,7 +396,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
         });
 
         // 连接 WebSocket
-        await wsClient.connect(sessionId, symbol, model);
+        await wsClient.connect(sessionId, model);
       } catch (error) {
         console.error('连接 WebSocket 失败:', error);
         api.error({
@@ -348,7 +411,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
     return () => {
       wsClient.disconnect();
     };
-  }, [open, sessionId, symbol, model]);
+  }, [open, sessionId, model]);
 
   /**
    * 发送消息
@@ -447,11 +510,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
         title={
           <Space>
             <span>AI 对话</span>
-            {symbol && (
-              <Tag color="blue" style={{ marginLeft: 8 }}>
-                {symbol}
-              </Tag>
-            )}
             {model && (
               <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
                 ({model})
@@ -483,12 +541,12 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({ open, onClose, sessionId, symbo
         >
           {messages.length === 0 ? (
             <Empty
-              description={symbol ? `开始关于 ${symbol} 的对话吧` : "开始对话吧"}
+              description="开始对话吧"
               style={{ marginTop: 60 }}
               imageStyle={{ height: 80 }}
             >
               <p style={{ color: '#999', fontSize: 14 }}>
-                {symbol ? `输入消息，询问关于 ${symbol} 的股票问题` : "输入消息询问股票相关问题"}
+                输入消息询问股票相关问题
               </p>
             </Empty>
           ) : (

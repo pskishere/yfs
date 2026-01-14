@@ -11,7 +11,22 @@ import './App.css';
 
 const App: React.FC = () => {
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider 
+      locale={zhCN}
+      theme={{
+        token: {
+          colorPrimary: '#00b96b', // 青绿色
+          borderRadius: 6, // 默认圆角
+        },
+        components: {
+          Button: {
+            borderRadius: 6,
+            borderRadiusSM: 4,
+            borderRadiusLG: 8,
+          },
+        },
+      }}
+    >
       <Router>
         <Layout>
           <Routes>

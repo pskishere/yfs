@@ -332,6 +332,9 @@ export interface FundamentalData {
   Cashflow?: CashflowRecord[];  // 年度现金流量表
   QuarterlyCashflow?: CashflowRecord[];  // 季度现金流量表
   
+  // 期权数据
+  options?: OptionsData;
+  
   // 历史数据
   StockSplits?: Record<string, number>;  // 日期 -> 分割比例
   
@@ -395,4 +398,40 @@ export interface NewsItem {
       tag: string;
     }>;
   };
+}
+
+/**
+ * 期权项数据
+ */
+export interface OptionItem {
+  contractSymbol: string;
+  lastTradeDate: string;
+  strike: number;
+  lastPrice: number;
+  bid: number;
+  ask: number;
+  change: number;
+  percentChange: number;
+  volume: number;
+  openInterest: number;
+  impliedVolatility: number;
+  inTheMoney: boolean;
+  contractSize: string;
+  currency: string;
+}
+
+/**
+ * 期权链数据 (单个到期日)
+ */
+export interface OptionChain {
+  calls: OptionItem[];
+  puts: OptionItem[];
+}
+
+/**
+ * 期权数据响应
+ */
+export interface OptionsData {
+  expiration_dates: string[];
+  chains: Record<string, OptionChain>;
 }

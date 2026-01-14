@@ -89,22 +89,29 @@
 .markdown-content table {
   border-collapse: collapse;
   width: 100%;
-  margin: 8px 0;
+  margin: 8px 0 16px 0;
+  border: 1px solid #f0f0f0;
+  font-size: 13px;
 }
 
 .markdown-content th,
 .markdown-content td {
-  border: 1px solid #d0d7de;
-  padding: 6px 12px;
+  border: 1px solid #f0f0f0;
+  padding: 8px 12px;
+  text-align: left;
 }
 
 .markdown-content th {
-  background: #f6f8fa;
+  background: #fafafa;
   font-weight: 600;
 }
 
+.markdown-content tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
 .markdown-content a {
-  color: #1890ff;
+  color: #00b96b;
   text-decoration: none;
 }
 
@@ -129,7 +136,7 @@
 .thinking-dot {
   width: 6px;
   height: 6px;
-  background-color: #1890ff;
+  background-color: #00b96b;
   border-radius: 50%;
   animation: thinking-blink 1.4s infinite;
 }
@@ -153,7 +160,7 @@
   display: inline-block;
   width: 2px;
   height: 14px;
-  background: #1890ff;
+  background: #00b96b;
   margin-left: 2px;
   vertical-align: middle;
   animation: cursor-blink 1s infinite;
