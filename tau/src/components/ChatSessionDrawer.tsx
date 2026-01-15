@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Drawer, List, Button, Typography, Space, Tag, Popconfirm, message, Empty } from 'antd';
 import { DeleteOutlined, MessageOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { getChatSessions, deleteChatSession, createChatSession, type ChatSession } from '../services/api';
+import { getChatSessions, deleteChatSession, type ChatSession } from '../services/api';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -17,8 +17,7 @@ const { Text } = Typography;
 interface ChatSessionDrawerProps {
   open: boolean;
   onClose: () => void;
-  onSelectSession?: (sessionId: string) => void;
-  model?: string; // 当前选中的 AI 模型
+  onSelectSession?: (sessionId?: string) => void;
 }
 
 /**
@@ -28,7 +27,6 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   open,
   onClose,
   onSelectSession,
-  model,
 }) => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,18 +58,13 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   };
 
   /**
-   * 创建新会话并打开
+   * 处理新建会话
+   * 不再调用 API 创建会话，而是清空当前会话 ID，
+   * 实际的会话创建将延迟到发送第一条消息时。
    */
-  const handleCreateSession = async () => {
-    try {
-      const newSession = await createChatSession(model);
-      message.success('新会话创建成功');
-      onClose();
-      onSelectSession?.(newSession.session_id);
-    } catch (error) {
-      console.error('创建会话失败:', error);
-      message.error('创建会话失败');
-    }
+  const handleCreateSession = () => {
+    onClose();
+    onSelectSession?.(undefined);
   };
 
   /**

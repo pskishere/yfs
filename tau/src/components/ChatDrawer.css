@@ -2,6 +2,37 @@
  * 聊天抽屉样式
  */
 
+/* Sender 组件及其内部 Skill 标签样式 */
+.chat-drawer-sender {
+  border: 1px solid #f0f0f0 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  transition: all 0.3s ease;
+  padding: 4px 8px !important;
+}
+
+.chat-drawer-sender:focus-within {
+  border-color: #40a9ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.ant-x-sender-content {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+}
+
+.ant-x-sender-skill {
+  margin-right: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+.ant-x-sender-input {
+  flex: 1 !important;
+  min-width: 60px !important;
+}
+
 /* 发送按钮圆形样式 */
 .chat-drawer-sender :where(.ant-x-sender-actions) button {
   border-radius: 50% !important;
@@ -110,6 +141,37 @@
   background-color: #fafafa;
 }
 
+/* 股票分析模块气泡样式 */
+.stock-module-bubble {
+  margin: 12px 0;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stock-module-bubble .ant-collapse-content-box {
+  padding: 0 !important;
+  overflow-x: auto;
+}
+
+.stock-module-bubble .ant-descriptions {
+  width: 100%;
+  min-width: 0;
+}
+
+.stock-module-bubble .ant-collapse {
+  background: transparent;
+}
+
+.stock-module-bubble .ant-descriptions {
+  padding: 12px;
+}
+
 .markdown-content a {
   color: #00b96b;
   text-decoration: none;
@@ -164,4 +226,50 @@
   margin-left: 2px;
   vertical-align: middle;
   animation: cursor-blink 1s infinite;
+}
+
+/* 快捷指令提示面板样式修复 */
+.ant-x-suggestion {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important; /* 确保弹出层可见 */
+}
+
+.ant-x-suggestion-list {
+  min-width: 200px !important;
+  max-width: calc(100% - 32px) !important;
+  max-height: 280px !important;
+  overflow-y: auto !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  z-index: 2000 !important;
+  box-sizing: border-box !important;
+}
+
+.ant-x-suggestion-item {
+  width: 100% !important;
+  padding: 8px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  cursor: pointer;
+}
+
+.ant-x-suggestion-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.ant-x-suggestion-item-extra {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+  white-space: nowrap;
 }

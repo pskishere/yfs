@@ -268,6 +268,7 @@ export interface HotStock {
  * 指标信息
  */
 export interface IndicatorInfo {
+  key: string;
   name: string;
   description: string;
   calculation?: string;

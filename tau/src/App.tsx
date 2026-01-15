@@ -1,15 +1,17 @@
 /**
  * 主应用组件 - 设置路由
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import Layout from './components/Layout';
-import MainPage from './pages/Main';
+import ChatPage from './pages/Chat';
 import './App.css';
 
 const App: React.FC = () => {
+  const [model, setModel] = useState('deepseek-v3.2:cloud');
+
   return (
     <ConfigProvider 
       locale={zhCN}
@@ -29,9 +31,9 @@ const App: React.FC = () => {
       }}
     >
       <Router>
-        <Layout>
+        <Layout model={model} onModelChange={setModel}>
           <Routes>
-            <Route path="/" element={<MainPage />} />
+            <Route path="/" element={<ChatPage model={model} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

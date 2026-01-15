@@ -38,8 +38,13 @@ const getApiBaseUrl = () => {
   }
   
   // 回退逻辑：如果是本地开发环境
-  if (window.location.hostname === 'localhost' || window.location.hostname === 'tauri.localhost') {
-    return 'http://localhost:8086';
+  const isLocal = window.location.hostname === 'localhost' || 
+                 window.location.hostname === '127.0.0.1' || 
+                 window.location.hostname === '0.0.0.0' || 
+                 window.location.hostname === 'tauri.localhost';
+
+  if (isLocal) {
+    return 'http://localhost:8000';
   }
   
   return '';

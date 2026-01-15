@@ -50,6 +50,12 @@ export class WebSocketClient {
    * 连接到 WebSocket 服务器
    */
   connect(sessionId?: string, model?: string): Promise<string> {
+    // 如果已经连接到相同的 sessionId 和 model，直接返回
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.sessionId === (sessionId || null) && this.model === (model || null)) {
+      console.log('WebSocket 已经连接到相同会话:', this.sessionId);
+      return Promise.resolve(this.sessionId!);
+    }
+
     return new Promise((resolve, reject) => {
       try {
         this.isManualClose = false;
@@ -128,8 +134,8 @@ export class WebSocketClient {
       
       let hostWithPort = port ? `${host}:${port}` : host;
       
-      if (host === 'localhost' || host === 'tauri.localhost' || host === '0.0.0.0') {
-        hostWithPort = `${host}:8086`;
+      if (host === 'localhost' || host === 'tauri.localhost' || host === '0.0.0.0' || host === '127.0.0.1') {
+        hostWithPort = `${host}:8000`;
       }
       
       baseUrl = `${protocol}//${hostWithPort}`;

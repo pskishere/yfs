@@ -10,6 +10,7 @@ import os
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
+from django.db import models
 
 # 在 Python 3.14 下强制使用 protobuf 纯 Python 实现，避免 upb 编译问题
 # 必须在导入任何可能使用 protobuf 的模块之前设置
@@ -114,7 +115,7 @@ def get_stock_info(symbol: str):
 
 def search_symbols(query: str) -> List[Dict[str, Any]]:
     """
-    通过查询关键词搜索股票代码 (从 Yahoo Finance)
+    通过查询关键词搜索股票代码 (结合本地缓存与 Yahoo Finance)
     
     Args:
         query: 关键词，如 "Apple", "腾讯", "AAPL"
@@ -122,25 +123,80 @@ def search_symbols(query: str) -> List[Dict[str, Any]]:
     Returns:
         匹配的股票列表
     """
+    results = []
+    
+    # 1. 优先搜索本地数据库 (StockInfo)
     try:
-        search = yf.Search(query, max_results=10)
-        results = []
+        from .models import StockInfo
+        # 搜索代码或名称包含关键词的股票
+        local_stocks = StockInfo.objects.filter(
+            models.Q(symbol__icontains=query) | models.Q(name__icontains=query)
+        )[:10]
         
-        if search.quotes:
-            for quote in search.quotes:
-                results.append({
-                    'symbol': quote.get('symbol'),
-                    'name': quote.get('longname') or quote.get('shortname'),
-                    'exchange': quote.get('exchange'),
-                    'type': quote.get('quoteType'),
-                    'category': quote.get('quoteType', 'Unknown'),
-                    'score': quote.get('score', 0)
-                })
+        for stock in local_stocks:
+            results.append({
+                'symbol': stock.symbol,
+                'name': stock.name,
+                'exchange': 'Local',
+                'type': 'EQUITY',
+                'category': 'Cached',
+                'score': 1000  # 本地匹配权重最高
+            })
+            
+        if len(results) >= 5:
+            return results
+    except Exception as e:
+        logger.debug(f"本地搜索失败: {e}")
+
+    # 2. 如果本地结果不足，尝试从 Yahoo Finance 获取
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+        }
+        # 使用 quote 对中文进行编码
+        from urllib.parse import quote
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={quote(query)}&quotesCount=10&newsCount=0"
+        
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            quotes = data.get('quotes', [])
+            
+            # 合并结果，避免重复
+            seen_symbols = {r['symbol'] for r in results}
+            for quote_item in quotes:
+                symbol = quote_item.get('symbol')
+                if symbol and symbol not in seen_symbols:
+                    results.append({
+                        'symbol': symbol,
+                        'name': quote_item.get('longname') or quote_item.get('shortname'),
+                        'exchange': quote_item.get('exchange'),
+                        'type': quote_item.get('quoteType'),
+                        'category': quote_item.get('quoteType', 'Unknown'),
+                        'score': quote_item.get('score', 0)
+                    })
+            if results:
+                return results
+
+        # 3. 回退到 yf.Search (虽然它可能也会被 rate limit)
+        if not results:
+            search = yf.Search(query, max_results=10)
+            if search.quotes:
+                for quote_item in search.quotes:
+                    results.append({
+                        'symbol': quote_item.get('symbol'),
+                        'name': quote_item.get('longname') or quote_item.get('shortname'),
+                        'exchange': quote_item.get('exchange'),
+                        'type': quote_item.get('quoteType'),
+                        'category': quote_item.get('quoteType', 'Unknown'),
+                        'score': quote_item.get('score', 0)
+                    })
         
         return results
     except Exception as e:
         logger.error(f"搜索股票代码失败: {query}, 错误: {e}")
-        return []
+        return results
 
 
 

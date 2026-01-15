@@ -424,8 +424,6 @@ def search_stocks(request) -> JsonResponse:
         JSON 响应，包含搜索结果
     """
     query = request.GET.get("q", "").strip()
-    if not query:
-        return JsonResponse({"success": False, "message": "搜索关键词不能为空"}, status=400)
     
     try:
         results = service_search_stocks(query)
