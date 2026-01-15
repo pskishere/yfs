@@ -19,23 +19,32 @@ const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   const isHttps = window.location.protocol === 'https:';
   const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
+  const hostname = window.location.hostname;
+  const isLocalHost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === 'tauri.localhost';
 
-  if (envUrl) {
+  if (isTauri) {
+    if (envUrl) {
+      let url = envUrl;
+      if (isHttps && url.startsWith('http://')) {
+        url = url.replace('http://', 'https://');
+      }
+      return url;
+    }
+    return isHttps ? 'https://localhost:8086' : 'http://localhost:8086';
+  }
+
+  if (envUrl && isLocalHost) {
     let url = envUrl;
-    // 如果页面是 HTTPS，强制将 http:// 升级为 https://
     if (isHttps && url.startsWith('http://')) {
       url = url.replace('http://', 'https://');
     }
     return url;
   }
-  
-  // Tauri 环境下必须显式指定 HTTP 地址，默认指向本机 Nginx 8086
-  if (isTauri) {
-    return isHttps ? 'https://localhost:8086' : 'http://localhost:8086';
-  }
 
-  // 浏览器环境：始终使用相对路径，交给 Nginx 或当前前端服务器转发
-  // 例如：/api/xxx -> 由 Nginx 代理到后端
   return '';
 };
 

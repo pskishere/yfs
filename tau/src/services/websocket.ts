@@ -110,9 +110,14 @@ export class WebSocketClient {
     const envWsUrl = import.meta.env.VITE_WS_URL;
     const isHttps = window.location.protocol === 'https:';
     const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
+    const hostname = window.location.hostname;
+    const isLocalHost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === 'tauri.localhost';
     
-    // 1. 优先使用环境变量（支持自定义网关）
-    if (envWsUrl) {
+    if (envWsUrl && (isTauri || isLocalHost)) {
       let base = envWsUrl;
       if (isHttps && base.startsWith('ws://')) {
         base = base.replace('ws://', 'wss://');
