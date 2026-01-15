@@ -4,7 +4,7 @@
 import React, { type ReactNode, useState } from 'react';
 import { Layout as AntLayout, Button, Space, Select } from 'antd';
 import { MenuOutlined } from '@ant-design/icons';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import ChatSessionDrawer from './ChatSessionDrawer';
 import './Layout.css';
 

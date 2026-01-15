@@ -2,7 +2,7 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, Input, notification, Modal, Tooltip, Empty, Flex, Divider, GetRef } from 'antd';
+import { Drawer, Button, notification, Tooltip, Empty, Flex, Divider, GetRef } from 'antd';
 import { Sender, ThoughtChain, Suggestion, type SenderProps } from '@ant-design/x';
 import {
   StopOutlined,
@@ -286,7 +286,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [stockSuggestions, setStockSuggestions] = useState<any[]>([]);
   const currentStreamingIdRef = useRef<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const senderRef = useRef<GetRef<typeof Sender>>(null);
   const [activeSkill, setActiveSkill] = useState<SenderProps['skill']>(undefined);
@@ -687,7 +686,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     };
   }, [active, sessionId, model]);
 
-  const handleSendMessage = async (message: string, event?: any, skill?: any) => {
+  const handleSendMessage = async (message: string, _event?: any, skill?: any) => {
     if (!message.trim() && !skill) return;
 
     // 如果当前处于编辑模式
@@ -696,7 +695,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       if (!isNaN(messageId)) {
         wsClient.editMessage(messageId, message.trim());
         setEditingMessageId(null);
-        setEditingContent('');
         setActiveSkill(undefined);
         setInputText('');
         senderRef.current?.clear?.();
@@ -761,7 +759,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleStartEdit = (message: MessageItem) => {
     setEditingMessageId(message.id);
-    setEditingContent(message.content);
     
     // 设置跳过下一次 onChange，防止 Sender 组件在设置 skill 时可能触发的清空行为
     skipNextChange.current = true;
@@ -775,7 +772,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         onClose: () => {
           setActiveSkill(undefined);
           setEditingMessageId(null);
-          setEditingContent('');
           setInputText('');
         },
       },
@@ -977,6 +973,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 }}
                 onSubmit={handleSendMessage}
                 onKeyDown={onKeyDown}
+                onPaste={() => {}}
                 disabled={!isConnected && !!sessionId}
                 loading={isStreaming}
                 submitType="enter"
