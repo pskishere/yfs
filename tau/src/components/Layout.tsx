@@ -20,7 +20,7 @@ const MODELS = [
   { label: 'DeepSeek V3.2 (Cloud)', value: 'deepseek-v3.2:cloud' },
   { label: 'DeepSeek V3.1 (671B)', value: 'deepseek-v3.1:671b-cloud' },
   { label: 'GPT-4o', value: 'gpt-4o' },
-  { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet' },
+  { label: 'Qwen3 32B', value: 'qwen3:32b' },
 ];
 
 const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {

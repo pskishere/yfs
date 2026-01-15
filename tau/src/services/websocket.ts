@@ -109,37 +109,34 @@ export class WebSocketClient {
   private getWebSocketUrl(sessionId?: string, model?: string): string {
     const envWsUrl = import.meta.env.VITE_WS_URL;
     const isHttps = window.location.protocol === 'https:';
-    
-    let baseUrl: string;
-    
-    // 如果在浏览器环境中运行（非 Tauri）且 hostname 不是 localhost，
-    // 我们应该优先使用当前域名，这样可以支持 ngrok 等代理
     const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    if (!isTauri && !isLocalhost) {
-      // 浏览器环境且非本地访问，使用当前域名
-      const protocol = isHttps ? 'wss:' : 'ws:';
-      baseUrl = `${protocol}//${window.location.host}`;
-    } else if (envWsUrl) {
-      baseUrl = envWsUrl;
-      // 如果页面是 HTTPS，强制将 ws:// 升级为 wss://
-      if (isHttps && baseUrl.startsWith('ws://')) {
-        baseUrl = baseUrl.replace('ws://', 'wss://');
+    
+    // 1. 优先使用环境变量（支持自定义网关）
+    if (envWsUrl) {
+      let base = envWsUrl;
+      if (isHttps && base.startsWith('ws://')) {
+        base = base.replace('ws://', 'wss://');
       }
-    } else {
-      const protocol = isHttps ? 'wss:' : 'ws:';
-      const host = window.location.hostname;
-      const port = window.location.port;
-      
-      let hostWithPort = port ? `${host}:${port}` : host;
-      
-      if (host === 'localhost' || host === 'tauri.localhost' || host === '0.0.0.0' || host === '127.0.0.1') {
-        hostWithPort = `${host}:8000`;
-      }
-      
-      baseUrl = `${protocol}//${hostWithPort}`;
+      return this.buildWebSocketUrl(base, sessionId, model);
     }
+
+    // 2. Tauri 环境下，不能用相对路径，回退到本机 Nginx 8086
+    if (isTauri) {
+      const protocol = isHttps ? 'wss:' : 'ws:';
+      const base = `${protocol}//localhost:8086`;
+      return this.buildWebSocketUrl(base, sessionId, model);
+    }
+
+    // 3. 浏览器环境：始终使用当前站点（通常由 Nginx 代理）
+    const protocol = isHttps ? 'wss:' : 'ws:';
+    const baseUrl = `${protocol}//${window.location.host}`;
+    return this.buildWebSocketUrl(baseUrl, sessionId, model);
+  }
+
+  /**
+   * 构建完整 WebSocket URL
+   */
+  private buildWebSocketUrl(baseUrl: string, sessionId?: string, model?: string): string {
     
     let path = sessionId ? `ws/stock-chat/${sessionId}/` : 'ws/stock-chat/';
     const params = new URLSearchParams();

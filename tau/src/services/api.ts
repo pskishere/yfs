@@ -12,21 +12,13 @@ import type {
 } from '../types/index';
 
 // API基础URL
-// 在 Tauri 环境中，我们必须使用绝对路径。
-// 优先使用环境变量 VITE_API_URL，如果未设置则回退到本地 Docker 映射端口 8086
+// 规则：
+// - 浏览器环境：默认走当前域名（通常由 Nginx 代理），使用相对路径
+// - Tauri 环境：必须使用绝对路径，优先环境变量，其次回退到本地 Nginx 端口 8086
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   const isHttps = window.location.protocol === 'https:';
-  
-  // 如果在浏览器环境中运行（非 Tauri）且 hostname 不是 localhost，
-  // 我们应该优先使用当前域名（相对路径或当前 host），这样可以支持 ngrok 等代理
   const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-  if (!isTauri && !isLocalhost) {
-    // 浏览器环境且非本地访问，返回空字符串使用相对路径，或者构造当前 host 的 URL
-    return ''; 
-  }
 
   if (envUrl) {
     let url = envUrl;
@@ -37,16 +29,13 @@ const getApiBaseUrl = () => {
     return url;
   }
   
-  // 回退逻辑：如果是本地开发环境
-  const isLocal = window.location.hostname === 'localhost' || 
-                 window.location.hostname === '127.0.0.1' || 
-                 window.location.hostname === '0.0.0.0' || 
-                 window.location.hostname === 'tauri.localhost';
-
-  if (isLocal) {
-    return 'http://localhost:8000';
+  // Tauri 环境下必须显式指定 HTTP 地址，默认指向本机 Nginx 8086
+  if (isTauri) {
+    return isHttps ? 'https://localhost:8086' : 'http://localhost:8086';
   }
-  
+
+  // 浏览器环境：始终使用相对路径，交给 Nginx 或当前前端服务器转发
+  // 例如：/api/xxx -> 由 Nginx 代理到后端
   return '';
 };
 

@@ -173,7 +173,7 @@ class StockAIAgent:
     - 询问期权/波动率：必须包含 `options`。
     - 综合诊断：应包含 `price`, `chart`, `indicators`, `fundamental`, `cycle`。
   - **指令响应**：
-    - 如果用户输入类似 `/{module} {symbol}` 的指令（如 `/价格 AAPL`、`/图表 AAPL`、`/指标 700.HK` 等），请**立即调用相关工具**获取数据，并**仅返回**对应的可视化标签（如 `<stock-analysis symbol="AAPL" module="价格" />`），无需多余文字解释，除非数据获取失败。
+176→    - 如果用户输入类似 `/{{module}} {{symbol}}` 的指令（如 `/价格 AAPL`、`/图表 AAPL`、`/指标 700.HK` 等），请**立即调用相关工具**获取数据，并**仅返回**对应的可视化标签（如 `<stock-analysis symbol="AAPL" module="价格" />`），无需多余文字解释，除非数据获取失败。
   - **组合建议**：
     - 基础分析：`price` + `chart`
     - 技术分析：`chart` + `indicators` + `pivot`
