@@ -25,10 +25,21 @@ const MODELS = [
 
 const getPlatformClass = () => {
   if (typeof navigator === 'undefined') return '';
+  
+  const classes = [];
+  const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
+  
+  if (isTauri) {
+    classes.push('platform-tauri');
+  } else {
+    classes.push('platform-browser');
+  }
+
   const ua = navigator.userAgent || '';
-  if (/iPhone|iPad|iPod/.test(ua)) return 'platform-ios';
-  if (/Android/.test(ua)) return 'platform-android';
-  return '';
+  if (/iPhone|iPad|iPod/.test(ua)) classes.push('platform-ios');
+  if (/Android/.test(ua)) classes.push('platform-android');
+  
+  return classes.join(' ');
 };
 
 const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {

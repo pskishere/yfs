@@ -1,9 +1,12 @@
 .app-layout {
   height: 100vh;
-  /* height: 100dvh; */
   overflow: hidden;
   /* 移动端优化 */
   -webkit-overflow-scrolling: touch;
+}
+
+.app-layout.platform-browser {
+  height: 100dvh;
 }
 
 .app-topbar {
