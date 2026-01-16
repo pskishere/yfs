@@ -2,7 +2,7 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, notification, Tooltip, Empty, Flex, Divider, GetRef } from 'antd';
+import { Drawer, Button, notification, Modal, Input, Tooltip, Empty, Flex, Divider, GetRef, Dropdown, type MenuProps } from 'antd';
 import { Sender, ThoughtChain, Suggestion, type SenderProps } from '@ant-design/x';
 import {
   StopOutlined,
@@ -17,9 +17,11 @@ import {
   DollarOutlined,
   DatabaseOutlined,
   BarChartOutlined,
+  AppstoreOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
-import { searchStocks } from '../services/api';
+import { searchStocks, getHotStocks } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import StockComponentRenderer from './StockComponentRenderer';
@@ -283,14 +285,32 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [stockSuggestions, setStockSuggestions] = useState<any[]>([]);
   const currentStreamingIdRef = useRef<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const senderRef = useRef<GetRef<typeof Sender>>(null);
   const [activeSkill, setActiveSkill] = useState<SenderProps['skill']>(undefined);
+  const [slotConfig, setSlotConfig] = useState<SenderProps['slotConfig']>(undefined);
+  const [hotStocks, setHotStocks] = useState<string[]>([]);
   const skipNextChange = useRef(false);
   const [api, contextHolder] = notification.useNotification();
+
+  // 获取热门股票
+  useEffect(() => {
+    const fetchHotStocks = async () => {
+      try {
+        const res = await getHotStocks(50);
+        if (res.success && res.stocks) {
+          const options = res.stocks.map((s: any) => s.symbol);
+          setHotStocks(options);
+        }
+      } catch (err) {
+        console.error('获取热门股票失败:', err);
+      }
+    };
+    fetchHotStocks();
+  }, []);
 
   // 快捷指令配置
   const suggestionItems = [
@@ -303,8 +323,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         value: '价格',
         label: '价格信息',
         icon: <DollarOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '获取 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的最新价格信息。' },
+      ],
     },
     {
       label: 'K线图表',
@@ -315,8 +350,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         value: '图表',
         label: 'K线图表',
         icon: <LineChartOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '查看 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的 K 线图表。' },
+      ],
     },
     {
       label: '技术指标',
@@ -327,8 +377,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         value: '指标',
         label: '技术指标',
         icon: <DashboardOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '分析 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的技术指标（RSI, MACD 等）。' },
+      ],
     },
     {
       label: '基本面',
@@ -339,32 +404,104 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         value: '基本面',
         label: '基本面',
         icon: <InfoCircleOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '查询 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的基本面数据。' },
+      ],
+    },
+    {
+      label: '最新新闻',
+      value: '新闻',
+      icon: <FileTextOutlined />,
+      extra: '展示个股最新相关新闻',
+      skill: {
+        value: '新闻',
+        label: '最新新闻',
+        icon: <FileTextOutlined />,
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '查看 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的最新相关新闻。' },
+      ],
     },
     {
       label: '市场行情',
       value: '行情',
       icon: <BarChartOutlined />,
-      extra: '展示成交量、换手率等',
+      extra: '展示 A 股、美股、港股行情',
       skill: {
         value: '行情',
         label: '市场行情',
         icon: <BarChartOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '获取 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的市场行情。' },
+      ],
     },
     {
       label: '周期分析',
       value: '周期',
       icon: <HistoryOutlined />,
-      extra: '展示短中长期趋势分析',
+      extra: '分析股票的时间周期规律',
       skill: {
         value: '周期',
         label: '周期分析',
         icon: <HistoryOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '对 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 进行周期性规律分析。' },
+      ],
     },
     {
       label: '枢轴点',
@@ -375,8 +512,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         value: '枢轴',
         label: '枢轴点',
         icon: <DatabaseOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '计算 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的枢轴点（支撑位与阻力位）。' },
+      ],
     },
     {
       label: '期权链',
@@ -387,35 +539,55 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         value: '期权',
         label: '期权链',
         icon: <DatabaseOutlined />,
-        closable: false,
-      }
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '查看 ' },
+        {
+          type: 'select',
+          key: 'symbol',
+          props: {
+            options: hotStocks,
+            placeholder: '股票代码',
+            style: { width: 100 },
+            showSearch: true,
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 的期权链信息。' },
+      ],
+    },
+    {
+      label: '智能选股',
+      value: '选股',
+      icon: <BarChartOutlined />,
+      extra: '通过条件筛选股票',
+      skill: {
+        value: '选股',
+        label: '智能选股',
+        icon: <BarChartOutlined />,
+        closable: true,
+      },
+      slotConfig: [
+        { type: 'text', value: '根据 ' },
+        {
+          type: 'select',
+          key: 'strategy',
+          props: {
+            options: ['热门增长', '高股息', '低估值'],
+            placeholder: '选股策略',
+            style: { width: 100 },
+            listHeight: 50,
+          },
+        },
+        { type: 'text', value: ' 策略进行智能选股。' },
+      ],
     },
   ];
 
   // 辅助函数：判断搜索上下文
-  const getSearchContext = (text: string, activeSkill?: any) => {
-    // 如果是编辑模式，不显示任何补全建议
-    if (activeSkill?.value === 'editing') return { mode: 'none' as const, query: '' };
-
-    // 只有单 / 时，强制为指令模式
-    if (text === '/') return { mode: 'instruction' as const, query: '' };
-    
-    // 如果有标签，则是股票搜索模式
-    if (activeSkill) return { mode: 'stock' as const, query: text };
-
-    const lastSlashIndex = text.lastIndexOf('/');
-    if (lastSlashIndex === -1) return { mode: 'none' as const, query: '' };
-    
-    const afterSlash = text.substring(lastSlashIndex + 1);
-    const spaceIndex = afterSlash.indexOf(' ');
-    
-    // 指令后有空格，进入股票搜索模式
-    if (spaceIndex !== -1) {
-      return { mode: 'stock' as const, query: afterSlash.substring(spaceIndex + 1) };
-    }
-    
-    // 否则还在输入指令
-    return { mode: 'instruction' as const, query: afterSlash };
+  const getSearchContext = (_text: string, _activeSkill?: any) => {
+    return { mode: 'none' as const, query: '' };
   };
 
   /**
@@ -687,20 +859,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [active, sessionId, model]);
 
   const handleSendMessage = async (message: string, _event?: any, skill?: any) => {
-    if (!message.trim() && !skill) return;
-
-    // 如果当前处于编辑模式
-    if (editingMessageId && activeSkill?.value === 'editing') {
-      const messageId = parseInt(editingMessageId);
-      if (!isNaN(messageId)) {
-        wsClient.editMessage(messageId, message.trim());
-        setEditingMessageId(null);
-        setActiveSkill(undefined);
-        setInputText('');
-        senderRef.current?.clear?.();
-        return;
-      }
-    }
+    if (!message.trim() && !skill && !activeSkill) return;
 
     // 如果还没有连接，说明是第一次发送消息（或者是连接断开了）
     if (!isConnected) {
@@ -746,6 +905,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     // 发送到服务器
     wsClient.sendMessage(fullMessage);
     setActiveSkill(undefined);
+    setSlotConfig(undefined);
   };
 
   const handleRegenerate = (messageId?: string) => {
@@ -759,28 +919,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleStartEdit = (message: MessageItem) => {
     setEditingMessageId(message.id);
-    
-    // 设置跳过下一次 onChange，防止 Sender 组件在设置 skill 时可能触发的清空行为
-    skipNextChange.current = true;
-    setInputText(message.content);
-    
-    setActiveSkill({
-      value: 'editing',
-      label: '正在编辑消息',
-      icon: <EditOutlined />,
-      closable: {
-        onClose: () => {
-          setActiveSkill(undefined);
-          setEditingMessageId(null);
-          setInputText('');
-        },
-      },
-    } as any);
-
-    // 自动聚焦到输入框
-    setTimeout(() => {
-      senderRef.current?.focus?.();
-    }, 0);
+    setEditingContent(message.content);
   };
 
   const handleCancel = () => {
@@ -839,194 +978,165 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             background: '#fff',
           }}
         >
-          <Suggestion
-            items={(search) => {
-              // 如果正在编辑，不显示任何建议
-              if (activeSkill?.value === 'editing') return [];
-
-              // 使用 search 参数作为上下文判断的基础，如果不是字符串（如 true）则回退到 inputText
-              const contextText = typeof search === 'string' ? search : inputText;
-              const { mode, query } = getSearchContext(contextText, activeSkill);
+          <Sender
+            ref={senderRef}
+            className="chat-drawer-sender"
+            skill={activeSkill}
+            placeholder={
+              isConnected
+                ? '输入消息...'
+                : !sessionId
+                ? '输入消息开始新对话...'
+                : '连接中...'
+            }
+            value={inputText}
+            onChange={(val) => {
+              console.log('onChange', val);
               
-              if (mode === 'stock') {
-                // 如果是股票搜索
-                if (stockSuggestions.length === 0 && query === '') {
-                  // 如果输入为空且没有搜索结果，可以显示“请输入股票代码或名称”或最近搜索（此处暂留空或后续扩展）
-                  return [];
-                }
-                return stockSuggestions.map(s => {
-                  const name = s.name || '';
-                  // 恢复手动截断，根据用户要求改成截断 19 个字符
-                  const displayName = name.length > 19 ? name.substring(0, 19) + '...' : name;
-                  return {
-                    label: `${s.symbol} - ${displayName}`,
-                    value: s.symbol,
-                    extra: s.type || s.exchDisp,
-                  };
-                });
+              // 如果刚刚通过 onSelect 更新了输入框，则跳过本次 onChange
+              if (skipNextChange.current) {
+                skipNextChange.current = false;
+                return;
               }
 
-              // 否则是指令搜索
-              const instructionQuery = mode === 'instruction' ? query : '';
-              if (typeof search !== 'string' || !search) return suggestionItems;
-              
-              return suggestionItems.filter(item => 
-                String(item.label).toLowerCase().includes(instructionQuery.toLowerCase()) ||
-                item.value.toLowerCase().includes(instructionQuery.toLowerCase())
+              // 如果按下 Backspace 导致内容为空，且当前有 activeSkill，则取消 activeSkill
+              if (val === '') {
+                if (activeSkill) setActiveSkill(undefined);
+              }
+
+              // 如果已经有选中的技能标签，且输入框内容只是一个斜杠，则忽略该斜杠
+              if (activeSkill && val === '/') {
+                setInputText('');
+                return;
+              }
+
+              setInputText(val);
+            }}
+            onSubmit={handleSendMessage}
+            onPaste={() => {}}
+            disabled={!isConnected && !!sessionId}
+            loading={isStreaming}
+            submitType="enter"
+            autoSize={{ minRows: 1, maxRows: 6 }}
+            slotConfig={slotConfig}
+            footer={(actionNode: React.ReactNode) => {
+              const items: MenuProps['items'] = suggestionItems.map(item => ({
+                key: item.value,
+                label: item.label,
+                icon: item.icon,
+              }));
+
+              const handleMenuClick: MenuProps['onClick'] = (info) => {
+                const item = suggestionItems.find(i => i.value === info.key);
+                if (item) {
+                  setActiveSkill({
+                    ...item.skill,
+                    closable: {
+                      onClose: () => {
+                        setActiveSkill(undefined);
+                        setSlotConfig(undefined);
+                      }
+                    }
+                  } as any);
+                  setSlotConfig(item.slotConfig as any);
+                  setInputText('');
+                  skipNextChange.current = true;
+                }
+              };
+
+              return (
+                <Flex justify="space-between" align="center">
+                  <Flex gap="small" align="center">
+                    <Dropdown 
+                      menu={{ 
+                        items, 
+                        onClick: handleMenuClick,
+                        selectable: true,
+                        selectedKeys: activeSkill?.value ? [activeSkill.value] : [],
+                      }}
+                      trigger={['click']}
+                    >
+                      <Button 
+                          type="text" 
+                          icon={<AppstoreOutlined />}
+                          style={{ 
+                            color: '#1677ff',
+                            backgroundColor: '#e6f4ff'
+                          }}
+                        />
+                    </Dropdown>
+                    <div style={{ fontSize: 12, color: '#999' }}>
+                      {isConnected ? (
+                        <span>按 Enter 发送</span>
+                      ) : !sessionId ? (
+                        <span>按 Enter 发送第一条消息并开始对话</span>
+                      ) : (
+                        <span>连接中...</span>
+                      )}
+                    </div>
+                  </Flex>
+                  <Flex align="center">
+                    {isStreaming ? (
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<StopOutlined />}
+                        onClick={handleCancel}
+                        style={{
+                          borderRadius: '50%',
+                          width: 40,
+                          height: 40,
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <Divider type="vertical" />
+                        {actionNode}
+                      </>
+                    )}
+                  </Flex>
+                </Flex>
               );
             }}
-            onSelect={(value) => {
-              const { mode } = getSearchContext(inputText, activeSkill);
-              
-              if (mode === 'stock') {
-                // 如果是补全股票代码
-                if (activeSkill) {
-                  // 在标签模式下，直接替换输入文本为选中的股票代码
-                  skipNextChange.current = true;
-                  setInputText(value);
-                } else {
-                  // 在纯文本模式下，保留指令前缀并替换最后的搜索词
-                  const newValue = (() => {
-                    const lastSlashIndex = inputText.lastIndexOf('/');
-                    const afterSlash = inputText.substring(lastSlashIndex + 1);
-                    const spaceIndex = afterSlash.indexOf(' ');
-                    const base = inputText.substring(0, lastSlashIndex + 1 + spaceIndex + 1);
-                    return `${base}${value}`;
-                  })();
-                  
-                  skipNextChange.current = true;
-                  setInputText(newValue);
-                }
-              } else {
-                const selectedItem = suggestionItems.find(item => item.value === value);
-                if (selectedItem && selectedItem.skill) {
-                  // 如果有对应的 skill 配置，则设置为标签样式
-                  setActiveSkill({
-                    ...selectedItem.skill,
-                  });
-                  // 选中指令后，强制清空输入框
-                  skipNextChange.current = true;
-                  setInputText('');
-                }
-              }
-            }}
-          >
-            {({ onKeyDown, onTrigger }) => (
-              <Sender
-                ref={senderRef}
-                className="chat-drawer-sender"
-                skill={activeSkill}
-                placeholder={
-                  isConnected
-                    ? '输入消息，或输入 / 使用快捷指令...'
-                    : !sessionId
-                    ? '输入消息开始新对话...'
-                    : '连接中...'
-                }
-                value={inputText}
-                onChange={async (val) => {
-                  // 如果刚刚通过 onSelect 更新了输入框，则跳过本次 onChange
-                  if (skipNextChange.current) {
-                    skipNextChange.current = false;
-                    return;
-                  }
-
-                  // 如果按下 Backspace 导致内容为空，且当前有 activeSkill，则取消 activeSkill
-                  if (val === '' && activeSkill) {
-                    setActiveSkill(undefined);
-                  }
-
-                  // 如果已经有选中的技能标签，且输入框内容只是一个斜杠，则忽略该斜杠
-                  // 这通常是由于快捷指令触发字符残留导致的
-                  if (activeSkill && val === '/') {
-                    setInputText('');
-                    return;
-                  }
-
-                  setInputText(val);
-                  
-                  const { mode, query } = getSearchContext(val, activeSkill);
-
-                  if (mode === 'stock') {
-                    // 进入股票搜索模式
-                    try {
-                      const res = await searchStocks(query);
-                      if (res.success && res.results) {
-                        setStockSuggestions(res.results);
-                        onTrigger(val);
-                      } else {
-                        onTrigger(false);
-                      }
-                    } catch (err) {
-                      onTrigger(false);
-                    }
-                  } else if (mode === 'instruction') {
-                    // 进入指令搜索模式
-                    const hasMatch = query === '' || suggestionItems.some(item => 
-                      String(item.label).toLowerCase().includes(query.toLowerCase()) ||
-                      item.value.toLowerCase().includes(query.toLowerCase())
-                    );
-                    onTrigger(hasMatch ? val : false);
-                  } else {
-                    onTrigger(false);
-                  }
-                }}
-                onSubmit={handleSendMessage}
-                onKeyDown={onKeyDown}
-                onPaste={() => {}}
-                disabled={!isConnected && !!sessionId}
-                loading={isStreaming}
-                submitType="enter"
-                autoSize={{ minRows: 1, maxRows: 6 }}
-                footer={(actionNode: React.ReactNode) => {
-                  return (
-                    <Flex justify="space-between" align="center">
-                      <Flex gap="small" align="center">
-                        <div style={{ fontSize: 12, color: '#999' }}>
-                          {isConnected ? (
-                            <span>按 Enter 发送，输入 / 唤起快捷指令</span>
-                          ) : !sessionId ? (
-                            <span>按 Enter 发送第一条消息并开始对话</span>
-                          ) : (
-                            <span>连接中...</span>
-                          )}
-                        </div>
-                      </Flex>
-                      <Flex align="center">
-                        {isStreaming ? (
-                          <Button
-                            type="text"
-                            danger
-                            size="small"
-                            icon={<StopOutlined />}
-                            onClick={handleCancel}
-                            style={{
-                              borderRadius: '50%',
-                              width: 40,
-                              height: 40,
-                              padding: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          />
-                        ) : (
-                          <>
-                            <Divider type="vertical" />
-                            {actionNode}
-                          </>
-                        )}
-                      </Flex>
-                    </Flex>
-                  );
-                }}
-                suffix={false}
-                onCancel={handleCancel}
-              />
-            )}
-          </Suggestion>
+            suffix={false}
+            onCancel={handleCancel}
+          />
         </div>
       </div>
+
+      <Modal
+        title="编辑消息"
+        open={!!editingMessageId}
+        onOk={() => {
+          if (editingMessageId) {
+            const messageId = parseInt(editingMessageId);
+            if (!isNaN(messageId)) {
+              wsClient.editMessage(messageId, editingContent);
+            }
+          }
+          setEditingMessageId(null);
+          setEditingContent('');
+        }}
+        onCancel={() => {
+          setEditingMessageId(null);
+          setEditingContent('');
+        }}
+        okText="确认"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Input.TextArea
+          value={editingContent}
+          onChange={(e) => setEditingContent(e.target.value)}
+          autoSize={{ minRows: 3, maxRows: 10 }}
+          placeholder="请输入编辑后的消息内容"
+        />
+      </Modal>
     </>
   );
 };

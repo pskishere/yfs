@@ -148,6 +148,15 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
           />
         </div>
       );
+    case 'news':
+    case '新闻':
+      return (
+        <div className="stock-module-bubble">
+          <NewsData
+            analysisResult={data!}
+          />
+        </div>
+      );
     case 'market':
     case '市场':
     case '行情':

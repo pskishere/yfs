@@ -19,8 +19,15 @@
 .ant-x-sender-content {
   display: flex !important;
   align-items: center !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
   gap: 4px !important;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+
+.ant-x-sender-content::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .ant-x-sender-skill {
@@ -30,7 +37,13 @@
 
 .ant-x-sender-input {
   flex: 1 !important;
-  min-width: 60px !important;
+  min-width: 100px !important;
+}
+
+/* 确保 slotConfig 中的文本不换行 */
+.ant-x-sender-content > span {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
 }
 
 /* 发送按钮圆形样式 */
@@ -42,6 +55,12 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+}
+
+/* 限制下拉菜单的最大高度并支持滚动 */
+.ant-dropdown-menu {
+  max-height: 300px !important;
+  overflow-y: auto !important;
 }
 
 .markdown-content {
