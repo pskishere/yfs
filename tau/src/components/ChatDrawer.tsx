@@ -86,14 +86,16 @@ const MessageBubble: React.FC<{
 
   // 快捷指令配置（用于渲染用户消息中的标签）
   const suggestionItems = [
-    { label: '价格信息', value: '价格' },
-    { label: 'K线图表', value: '图表' },
-    { label: '技术指标', value: '指标' },
+    { label: '价格信息', value: '价格信息' },
+    { label: 'K线图表', value: 'K线图表' },
+    { label: '技术指标', value: '技术指标' },
     { label: '基本面', value: '基本面' },
-    { label: '市场行情', value: '行情' },
-    { label: '周期分析', value: '周期' },
-    { label: '枢轴点', value: '枢轴' },
-    { label: '期权链', value: '期权' },
+    { label: '市场行情', value: '市场行情' },
+    { label: '周期分析', value: '周期分析' },
+    { label: '枢轴点', value: '枢轴点' },
+    { label: '期权链', value: '期权链' },
+    { label: '最新新闻', value: '最新新闻' },
+    { label: '智能选股', value: '智能选股' },
   ];
 
   return (
@@ -314,11 +316,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const suggestionItems = [
     {
       label: '价格信息',
-      value: '价格',
+      value: '价格信息',
       icon: <DollarOutlined />,
       extra: '展示当前价格、涨跌幅等',
       skill: {
-        value: '价格',
+        value: '价格信息',
         label: '价格信息',
         icon: <DollarOutlined />,
         closable: true,
@@ -341,11 +343,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: 'K线图表',
-      value: '图表',
+      value: 'K线图表',
       icon: <LineChartOutlined />,
       extra: '展示交互式 K 线图',
       skill: {
-        value: '图表',
+        value: 'K线图表',
         label: 'K线图表',
         icon: <LineChartOutlined />,
         closable: true,
@@ -368,11 +370,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '技术指标',
-      value: '指标',
+      value: '技术指标',
       icon: <DashboardOutlined />,
       extra: '展示 RSI, MACD, KDJ 等',
       skill: {
-        value: '指标',
+        value: '技术指标',
         label: '技术指标',
         icon: <DashboardOutlined />,
         closable: true,
@@ -422,11 +424,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '最新新闻',
-      value: '新闻',
+      value: '最新新闻',
       icon: <FileTextOutlined />,
       extra: '展示个股最新相关新闻',
       skill: {
-        value: '新闻',
+        value: '最新新闻',
         label: '最新新闻',
         icon: <FileTextOutlined />,
         closable: true,
@@ -449,11 +451,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '市场行情',
-      value: '行情',
+      value: '市场行情',
       icon: <BarChartOutlined />,
       extra: '展示 A 股、美股、港股行情',
       skill: {
-        value: '行情',
+        value: '市场行情',
         label: '市场行情',
         icon: <BarChartOutlined />,
         closable: true,
@@ -476,11 +478,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '周期分析',
-      value: '周期',
+      value: '周期分析',
       icon: <HistoryOutlined />,
       extra: '分析股票的时间周期规律',
       skill: {
-        value: '周期',
+        value: '周期分析',
         label: '周期分析',
         icon: <HistoryOutlined />,
         closable: true,
@@ -503,11 +505,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '枢轴点',
-      value: '枢轴',
+      value: '枢轴点',
       icon: <DatabaseOutlined />,
       extra: '展示支撑位与阻力位',
       skill: {
-        value: '枢轴',
+        value: '枢轴点',
         label: '枢轴点',
         icon: <DatabaseOutlined />,
         closable: true,
@@ -530,11 +532,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '期权链',
-      value: '期权',
+      value: '期权链',
       icon: <DatabaseOutlined />,
       extra: '展示期权行权价与波动率',
       skill: {
-        value: '期权',
+        value: '期权链',
         label: '期权链',
         icon: <DatabaseOutlined />,
         closable: true,
@@ -557,11 +559,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
     {
       label: '智能选股',
-      value: '选股',
+      value: '智能选股',
       icon: <BarChartOutlined />,
       extra: '通过条件筛选股票',
       skill: {
-        value: '选股',
+        value: '智能选股',
         label: '智能选股',
         icon: <BarChartOutlined />,
         closable: true,

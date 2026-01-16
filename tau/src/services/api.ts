@@ -20,6 +20,8 @@ const getApiBaseUrl = () => {
   const isHttps = window.location.protocol === 'https:';
   const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
   const hostname = window.location.hostname;
+  const ua = navigator.userAgent || '';
+  const isAndroid = /Android/.test(ua);
   const isLocalHost =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
@@ -29,10 +31,16 @@ const getApiBaseUrl = () => {
   if (isTauri) {
     if (envUrl) {
       let url = envUrl;
+      if (isAndroid && (url.includes('localhost') || url.includes('127.0.0.1'))) {
+        url = url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
+      }
       if (isHttps && url.startsWith('http://')) {
         url = url.replace('http://', 'https://');
       }
       return url;
+    }
+    if (isAndroid) {
+      return isHttps ? 'https://10.0.2.2:8086' : 'http://10.0.2.2:8086';
     }
     return isHttps ? 'https://localhost:8086' : 'http://localhost:8086';
   }

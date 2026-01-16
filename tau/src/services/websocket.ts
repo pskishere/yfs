@@ -111,6 +111,8 @@ export class WebSocketClient {
     const isHttps = window.location.protocol === 'https:';
     const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
     const hostname = window.location.hostname;
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/.test(ua);
     const isLocalHost =
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
@@ -119,6 +121,9 @@ export class WebSocketClient {
     
     if (envWsUrl && (isTauri || isLocalHost)) {
       let base = envWsUrl;
+      if (isAndroid && (base.includes('localhost') || base.includes('127.0.0.1'))) {
+        base = base.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
+      }
       if (isHttps && base.startsWith('ws://')) {
         base = base.replace('ws://', 'wss://');
       }
@@ -128,7 +133,8 @@ export class WebSocketClient {
     // 2. Tauri 环境下，不能用相对路径，回退到本机 Nginx 8086
     if (isTauri) {
       const protocol = isHttps ? 'wss:' : 'ws:';
-      const base = `${protocol}//localhost:8086`;
+      const host = isAndroid ? '10.0.2.2' : 'localhost';
+      const base = `${protocol}//${host}:8086`;
       return this.buildWebSocketUrl(base, sessionId, model);
     }
 
