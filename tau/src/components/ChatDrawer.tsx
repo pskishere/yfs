@@ -941,6 +941,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const item = suggestionItems.find(i => i.value === cmd);
       
       if (item) {
+        skipNextChange.current = true;
         // 设置技能标签，但内容直接作为文本回填
         setActiveSkill({
           ...item.skill,
@@ -951,6 +952,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             }
           }
         } as any);
+        setSlotConfig(item.slotConfig as any);
         setInputText(rest);
         setTimeout(scrollToBottom, 100);
         return;

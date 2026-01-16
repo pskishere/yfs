@@ -1,13 +1,18 @@
 .app-layout {
   height: 100vh;
-  height: 100dvh; /* 使用动态视口高度，适配移动端浏览器 */
+  /* height: 100dvh; */
   overflow: hidden;
   /* 移动端优化 */
   -webkit-overflow-scrolling: touch;
 }
 
+.app-topbar {
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+}
+
 .app-content {
-  padding: 24px;
+  padding: 16px 24px 24px;
   background: #f7f8fa;
   height: 100%;
   overflow-y: auto;
@@ -19,12 +24,12 @@
 /* 移动端优化 */
 @media (max-width: 768px) {
   .app-content {
-    padding: 12px 8px;
+    padding: 8px 8px 12px;
   }
 }
 
 @media (max-width: 480px) {
   .app-content {
-    padding: 8px 4px;
+    padding: 4px 4px 8px;
   }
 }

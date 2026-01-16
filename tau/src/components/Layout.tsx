@@ -29,13 +29,12 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
 
   return (
     <AntLayout className="app-layout">
-      {/* 全局顶栏 */}
       <div
+        className="app-topbar"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '8px 12px',
           borderBottom: '1px solid #f0f0f0',
           background: '#fff',
           position: 'sticky',
@@ -89,4 +88,3 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
 };
 
 export default Layout;
-

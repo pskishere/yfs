@@ -129,11 +129,11 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
       open={open}
       styles={{
         header: {
-          paddingTop: '16px',
+          paddingTop: isMobile ? 'calc(16px + env(safe-area-inset-top))' : '16px',
         },
         body: {
           paddingBottom: '16px',
-        }
+        },
       }}
       extra={
         <Space>
