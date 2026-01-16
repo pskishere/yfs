@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
+import { XProvider } from '@ant-design/x';
 import zhCN from 'antd/locale/zh_CN';
 import Layout from './components/Layout';
 import ChatPage from './pages/Chat';
@@ -30,14 +31,16 @@ const App: React.FC = () => {
         },
       }}
     >
-      <Router>
-        <Layout model={model} onModelChange={setModel}>
-          <Routes>
-            <Route path="/" element={<ChatPage model={model} />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      </Router>
+      <XProvider>
+        <Router>
+          <Layout model={model} onModelChange={setModel}>
+            <Routes>
+              <Route path="/" element={<ChatPage model={model} />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </XProvider>
     </ConfigProvider>
   );
 };

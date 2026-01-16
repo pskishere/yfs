@@ -2,8 +2,8 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, notification, Modal, Input, Tooltip, Empty, Flex, Divider, GetRef, Dropdown, Tag, Space, type MenuProps } from 'antd';
-import { Sender, ThoughtChain, Suggestion, type SenderProps } from '@ant-design/x';
+import { Drawer, Button, notification, Empty, Flex, Divider, GetRef, Dropdown, Tag, type MenuProps } from 'antd';
+import { Sender, ThoughtChain, type SenderProps } from '@ant-design/x';
 import {
   StopOutlined,
   EditOutlined,
@@ -19,10 +19,9 @@ import {
   BarChartOutlined,
   AppstoreOutlined,
   FileTextOutlined,
-  CloseOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
-import { searchStocks, getHotStocks } from '../services/api';
+import { getHotStocks } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import StockComponentRenderer from './StockComponentRenderer';
@@ -584,11 +583,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     },
   ];
 
-  // 辅助函数：判断搜索上下文
-  const getSearchContext = (_text: string, _activeSkill?: any) => {
-    return { mode: 'none' as const, query: '' };
-  };
-
   /**
    * 自动滚动到底部
    */
@@ -1027,7 +1021,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           style={{
             borderTop: '1px solid #f0f0f0',
             padding: '12px 16px',
-            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
             background: '#fff',
           }}
         >
@@ -1197,7 +1190,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
       open={open}
       styles={{
         header: {
-          paddingTop: 'calc(16px + env(safe-area-inset-top))',
+          paddingTop: '16px',
         },
         body: {
           padding: 0,

@@ -36,7 +36,6 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 12px',
-          paddingTop: 'calc(8px + env(safe-area-inset-top))',
           borderBottom: '1px solid #f0f0f0',
           background: '#fff',
           position: 'sticky',

@@ -112,7 +112,7 @@ export const NewsData: React.FC<NewsDataProps> = ({
     <div id="section-news">
       <Collapse
         ghost
-        defaultActiveKey={['news']}
+        defaultActiveKey={[]}
         items={collapseItems}
         style={{ marginTop: 0 }}
       />

@@ -857,7 +857,7 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
     <div id="section-cycle">
       <Collapse
         ghost
-        defaultActiveKey={['cycle']}
+        defaultActiveKey={[]}
         items={[{
           key: 'cycle',
           label: (

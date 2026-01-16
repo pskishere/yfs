@@ -2,7 +2,7 @@
  * 基本面数据组件
  */
 import React from 'react';
-import { Collapse, Descriptions, Space, Tag, Tabs, Typography, Pagination } from 'antd';
+import { Collapse, Descriptions, Space, Tag, Tabs } from 'antd';
 import { 
   DatabaseOutlined, 
   FileTextOutlined,
@@ -335,7 +335,7 @@ export const FundamentalData: React.FC<FundamentalDataProps> = ({
     <div id="section-fundamental">
       <Collapse
         ghost
-        defaultActiveKey={['fundamental']}
+        defaultActiveKey={[]}
         items={collapseItems}
         style={{ marginTop: 0 }}
       />

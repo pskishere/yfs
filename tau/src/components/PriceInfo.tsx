@@ -51,7 +51,7 @@ export const PriceInfo: React.FC<PriceInfoProps> = ({
     <div id="section-price-info">
       <Collapse
         ghost
-        defaultActiveKey={['price-info']}
+        defaultActiveKey={[]}
         items={[{
           key: 'price-info',
           label: (

@@ -115,10 +115,10 @@ export const IndicatorLabel: React.FC<IndicatorLabelProps> = ({ label, indicator
         destroyOnClose
         styles={{
           header: {
-            paddingTop: 'calc(16px + env(safe-area-inset-top))',
+            paddingTop: '16px',
           },
           body: {
-            paddingBottom: 'env(safe-area-inset-bottom)',
+            paddingBottom: '16px',
           }
         }}
       >

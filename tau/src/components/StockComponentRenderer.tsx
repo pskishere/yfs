@@ -16,6 +16,7 @@ import { OptionsTable } from './OptionsTable';
 import { CycleAnalysis } from './CycleAnalysis';
 import { PivotPoints } from './PivotPoints';
 import { IndicatorLabel } from './IndicatorLabel';
+import { NewsData } from './NewsData';
 
 interface StockComponentRendererProps {
   symbol: string;

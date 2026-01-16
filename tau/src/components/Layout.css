@@ -8,8 +8,6 @@
 
 .app-content {
   padding: 24px;
-  padding-top: calc(24px + env(safe-area-inset-top));
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
   background: #f7f8fa;
   height: 100%;
   overflow-y: auto;
@@ -22,15 +20,11 @@
 @media (max-width: 768px) {
   .app-content {
     padding: 12px 8px;
-    padding-top: calc(12px + env(safe-area-inset-top));
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 }
 
 @media (max-width: 480px) {
   .app-content {
     padding: 8px 4px;
-    padding-top: calc(8px + env(safe-area-inset-top));
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
   }
 }
