@@ -23,12 +23,21 @@ const MODELS = [
   { label: 'Qwen3 32B', value: 'qwen3:32b' },
 ];
 
+const getPlatformClass = () => {
+  if (typeof navigator === 'undefined') return '';
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/.test(ua)) return 'platform-ios';
+  if (/Android/.test(ua)) return 'platform-android';
+  return '';
+};
+
 const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
   const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
   const navigate = useNavigate();
+  const platformClass = getPlatformClass();
 
   return (
-    <AntLayout className="app-layout">
+    <AntLayout className={`app-layout ${platformClass}`}>
       <div
         className="app-topbar"
         style={{

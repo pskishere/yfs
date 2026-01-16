@@ -115,6 +115,16 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
     }
   }, [open]);
 
+  const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+  const isAndroid = typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent || '');
+
+  const headerPaddingTop = (() => {
+    if (!isMobile) return '16px';
+    if (isIOS) return 'calc(16px + env(safe-area-inset-top))';
+    if (isAndroid) return 'calc(25px + env(safe-area-inset-top))';
+    return '16px';
+  })();
+
   return (
     <Drawer
       title={
@@ -129,7 +139,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
       open={open}
       styles={{
         header: {
-          paddingTop: isMobile ? 'calc(16px + env(safe-area-inset-top))' : '16px',
+          paddingTop: headerPaddingTop,
         },
         body: {
           paddingBottom: '16px',

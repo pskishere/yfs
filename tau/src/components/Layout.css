@@ -8,7 +8,15 @@
 
 .app-topbar {
   padding: 8px 12px;
+}
+
+.platform-ios .app-topbar {
   padding-top: calc(8px + env(safe-area-inset-top));
+}
+
+.platform-android .app-topbar {
+  padding-top: calc(25px + env(safe-area-inset-top));
+  padding-bottom: 4px;
 }
 
 .app-content {
