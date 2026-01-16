@@ -2,7 +2,7 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, notification, Modal, Input, Tooltip, Empty, Flex, Divider, GetRef, Dropdown, type MenuProps } from 'antd';
+import { Drawer, Button, notification, Modal, Input, Tooltip, Empty, Flex, Divider, GetRef, Dropdown, Tag, Space, type MenuProps } from 'antd';
 import { Sender, ThoughtChain, Suggestion, type SenderProps } from '@ant-design/x';
 import {
   StopOutlined,
@@ -19,6 +19,7 @@ import {
   BarChartOutlined,
   AppstoreOutlined,
   FileTextOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
 import { searchStocks, getHotStocks } from '../services/api';
@@ -38,7 +39,7 @@ interface ChatDrawerProps {
 interface ThoughtItem {
   key: string;
   title: string;
-  status: 'loading' | 'success' | 'error' | 'pending';
+  status: 'loading' | 'success' | 'error' | 'pending' | 'streaming';
 }
 
 interface MessageItem {
@@ -115,132 +116,135 @@ const MessageBubble: React.FC<{
         minWidth: 0 // 防止 flex 子元素溢出
       }}>
         <div style={{ display: 'flex', width: '100%', justifyContent: isUser ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 8 }}>
-          {/* 消息气泡 */}
-          <div
-            style={{
-              padding: '8px 12px',
-              borderRadius: 12,
-              background: isUser ? '#e6f7ff' : '#f5f5f5',
-              wordBreak: 'break-word',
-              flex: isUser ? '0 1 auto' : '1 1 auto',
-              maxWidth: '100%', // 确保气泡本身不溢出
-              minWidth: 0,      // 允许气泡缩小
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4
-            }}
-          >
-            {message.role === 'assistant' ? (
-              <div className="markdown-content">
-                {/* 思维链展示 */}
-                {message.thoughts && message.thoughts.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <ThoughtChain 
-                      items={message.thoughts.map(t => ({
-                        key: t.key,
-                        title: t.title,
-                        status: t.status === 'pending' ? 'loading' : t.status,
-                        icon: t.status === 'loading' ? <LoadingOutlined spin /> : 
-                               t.status === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : undefined
-                      }))} 
-                    />
-                  </div>
-                )}
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 8 }}>
+            {/* 思维链展示 - 移到气泡外 */}
+            {message.role === 'assistant' && message.thoughts && message.thoughts.length > 0 && (
+              <div style={{ marginBottom: 4, width: '100%' }}>
+                <ThoughtChain 
+                  items={message.thoughts.map(t => {
+                    const isLoading = t.status !== 'success' && t.status !== 'error';
+                    return {
+                      key: t.key,
+                      title: t.title || (isLoading ? '正在处理...' : ''),
+                      status: isLoading ? 'loading' : (t.status as any),
+                      icon: isLoading ? <LoadingOutlined spin /> : 
+                             t.status === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : undefined
+                    };
+                  })} 
+                />
+              </div>
+            )}
+            
+            {/* 消息气泡 */}
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: 12,
+                background: isUser ? '#e6f7ff' : '#f5f5f5',
+                wordBreak: 'break-word',
+                alignSelf: isUser ? 'flex-end' : 'flex-start',
+                maxWidth: '100%',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}
+            >
+              {message.role === 'assistant' ? (
+                <div className="markdown-content">
+                  {(message.status === 'streaming' || message.status === 'pending') && !message.content ? (
+                    <div className="thinking-dots">
+                      <span className="thinking-dot"></span>
+                      <span className="thinking-dot"></span>
+                      <span className="thinking-dot"></span>
+                    </div>
+                  ) : (
+                    <>
+                      {(() => {
+                        const content = message.content;
+                        const regex = /(?:<|\[)(?:stock-analysis|股票分析)\s+symbol=["']([^"']+)["']\s+module=["']([^"']+)["']\s*\/?(?:>|\])/gi;
+                        const parts = [];
+                        let lastIndex = 0;
+                        let match;
 
-                {(message.status === 'streaming' || message.status === 'pending') && !message.content && (!message.thoughts || message.thoughts.length === 0) ? (
-                  <div className="thinking-dots">
-                    <span className="thinking-dot"></span>
-                    <span className="thinking-dot"></span>
-                    <span className="thinking-dot"></span>
-                  </div>
-                ) : (
-                  <>
-                    {(() => {
-                      const content = message.content;
-                      // 匹配 <stock-analysis symbol="AAPL" module="price" />
-                      // 支持两种标签格式: <stock-analysis /> 和 [stock-analysis ]
-                      const regex = /(?:<|\[)(?:stock-analysis|股票分析)\s+symbol=["']([^"']+)["']\s+module=["']([^"']+)["']\s*\/?(?:>|\])/gi;
-                      const parts = [];
-                      let lastIndex = 0;
-                      let match;
+                        while ((match = regex.exec(content)) !== null) {
+                          if (match.index > lastIndex) {
+                            parts.push(
+                              <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
+                                {content.substring(lastIndex, match.index)}
+                              </ReactMarkdown>
+                            );
+                          }
 
-                      while ((match = regex.exec(content)) !== null) {
-                        if (match.index > lastIndex) {
+                          parts.push(
+                            <StockComponentRenderer
+                              key={`stock-${match.index}`}
+                              symbol={match[1]}
+                              module={match[2]}
+                            />
+                          );
+
+                          lastIndex = regex.lastIndex;
+                        }
+
+                        if (lastIndex < content.length) {
                           parts.push(
                             <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
-                              {content.substring(lastIndex, match.index)}
+                              {content.substring(lastIndex)}
                             </ReactMarkdown>
                           );
                         }
 
-                        parts.push(
-                          <StockComponentRenderer
-                            key={`stock-${match.index}`}
-                            symbol={match[1]}
-                            module={match[2]}
-                          />
+                        return parts.length > 0 ? parts : (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                         );
-
-                        lastIndex = regex.lastIndex;
-                      }
-
-                      if (lastIndex < content.length) {
-                        parts.push(
-                          <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
-                            {content.substring(lastIndex)}
-                          </ReactMarkdown>
-                        );
-                      }
-
-                      return parts.length > 0 ? parts : (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-                      );
-                    })()}
-                    {message.status === 'streaming' && message.content && (
-                      <span className="streaming-cursor"></span>
-                    )}
-                  </>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                {(() => {
-                  const content = message.content;
-                  const slashIndex = content.indexOf('/');
-                  const spaceIndex = content.indexOf(' ');
-                  
-                  if (slashIndex === 0 && spaceIndex !== -1) {
-                    const cmd = content.substring(1, spaceIndex);
-                    const rest = content.substring(spaceIndex + 1);
-                    const item = suggestionItems.find(i => i.value === cmd);
+                      })()}
+                      {message.status === 'streaming' && message.content && (
+                        <span className="streaming-cursor"></span>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                  {(() => {
+                    const content = message.content;
+                    const slashIndex = content.indexOf('/');
+                    const spaceIndex = content.indexOf(' ');
                     
-                    if (item) {
-                      return (
-                        <>
-                          <span style={{ 
-                            background: '#f6ffed', 
-                            border: '1px solid #b7eb8f', 
-                            color: '#389e0d',
-                            padding: '0 8px',
-                            borderRadius: 4,
-                            fontSize: 12,
-                            height: 22,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            flexShrink: 0
-                          }}>
-                            {item.label}
-                          </span>
-                          <span>{rest}</span>
-                        </>
-                      );
+                    if (slashIndex === 0 && spaceIndex !== -1) {
+                      const cmd = content.substring(1, spaceIndex);
+                      const rest = content.substring(spaceIndex + 1);
+                      const item = suggestionItems.find(i => i.value === cmd);
+                      
+                      if (item) {
+                        return (
+                          <>
+                            <span style={{ 
+                              background: '#f6ffed', 
+                              border: '1px solid #b7eb8f', 
+                              color: '#389e0d',
+                              padding: '0 8px',
+                              borderRadius: 4,
+                              fontSize: 12,
+                              height: 22,
+                              lineHeight: '20px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              flexShrink: 0
+                            }}>
+                              {item.label}
+                            </span>
+                            <span>{rest}</span>
+                          </>
+                        );
+                      }
                     }
-                  }
-                  return content;
-                })()}
-              </div>
-            )}
+                    return content;
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -248,26 +252,22 @@ const MessageBubble: React.FC<{
         <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginTop: 4 }}>
           {/* 用户消息：编辑按钮 */}
           {isUser && isCompleted && onEdit && (
-            <Tooltip title="编辑">
-              <Button
+            <Button
                 type="text"
                 size="small"
                 icon={<EditOutlined />}
                 onClick={() => onEdit(message)}
               />
-            </Tooltip>
           )}
 
           {/* AI消息：重新生成按钮 */}
           {!isUser && isCompleted && onRegenerate && !isStreaming && (
-            <Tooltip title="重新生成">
-              <Button
+            <Button
                 type="text"
                 size="small"
                 icon={<ReloadOutlined />}
                 onClick={() => onRegenerate(message.id)}
               />
-            </Tooltip>
           )}
         </div>
       </div>
@@ -287,7 +287,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const currentStreamingIdRef = useRef<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const senderRef = useRef<GetRef<typeof Sender>>(null);
   const [activeSkill, setActiveSkill] = useState<SenderProps['skill']>(undefined);
@@ -618,6 +617,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           role: msg.role,
           content: msg.content || '',
           status: msg.status || 'completed',
+          thoughts: msg.thoughts || [],
         }));
         setMessages(formattedMessages);
       },
@@ -778,6 +778,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             role: msg.role,
             content: msg.content || '',
             status: msg.status || 'completed',
+            thoughts: msg.thoughts || [],
           }));
           setMessages(formattedMessages);
         }
@@ -789,6 +790,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             role: msg.role,
             content: msg.content || '',
             status: msg.status || 'completed',
+            thoughts: msg.thoughts || [],
           }));
           setMessages(formattedMessages);
         }
@@ -882,6 +884,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     const finalSkill = skill || activeSkill;
     const fullMessage = finalSkill ? `/${finalSkill.value} ${message}` : message;
 
+    // 如果处于编辑模式
+    if (editingMessageId) {
+      const numId = parseInt(editingMessageId);
+      if (!isNaN(numId)) {
+        wsClient.editMessage(numId, fullMessage);
+      }
+      setEditingMessageId(null);
+      setInputText('');
+      senderRef.current?.clear?.();
+      setActiveSkill(undefined);
+      setSlotConfig(undefined);
+      return;
+    }
+
     const userMessage: MessageItem = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -919,7 +935,44 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleStartEdit = (message: MessageItem) => {
     setEditingMessageId(message.id);
-    setEditingContent(message.content);
+    
+    const content = message.content;
+    const slashIndex = content.indexOf('/');
+    const spaceIndex = content.indexOf(' ');
+    
+    // 检查是否是指令消息
+    if (slashIndex === 0 && spaceIndex !== -1) {
+      const cmd = content.substring(1, spaceIndex);
+      const rest = content.substring(spaceIndex + 1);
+      const item = suggestionItems.find(i => i.value === cmd);
+      
+      if (item) {
+        // 设置技能标签，但内容直接作为文本回填
+        setActiveSkill({
+          ...item.skill,
+          closable: {
+            onClose: () => {
+              setActiveSkill(undefined);
+              setSlotConfig(undefined);
+            }
+          }
+        } as any);
+        setInputText(rest);
+        setTimeout(scrollToBottom, 100);
+        return;
+      }
+    }
+
+    setInputText(content);
+    // 滚动到底部以确保输入框可见
+    setTimeout(scrollToBottom, 100);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setInputText('');
+    setActiveSkill(undefined);
+    setSlotConfig(undefined);
   };
 
   const handleCancel = () => {
@@ -978,6 +1031,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             background: '#fff',
           }}
         >
+          {editingMessageId && (
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'flex-end' }}>
+              <Tag 
+                color="blue" 
+                closable 
+                onClose={(e) => {
+                  e.preventDefault();
+                  handleCancelEdit();
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                取消编辑
+              </Tag>
+            </div>
+          )}
           <Sender
             ref={senderRef}
             className="chat-drawer-sender"
@@ -1108,35 +1176,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           />
         </div>
       </div>
-
-      <Modal
-        title="编辑消息"
-        open={!!editingMessageId}
-        onOk={() => {
-          if (editingMessageId) {
-            const messageId = parseInt(editingMessageId);
-            if (!isNaN(messageId)) {
-              wsClient.editMessage(messageId, editingContent);
-            }
-          }
-          setEditingMessageId(null);
-          setEditingContent('');
-        }}
-        onCancel={() => {
-          setEditingMessageId(null);
-          setEditingContent('');
-        }}
-        okText="确认"
-        cancelText="取消"
-        destroyOnClose
-      >
-        <Input.TextArea
-          value={editingContent}
-          onChange={(e) => setEditingContent(e.target.value)}
-          autoSize={{ minRows: 3, maxRows: 10 }}
-          placeholder="请输入编辑后的消息内容"
-        />
-      </Modal>
     </>
   );
 };

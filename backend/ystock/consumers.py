@@ -375,6 +375,7 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         """流式生成 AI 回复"""
         try:
             full_response = ""
+            current_thoughts = []
             
             async for chunk in self.agent_service.stream_chat(
                 session_id=self.session_id,
@@ -395,6 +396,25 @@ class StockChatConsumer(AsyncWebsocketConsumer):
                         'status': 'streaming'
                     })
                 elif chunk["type"] == "thought":
+                    # 更新本地思维链记录
+                    thought_data = {
+                        'key': chunk.get("tool"),
+                        'title': chunk["content"],
+                        'status': chunk["status"]
+                    }
+                    
+                    # 查找是否已存在该工具的记录
+                    existing_index = -1
+                    for i, t in enumerate(current_thoughts):
+                        if t.get('key') == thought_data['key']:
+                            existing_index = i
+                            break
+                    
+                    if existing_index > -1:
+                        current_thoughts[existing_index] = thought_data
+                    else:
+                        current_thoughts.append(thought_data)
+                    
                     # 发送思维链/工具调用信息
                     await self.send_json({
                         'type': 'thought',
@@ -405,8 +425,9 @@ class StockChatConsumer(AsyncWebsocketConsumer):
                     })
             
             if not self.should_cancel:
-                # 保存完整回复
+                # 保存完整回复和思维链
                 await self.update_message_content(message_id, full_response)
+                await self.update_message_thoughts(message_id, current_thoughts)
                 await self.update_message_status(message_id, 'completed')
                 
                 await self.send_json({
@@ -419,6 +440,8 @@ class StockChatConsumer(AsyncWebsocketConsumer):
                 # 保存部分回复（如果有的话）
                 if full_response:
                     await self.update_message_content(message_id, full_response)
+                if current_thoughts:
+                    await self.update_message_thoughts(message_id, current_thoughts)
                     
         except asyncio.CancelledError:
             # 任务被取消
@@ -504,6 +527,11 @@ class StockChatConsumer(AsyncWebsocketConsumer):
     def update_message_content(self, message_id: int, content: str):
         """更新消息内容"""
         ChatMessage.objects.filter(id=message_id).update(content=content)
+    
+    @database_sync_to_async
+    def update_message_thoughts(self, message_id: int, thoughts: list):
+        """更新消息思维链"""
+        ChatMessage.objects.filter(id=message_id).update(thoughts=thoughts)
     
     @database_sync_to_async
     def update_message_status(self, message_id: int, status: str, error_msg: Optional[str] = None):

@@ -78,7 +78,8 @@ class StockMemory:
             ChatMessage.objects.create(
                 session=self.session,
                 role='assistant',
-                content=ai_output
+                content=ai_output,
+                thoughts=outputs.get('thoughts', [])
             )
 
     def load_memory_variables(self, inputs: Dict[str, str]) -> Dict[str, str]:
@@ -401,6 +402,7 @@ class StockAIAgent:
                     'role': msg.role,
                     'content': msg.content,
                     'status': msg.status,
+                    'thoughts': msg.thoughts,
                     'metadata': msg.metadata,
                     'created_at': msg.created_at.isoformat()
                 })

@@ -147,6 +147,7 @@ class ChatMessage(models.Model):
     parent_message = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='children', verbose_name='父消息')
     error_message = models.TextField(blank=True, null=True, verbose_name='错误信息')
     feedback = models.IntegerField(default=0, verbose_name='反馈')  # -1: 点踩, 0: 无, 1: 点赞
+    thoughts = models.JSONField(default=list, blank=True, verbose_name='思考过程')
     metadata = models.JSONField(default=dict, blank=True, verbose_name='元数据（如引用的股票代码、指标数据等）')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
