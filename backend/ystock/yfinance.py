@@ -364,6 +364,10 @@ def _format_historical_data(df: pd.DataFrame):
     has_volume = 'Volume' in df.columns
     
     for date, row in df.iterrows():
+        # 检查 OHLC 是否有效，如果无效则跳过
+        if pd.isna(row['Open']) or pd.isna(row['High']) or pd.isna(row['Low']) or pd.isna(row['Close']):
+            continue
+
         date_str = date.strftime('%Y%m%d')
         if pd.notna(date.hour):
             date_str = date.strftime('%Y%m%d %H:%M:%S')

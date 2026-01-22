@@ -2,6 +2,7 @@
 服务层模块 - 处理股票分析业务逻辑
 """
 import logging
+import math
 from typing import Any, Dict, Tuple, List
 
 from django.db import transaction
@@ -407,6 +408,18 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
                     if not date_val:
                         continue
                     
+                    # 检查 OHLC 是否有效
+                    open_val = row.get('open')
+                    high_val = row.get('high')
+                    low_val = row.get('low')
+                    close_val = row.get('close')
+                    
+                    # 过滤掉 None 或 NaN/Inf
+                    if any(val is None or (isinstance(val, float) and (math.isnan(val) or math.isinf(val))) 
+                           for val in [open_val, high_val, low_val, close_val]):
+                        logger.warning(f"跳过无效 K线数据: {symbol} {date_val} open={open_val} high={high_val} low={low_val} close={close_val}")
+                        continue
+                    
                     vol = row.get('volume', 0)
                     try:
                         vol = int(vol)
@@ -417,10 +430,10 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
                         stock=stock,
                         date=date_val,
                         period=bar_size,
-                        open=row.get('open', 0.0),
-                        high=row.get('high', 0.0),
-                        low=row.get('low', 0.0),
-                        close=row.get('close', 0.0),
+                        open=open_val,
+                        high=high_val,
+                        low=low_val,
+                        close=close_val,
                         volume=vol
                     ))
                 
