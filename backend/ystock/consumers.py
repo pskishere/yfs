@@ -442,8 +442,9 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             'status': 'pending'
         }
         
-        if parent_id:
-            params['parent_message_id'] = parent_id
+        # 模型暂不支持 parent_message_id，忽略 parent_id 参数
+        # if parent_id:
+        #     params['parent_message_id'] = parent_id
             
         message = ChatMessage.objects.create(**params)
         return message.id
@@ -540,8 +541,10 @@ class StockChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_parent_user_message(self, message: ChatMessage) -> Optional[ChatMessage]:
         """获取父用户消息"""
-        if message.parent_message:
-            return message.parent_message
+        # 模型暂不支持 parent_message 字段
+        # if message.parent_message:
+        #     return message.parent_message
+        
         # 如果没有父消息，找到前一条用户消息
         previous_msg = ChatMessage.objects.filter(
             session=message.session,

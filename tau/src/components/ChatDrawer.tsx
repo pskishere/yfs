@@ -787,7 +787,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       }
       setEditingMessageId(null);
       setInputText('');
-      senderRef.current?.clear?.();
       setActiveSkill(undefined);
       setSlotConfig(undefined);
       return;
@@ -811,7 +810,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     currentStreamingIdRef.current = aiPlaceholder.id;
     setIsStreaming(true);
     setInputText('');
-    senderRef.current?.clear?.();
 
     // 发送到服务器
     wsClient.sendMessage(fullMessage);
