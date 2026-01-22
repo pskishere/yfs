@@ -7,7 +7,7 @@ interface ChatPageProps {
 }
 
 const ChatPage: React.FC<ChatPageProps> = ({ model }) => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentChatSessionId, setCurrentChatSessionId] = useState<string | undefined>(undefined);
 
   // 监听 URL 中的 session 参数
@@ -39,7 +39,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ model }) => {
           sessionId={currentChatSessionId}
           model={model}
           onSessionCreated={(sessionId) => {
-            setCurrentChatSessionId(sessionId);
+            setSearchParams({ session: sessionId });
           }}
         />
       </div>

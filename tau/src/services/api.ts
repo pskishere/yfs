@@ -5,10 +5,9 @@ import axios, { type AxiosResponse } from 'axios';
 import type {
   ApiResponse,
   AnalysisResult,
-  HotStock,
-  IndicatorInfoResponse,
-  NewsItem,
+  SubscriptionStock,
   OptionsData,
+  IndicatorInfoResponse,
 } from '../types/index';
 
 // API基础URL
@@ -110,20 +109,26 @@ const handleError = (error: any): never => {
  * @param symbol - 股票代码
  * @param duration - 数据周期，默认 '5y'
  * @param barSize - K线周期，默认 '1 day'
+ * @param modules - 需要加载的模块列表 (可选)
  */
 export const analyze = async (
   symbol: string,
   duration: string = '5y',
-  barSize: string = '1 day'
+  barSize: string = '1 day',
+  modules: string[] = []
 ): Promise<AnalysisResult> => {
   try {
     const params = new URLSearchParams({
       duration: duration,
       bar_size: barSize,
     });
+    
+    if (modules && modules.length > 0) {
+      params.append('modules', modules.join(','));
+    }
 
     const response = await api.get<AnalysisResult>(
-      `/api/analyze/${symbol.toUpperCase()}?${params.toString()}`,
+      `/api/stocks/${symbol.toUpperCase()}/?${params.toString()}`,
       {
         timeout: 60000, // 数据获取超时时间60秒
       }
@@ -149,7 +154,7 @@ export const getAnalysisStatus = async (
       bar_size: barSize,
     });
     const response = await api.get<AnalysisResult>(
-      `/api/analysis-status/${symbol.toUpperCase()}?${params.toString()}`
+      `/api/stocks/${symbol.toUpperCase()}/status/?${params.toString()}`
     );
     return handleResponse<AnalysisResult>(response) as AnalysisResult;
   } catch (error) {
@@ -159,60 +164,12 @@ export const getAnalysisStatus = async (
 };
 
 /**
- * AI分析 - 基于已保存的数据执行AI分析
- * 需要先调用 analyze 接口获取数据并保存到数据库
- * @param symbol - 股票代码
- * @param duration - 数据周期，默认 '5y'
- * @param barSize - K线周期，默认 '1 day'
- * @param model - AI模型名称，默认 'deepseek-v3.1:671b-cloud'
+ * 获取订阅股票列表（仅美股）
  */
-export const aiAnalyze = async (
-  symbol: string,
-  duration: string = '5y',
-  barSize: string = '1 day',
-  model: string = 'deepseek-v3.1:671b-cloud'
-): Promise<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string; status?: string }> => {
+export const getSubscriptions = async (): Promise<ApiResponse<SubscriptionStock[]>> => {
   try {
-    const params = new URLSearchParams({
-      duration: duration,
-      bar_size: barSize,
-      model: model,
-    });
-
-    const response = await api.post<{ success: boolean; ai_analysis?: string; model?: string; ai_available?: boolean; cached?: boolean; message?: string; status?: string }>(
-      `/api/ai-analyze/${symbol.toUpperCase()}?${params.toString()}`,
-      {},
-      {
-        timeout: 10000, // 缩短超时时间，因为现在会立即返回
-      }
-    );
-    return handleResponse(response);
-  } catch (error: any) {
-    // 如果是 202 状态码（Accepted），表示任务已开始，返回进行中状态
-    if (error?.response?.status === 202) {
-      return {
-        success: false,
-        message: error?.response?.data?.message || 'AI分析已开始，请稍后查询结果',
-        status: 'running',
-      };
-    }
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 获取热门股票列表（仅美股）
- * @param limit - 返回数量限制，默认 20
- */
-export const getHotStocks = async (limit: number = 20): Promise<ApiResponse<HotStock[]>> => {
-  try {
-    const params = new URLSearchParams({
-      limit: limit.toString(),
-    });
-
-    const response = await api.get<ApiResponse<HotStock[]>>(
-      `/api/hot-stocks?${params.toString()}`
+    const response = await api.get<ApiResponse<SubscriptionStock[]>>(
+      `/api/stocks/subscriptions/`
     );
     return handleResponse(response);
   } catch (error) {
@@ -313,20 +270,7 @@ export interface ChatSession {
  */
 export const getOptions = async (symbol: string): Promise<ApiResponse<OptionsData>> => {
   try {
-    const response = await api.get<ApiResponse<OptionsData>>(`/api/options/${symbol.toUpperCase()}`);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 获取股票新闻
- */
-export const getNews = async (symbol: string): Promise<ApiResponse<NewsItem[]>> => {
-  try {
-    const response = await api.get<ApiResponse<NewsItem[]>>(`/api/news/${symbol.toUpperCase()}`);
+    const response = await api.get<ApiResponse<OptionsData>>(`/api/stocks/${symbol.toUpperCase()}/options/`);
     return handleResponse(response);
   } catch (error) {
     handleError(error);
@@ -341,7 +285,7 @@ export const getNews = async (symbol: string): Promise<ApiResponse<NewsItem[]>> 
 export const searchStocks = async (query: string): Promise<{ success: boolean; results: any[] }> => {
   try {
     const params = new URLSearchParams({ q: query });
-    const response = await api.get(`/api/search?${params.toString()}`);
+    const response = await api.get(`/api/stocks/search/?${params.toString()}`);
     const data = handleResponse(response);
     return { success: data.success, results: data.results || [] };
   } catch (error) {
@@ -355,7 +299,7 @@ export const searchStocks = async (query: string): Promise<{ success: boolean; r
  */
 export const getChatSessions = async (): Promise<ChatSession[]> => {
   try {
-    const response = await api.get('/api/chat/sessions');
+    const response = await api.get('/api/chat/sessions/');
     return response.data.sessions;
   } catch (error) {
     handleError(error);
@@ -369,7 +313,7 @@ export const getChatSessions = async (): Promise<ChatSession[]> => {
  */
 export const createChatSession = async (model?: string): Promise<ChatSession> => {
   try {
-    const response = await api.post('/api/chat/sessions', { model });
+    const response = await api.post('/api/chat/sessions/', { model });
     return response.data.session;
   } catch (error) {
     handleError(error);
@@ -382,7 +326,7 @@ export const createChatSession = async (model?: string): Promise<ChatSession> =>
  */
 export const getChatSessionDetail = async (sessionId: string) => {
   try {
-    const response = await api.get(`/api/chat/sessions/${sessionId}`);
+    const response = await api.get(`/api/chat/sessions/${sessionId}/`);
     return response.data.session;
   } catch (error) {
     handleError(error);
@@ -395,7 +339,7 @@ export const getChatSessionDetail = async (sessionId: string) => {
  */
 export const deleteChatSession = async (sessionId: string): Promise<void> => {
   try {
-    await api.delete(`/api/chat/sessions/${sessionId}/delete`);
+    await api.delete(`/api/chat/sessions/${sessionId}/`);
   } catch (error) {
     handleError(error);
     throw error;

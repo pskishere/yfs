@@ -134,7 +134,6 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
         </Space>
       }
       placement="left"
-      width={isMobile ? '100%' : 360}
       onClose={onClose}
       open={open}
       styles={{
@@ -144,6 +143,9 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
         body: {
           paddingBottom: '16px',
         },
+        wrapper: {
+          width: isMobile ? '100%' : 360
+        }
       }}
       extra={
         <Space>

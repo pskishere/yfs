@@ -15,8 +15,8 @@ from langgraph.prebuilt import ToolNode
 from typing import TypedDict, Annotated, Sequence, Union
 import operator
 
-from .models import ChatSession, ChatMessage, StockAnalysis
-from .tools import STOCKS_TOOLS, get_technical_indicators, get_stock_news, get_fundamental_data, get_cycle_analysis
+from .models import ChatSession, ChatMessage
+from .tools import STOCKS_TOOLS, get_cycle_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -159,27 +159,19 @@ class StockAIAgent:
 - **重要：可视化展示**：你可以通过在回复中插入特定的标签来展示专业的可视化组件。
   - 标签格式：`<stock-analysis symbol="股票代码" module="模块名称" />`
   - 可用模块名称：
-    - `price`: 价格信息（当前价格、涨跌幅、高低价等）
-    - `indicators`: 技术指标（RSI, MACD, KDJ 等详细数值）
     - `chart`: K线图表
-    - `fundamental`: 基本面数据（市值、市盈率、收入等）
-    - `market`: 市场行情（成交量、平均成交量等）
     - `cycle`: 周期分析（短期、中期、长期趋势）
-    - `pivot`: 枢轴点（支撑位与阻力位）
     - `options`: 期权链数据（行权价、隐含波动率等）
   - **触发规则**：
-    - 提及价格/走势：必须包含 `price` 和 `chart`。
-    - 询问技术指标/买卖点：必须包含 `indicators` 和 `chart`。
-    - 询问公司价值/财务：必须包含 `fundamental`。
+    - 提及价格/走势：必须包含 `chart`。
     - 询问期权/波动率：必须包含 `options`。
-    - 综合诊断：应包含 `price`, `chart`, `indicators`, `fundamental`, `cycle`。
+    - 综合诊断：应包含 `chart`, `cycle`。
   - **指令响应**：
-176→    - 如果用户输入类似 `/{{module}} {{symbol}}` 的指令（如 `/价格 AAPL`、`/图表 AAPL`、`/指标 700.HK` 等），请**立即调用相关工具**获取数据，并**仅返回**对应的可视化标签（如 `<stock-analysis symbol="AAPL" module="价格" />`），无需多余文字解释，除非数据获取失败。
+    - 如果用户输入类似 `/{{module}} {{symbol}}` 的指令（如 `/图表 AAPL`、`/周期 AAPL` 等），请**立即调用相关工具**获取数据，并**仅返回**对应的可视化标签（如 `<stock-analysis symbol="AAPL" module="图表" />`），无需多余文字解释，除非数据获取失败。
   - **组合建议**：
-    - 基础分析：`price` + `chart`
-    - 技术分析：`chart` + `indicators` + `pivot`
-    - 全方位分析：`price` + `chart` + `indicators` + `fundamental` + `cycle`
-  - 示例：当你分析 AAPL 的价格时，可以在文字描述后加上 `<stock-analysis symbol="AAPL" module="price" />`。你可以一次性插入多个模块，每个模块占一行。"""
+    - 基础分析：`chart`
+    - 全方位分析：`chart` + `cycle`
+  - 示例：当你分析 AAPL 的走势时，可以在文字描述后加上 `<stock-analysis symbol="AAPL" module="chart" />`。你可以一次性插入多个模块，每个模块占一行。"""
         
         # 初始化工作流
         self._build_workflow()
@@ -322,9 +314,15 @@ class StockAIAgent:
         }
         
         # 使用 astream_events 来捕获流式输出
+        print(f"Starting workflow for session: {session_id}")
         async for event in self.app.astream_events(initial_state, version="v1"):
             kind = event["event"]
             
+            # 打印关键事件日志
+            if kind in ["on_chain_start", "on_chain_end", "on_chat_model_start", "on_tool_start", "on_tool_end"]:
+                node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
+                print(f"Workflow Event: {kind} | Name: {event.get('name')} | Node: {node_name}")
+
             # 当 agent 节点正在流式生成内容时
             if kind == "on_chat_model_stream" and event["metadata"].get("langgraph_node") == "agent":
                 content = event["data"]["chunk"].content
@@ -375,8 +373,7 @@ class StockAIAgent:
         """
         session_id = str(uuid.uuid4())
         ChatSession.objects.create(
-            session_id=session_id,
-            model=model
+            session_id=session_id
         )
         return session_id
     

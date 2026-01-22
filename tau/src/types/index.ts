@@ -248,17 +248,13 @@ export interface AnalysisResult {
   indicators: Indicators;
   signals?: Signals;
   candles?: Candle[];
-  ai_analysis?: string;
-  ai_available?: boolean;
-  model?: string;
-  ai_error?: string;
   [key: string]: any;
 }
 
 /**
- * 热门股票
+ * 订阅股票
  */
-export interface HotStock {
+export interface SubscriptionStock {
   symbol: string;
   name: string;
   category: string;

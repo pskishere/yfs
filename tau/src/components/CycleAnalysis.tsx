@@ -2,15 +2,13 @@
  * 周期分析组件
  */
 import React, { useState } from 'react';
-import { Collapse, Descriptions, Space, Tag, Tabs, Table } from 'antd';
-import { BarChartOutlined } from '@ant-design/icons';
+import { Tag, Tabs, Table } from 'antd';
 import type { AnalysisResult } from '../types/index';
 import { formatValue } from '../utils/formatters';
 
 interface CycleAnalysisProps {
   analysisResult: AnalysisResult;
   currencySymbol: string;
-  createIndicatorLabel: (label: string, indicatorKey: string) => React.ReactNode;
 }
 
 /**
@@ -19,7 +17,6 @@ interface CycleAnalysisProps {
 export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
   analysisResult,
   currencySymbol,
-  createIndicatorLabel,
 }) => {
   const formatCurrency = (value?: number, decimals: number = 2) =>
     `${currencySymbol}${formatValue(value ?? 0, decimals)}`;
@@ -39,264 +36,7 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
     return null;
   }
 
-  /**
-   * 渲染周期概述信息
-   */
-  const renderCycleOverview = () => {
-    const items = [];
 
-    // 平均周期
-    if (indicators.avg_cycle_length !== undefined) {
-      items.push({
-        label: '平均周期',
-        children: (
-          <span style={{ fontSize: 14, fontWeight: 500 }}>
-            {indicators.avg_cycle_length.toFixed(1)}天
-          </span>
-        ),
-      });
-    }
-
-    // 周期稳定性评估
-    if (indicators.cycle_stability) {
-      items.push({
-        label: '周期稳定性',
-        children: (
-          <Space size="small" orientation="vertical">
-            <Tag
-              color={
-                indicators.cycle_stability === 'high' ? 'success' :
-                  indicators.cycle_stability === 'medium' ? 'default' :
-                    indicators.cycle_stability === 'low' ? 'warning' : 'error'
-              }
-              style={{ fontSize: 12 }}
-            >
-              {indicators.cycle_stability === 'high' ? '非常稳定' :
-                indicators.cycle_stability === 'medium' ? '较为稳定' :
-                  indicators.cycle_stability === 'low' ? '不够稳定' : '不稳定'}
-            </Tag>
-            {indicators.cycle_stability_desc && (
-              <span style={{ fontSize: 11, color: '#999' }}>
-                {indicators.cycle_stability_desc}
-              </span>
-            )}
-          </Space>
-        ),
-      });
-    }
-
-    // 横盘判断或当前阶段
-    if (indicators.sideways_market !== undefined) {
-      if (indicators.sideways_market) {
-        // 横盘状态
-        items.push({
-          label: '市场状态',
-          children: (
-            <Space size="small" direction="vertical" style={{ width: '100%' }}>
-              <Tag color="orange" style={{ fontSize: 12 }}>横盘</Tag>
-              {indicators.sideways_strength !== undefined && (
-                <span style={{ fontSize: 11, color: '#999' }}>
-                  强度: {(indicators.sideways_strength * 100).toFixed(0)}%
-                </span>
-              )}
-              {indicators.sideways_amplitude_20 !== undefined && (
-                <div style={{ fontSize: 11, color: '#666' }}>
-                  20日振幅: {indicators.sideways_amplitude_20.toFixed(2)}%
-                </div>
-              )}
-              {indicators.sideways_price_change_pct !== undefined && (
-                <div style={{ fontSize: 11, color: '#666' }}>
-                  20日价格变化: {indicators.sideways_price_change_pct.toFixed(2)}%
-                </div>
-              )}
-              {indicators.sideways_price_range_pct !== undefined && (
-                <div style={{ fontSize: 11, color: '#666' }}>
-                  波动范围: {indicators.sideways_price_range_pct.toFixed(2)}%
-                </div>
-              )}
-            </Space>
-          ),
-        });
-      } else if (indicators.cycle_phase) {
-        // 上涨或下跌阶段
-        items.push({
-          label: '市场状态',
-          children: (
-            <Space size="small" orientation="vertical">
-              <Tag
-                color={
-                  indicators.cycle_phase === 'early_rise' ? 'success' :
-                    indicators.cycle_phase === 'mid_rise' ? 'default' :
-                      indicators.cycle_phase === 'late_rise' ? 'warning' : 'error'
-                }
-                style={{ fontSize: 12 }}
-              >
-                {indicators.cycle_phase === 'early_rise' ? '早期上涨' :
-                  indicators.cycle_phase === 'mid_rise' ? '中期上涨' :
-                    indicators.cycle_phase === 'late_rise' ? '后期上涨' : '下跌'}
-              </Tag>
-              {indicators.cycle_phase_desc && (
-                <span style={{ fontSize: 11, color: '#999' }}>
-                  {indicators.cycle_phase_desc}
-                </span>
-              )}
-              {indicators.cycle_position !== undefined && (
-                <div style={{ fontSize: 11, color: '#999' }}>
-                  周期进度: {(indicators.cycle_position * 100).toFixed(0)}%
-                  {indicators.days_from_last_trough !== undefined && (
-                    <span style={{ marginLeft: 4 }}>
-                      (距低点{indicators.days_from_last_trough}天)
-                    </span>
-                  )}
-                </div>
-              )}
-            </Space>
-          ),
-        });
-      }
-    } else if (indicators.cycle_phase) {
-      // 如果没有横盘判断但有阶段信息
-      items.push({
-        label: '市场状态',
-        children: (
-          <Space size="small" orientation="vertical">
-            <Tag
-              color={
-                indicators.cycle_phase === 'early_rise' ? 'success' :
-                  indicators.cycle_phase === 'mid_rise' ? 'default' :
-                    indicators.cycle_phase === 'late_rise' ? 'warning' : 'error'
-              }
-              style={{ fontSize: 12 }}
-            >
-              {indicators.cycle_phase === 'early_rise' ? '早期上涨' :
-                indicators.cycle_phase === 'mid_rise' ? '中期上涨' :
-                  indicators.cycle_phase === 'late_rise' ? '后期上涨' : '下跌'}
-            </Tag>
-            {indicators.cycle_phase_desc && (
-              <span style={{ fontSize: 11, color: '#999' }}>
-                {indicators.cycle_phase_desc}
-              </span>
-            )}
-            {indicators.cycle_position !== undefined && (
-              <div style={{ fontSize: 11, color: '#999' }}>
-                周期进度: {(indicators.cycle_position * 100).toFixed(0)}%
-                {indicators.days_from_last_trough !== undefined && (
-                  <span style={{ marginLeft: 4 }}>
-                    (距低点{indicators.days_from_last_trough}天)
-                  </span>
-                )}
-              </div>
-            )}
-          </Space>
-        ),
-      });
-    }
-
-    // 多周期检测
-    if (indicators.short_cycles || indicators.medium_cycles || indicators.long_cycles) {
-      items.push({
-        label: '多周期检测',
-        span: 3,
-        children: (
-          <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-            {indicators.short_cycles && indicators.short_cycles.length > 0 && (
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>短周期: </span>
-                {indicators.short_cycles.map((cycle, idx) => (
-                  <Tag key={idx} style={{ marginRight: 4 }}>
-                    {cycle}天
-                  </Tag>
-                ))}
-                {indicators.short_cycle_strength !== undefined && (
-                  <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
-                    强度: {(indicators.short_cycle_strength * 100).toFixed(0)}%
-                  </span>
-                )}
-              </div>
-            )}
-            {indicators.medium_cycles && indicators.medium_cycles.length > 0 && (
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>中周期: </span>
-                {indicators.medium_cycles.map((cycle, idx) => (
-                  <Tag key={idx} color="blue" style={{ marginRight: 4 }}>
-                    {cycle}天
-                  </Tag>
-                ))}
-                {indicators.medium_cycle_strength !== undefined && (
-                  <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
-                    强度: {(indicators.medium_cycle_strength * 100).toFixed(0)}%
-                  </span>
-                )}
-              </div>
-            )}
-            {indicators.long_cycles && indicators.long_cycles.length > 0 && (
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>长周期: </span>
-                {indicators.long_cycles.map((cycle, idx) => (
-                  <Tag key={idx} color="purple" style={{ marginRight: 4 }}>
-                    {cycle}天
-                  </Tag>
-                ))}
-                {indicators.long_cycle_strength !== undefined && (
-                  <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
-                    强度: {(indicators.long_cycle_strength * 100).toFixed(0)}%
-                  </span>
-                )}
-              </div>
-            )}
-          </Space>
-        ),
-      });
-    }
-
-    // 周期振幅
-    if (indicators.avg_cycle_amplitude !== undefined) {
-      items.push({
-        label: '周期振幅',
-        children: (
-          <Space orientation="vertical" size="small">
-            <span style={{ fontSize: 14, fontWeight: 500 }}>
-              平均: {indicators.avg_cycle_amplitude.toFixed(2)}%
-            </span>
-            {indicators.max_cycle_amplitude !== undefined && indicators.min_cycle_amplitude !== undefined && (
-              <span style={{ fontSize: 12, color: '#999' }}>
-                范围: {indicators.min_cycle_amplitude.toFixed(2)}% - {indicators.max_cycle_amplitude.toFixed(2)}%
-              </span>
-            )}
-          </Space>
-        ),
-      });
-    }
-
-    // 统计信息
-    if (indicators.peak_count !== undefined || indicators.trough_count !== undefined) {
-      items.push({
-        label: '统计信息',
-        children: (
-          <Space orientation="vertical" size="small">
-            <span style={{ fontSize: 13 }}>
-              高点: <strong>{indicators.peak_count || 0}</strong>个
-            </span>
-            <span style={{ fontSize: 13 }}>
-              低点: <strong>{indicators.trough_count || 0}</strong>个
-            </span>
-            {indicators.avg_peak_period !== undefined && (
-              <span style={{ fontSize: 12, color: '#999' }}>
-                高点平均周期: {indicators.avg_peak_period.toFixed(1)}天
-              </span>
-            )}
-            {indicators.avg_trough_period !== undefined && (
-              <span style={{ fontSize: 12, color: '#999' }}>
-                低点平均周期: {indicators.avg_trough_period.toFixed(1)}天
-              </span>
-            )}
-          </Space>
-        ),
-      });
-    }
-
-    return items;
-  };
 
   /**
    * 渲染周期时间段表格
@@ -339,14 +79,14 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
               key: 'start_time',
               width: 120,
               render: (_: any, record: any) => {
-                const timeStr = record.start_time;
+                const timeStr = record.start_time || record.startTime;
                 if (timeStr) {
-                  return timeStr.split('T')[0].split(' ')[0];
+                  return String(timeStr).split('T')[0].split(' ')[0];
                 }
-                if (analysisResult.candles && record.start_index < analysisResult.candles.length) {
+                if (analysisResult.candles && record.start_index !== undefined && record.start_index < analysisResult.candles.length) {
                   const candle = analysisResult.candles[record.start_index];
                   if (candle && candle.time) {
-                    return candle.time.split('T')[0].split(' ')[0];
+                    return String(candle.time).split('T')[0].split(' ')[0];
                   }
                 }
                 return '-';
@@ -384,14 +124,14 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
               key: 'end_time',
               width: 120,
               render: (_: any, record: any) => {
-                const timeStr = record.end_time;
+                const timeStr = record.end_time || record.endTime;
                 if (timeStr) {
-                  return timeStr.split('T')[0].split(' ')[0];
+                  return String(timeStr).split('T')[0].split(' ')[0];
                 }
-                if (analysisResult.candles && record.end_index < analysisResult.candles.length) {
+                if (analysisResult.candles && record.end_index !== undefined && record.end_index < analysisResult.candles.length) {
                   const candle = analysisResult.candles[record.end_index];
                   if (candle && candle.time) {
-                    return candle.time.split('T')[0].split(' ')[0];
+                    return String(candle.time).split('T')[0].split(' ')[0];
                   }
                 }
                 return '-';
@@ -855,47 +595,17 @@ export const CycleAnalysis: React.FC<CycleAnalysisProps> = ({
 
   return (
     <div id="section-cycle">
-      <Collapse
-        ghost
-        defaultActiveKey={[]}
-        items={[{
-          key: 'cycle',
-          label: (
-            <span>
-              <BarChartOutlined style={{ marginRight: 8 }} />
-              {createIndicatorLabel('周期分析', 'cycle')}
-              {indicators.cycle_summary && (
-                <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
-                  {indicators.cycle_summary}
-                </span>
-              )}
-            </span>
-          ),
-          children: (
-            <div>
-              {/* 周期概述 */}
-              <Descriptions
-                bordered
-                column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
-                size="small"
-                layout="horizontal"
-                items={renderCycleOverview()}
-              />
-              
-              {/* 周期表格 */}
-              {tabItems.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <Tabs
-                    defaultActiveKey="cycle-periods"
-                    items={tabItems}
-                  />
-                </div>
-              )}
-            </div>
-          ),
-        }]}
-        style={{ marginTop: 0 }}
-      />
+      <div>
+        {/* 周期表格 */}
+        {tabItems.length > 0 && (
+          <div style={{ marginTop: 0 }}>
+            <Tabs
+              defaultActiveKey="cycle-periods"
+              items={tabItems}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

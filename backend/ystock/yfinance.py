@@ -96,7 +96,9 @@ def get_stock_info(symbol: str):
         currency_code = _resolve_currency_code(info, ticker)
         currency_symbol = _resolve_currency_symbol(currency_code)
 
-        return {
+        # 返回完整信息以便调用方筛选，同时保留已处理字段
+        result = info.copy()
+        result.update({
             'symbol': symbol,
             'longName': info.get('longName', info.get('shortName', symbol)),
             'shortName': info.get('shortName', ''),
@@ -107,7 +109,8 @@ def get_stock_info(symbol: str):
             'regularMarketPrice': info.get('regularMarketPrice', 0),
             'fiftyTwoWeekHigh': info.get('fiftyTwoWeekHigh', 0),
             'fiftyTwoWeekLow': info.get('fiftyTwoWeekLow', 0),
-        }
+        })
+        return result
     except Exception as e:
         logger.error(f"获取股票信息失败: {symbol}, 错误: {e}")
         return None
@@ -115,7 +118,7 @@ def get_stock_info(symbol: str):
 
 def search_symbols(query: str) -> List[Dict[str, Any]]:
     """
-    通过查询关键词搜索股票代码 (结合本地缓存与 Yahoo Finance)
+    通过查询关键词搜索股票代码 (仅从 Yahoo Finance 获取)
     
     Args:
         query: 关键词，如 "Apple", "腾讯", "AAPL"
@@ -125,30 +128,7 @@ def search_symbols(query: str) -> List[Dict[str, Any]]:
     """
     results = []
     
-    # 1. 优先搜索本地数据库 (StockInfo)
-    try:
-        from .models import StockInfo
-        # 搜索代码或名称包含关键词的股票
-        local_stocks = StockInfo.objects.filter(
-            models.Q(symbol__icontains=query) | models.Q(name__icontains=query)
-        )[:10]
-        
-        for stock in local_stocks:
-            results.append({
-                'symbol': stock.symbol,
-                'name': stock.name,
-                'exchange': 'Local',
-                'type': 'EQUITY',
-                'category': 'Cached',
-                'score': 1000  # 本地匹配权重最高
-            })
-            
-        if len(results) >= 5:
-            return results
-    except Exception as e:
-        logger.debug(f"本地搜索失败: {e}")
-
-    # 2. 如果本地结果不足，尝试从 Yahoo Finance 获取
+    # 尝试从 Yahoo Finance 获取
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -163,11 +143,9 @@ def search_symbols(query: str) -> List[Dict[str, Any]]:
             data = response.json()
             quotes = data.get('quotes', [])
             
-            # 合并结果，避免重复
-            seen_symbols = {r['symbol'] for r in results}
             for quote_item in quotes:
                 symbol = quote_item.get('symbol')
-                if symbol and symbol not in seen_symbols:
+                if symbol:
                     results.append({
                         'symbol': symbol,
                         'name': quote_item.get('longname') or quote_item.get('shortname'),
@@ -179,7 +157,7 @@ def search_symbols(query: str) -> List[Dict[str, Any]]:
             if results:
                 return results
 
-        # 3. 回退到 yf.Search (虽然它可能也会被 rate limit)
+        # 回退到 yf.Search (虽然它可能也会被 rate limit)
         if not results:
             search = yf.Search(query, max_results=10)
             if search.quotes:
@@ -303,7 +281,7 @@ def _calculate_period_from_duration(duration: str) -> str:
     duration是最大值，但至少2年起步
     
     Args:
-        duration: 数据周期，如 '1 M', '3 M', '1 Y', '2 Y'
+        duration: 数据周期，如 '1M', '3M', '1Y', '2Y'
     
     Returns:
         yfinance的period字符串，如 '2y', '3y'等
@@ -313,6 +291,10 @@ def _calculate_period_from_duration(duration: str) -> str:
         if 'Y' in duration:
             years = int(duration.replace('Y', '').strip())
             return f"{max(years, 2)}y"
+        elif 'MO' in duration:
+            months = int(duration.replace('MO', '').strip())
+            years = max((months / 12), 2)
+            return f"{int(years)}y"
         elif 'M' in duration:
             months = int(duration.replace('M', '').strip())
             years = max((months / 12), 2)
@@ -338,7 +320,7 @@ def _filter_by_duration(df: pd.DataFrame, duration: str) -> pd.DataFrame:
     
     Args:
         df: 完整的历史数据DataFrame
-        duration: 数据周期，如 '1 M', '3 M', '1 Y'
+        duration: 数据周期，如 '1M', '3M', '1Y'
     
     Returns:
         截取后的DataFrame
@@ -348,7 +330,10 @@ def _filter_by_duration(df: pd.DataFrame, duration: str) -> pd.DataFrame:
     
     try:
         duration = duration.strip().upper()
-        if 'M' in duration:
+        if 'MO' in duration:
+            months = int(duration.replace('MO', '').strip())
+            days = months * 22
+        elif 'M' in duration:
             months = int(duration.replace('M', '').strip())
             days = months * 22
         elif 'Y' in duration:

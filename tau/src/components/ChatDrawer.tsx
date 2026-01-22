@@ -2,7 +2,7 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, notification, Empty, Flex, Divider, GetRef, Dropdown, Tag, type MenuProps } from 'antd';
+import { Drawer, Button, notification, Empty, Flex, GetRef, Dropdown, Tag, type MenuProps } from 'antd';
 import { Sender, ThoughtChain, type SenderProps } from '@ant-design/x';
 import {
   StopOutlined,
@@ -11,17 +11,15 @@ import {
   CheckCircleOutlined,
   LoadingOutlined,
   LineChartOutlined,
-  InfoCircleOutlined,
-  DashboardOutlined,
   HistoryOutlined,
-  DollarOutlined,
   DatabaseOutlined,
-  BarChartOutlined,
   AppstoreOutlined,
-  FileTextOutlined,
+  ReadOutlined,
+  FundOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
-import { getHotStocks } from '../services/api';
+import { getSubscriptions } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import StockComponentRenderer from './StockComponentRenderer';
@@ -86,16 +84,12 @@ const MessageBubble: React.FC<{
 
   // 快捷指令配置（用于渲染用户消息中的标签）
   const suggestionItems = [
-    { label: '价格信息', value: '价格信息' },
     { label: 'K线图表', value: 'K线图表' },
+    { label: '新闻资讯', value: '新闻资讯' },
     { label: '技术指标', value: '技术指标' },
-    { label: '基本面', value: '基本面' },
-    { label: '市场行情', value: '市场行情' },
     { label: '周期分析', value: '周期分析' },
-    { label: '枢轴点', value: '枢轴点' },
     { label: '期权链', value: '期权链' },
-    { label: '最新新闻', value: '最新新闻' },
-    { label: '智能选股', value: '智能选股' },
+    { label: '基本面', value: '基本面' },
   ];
 
   return (
@@ -143,7 +137,8 @@ const MessageBubble: React.FC<{
                 borderRadius: 12,
                 background: isUser ? '#e6f7ff' : '#f5f5f5',
                 wordBreak: 'break-word',
-                alignSelf: isUser ? 'flex-end' : 'flex-start',
+                alignSelf: isUser ? 'flex-end' : 'stretch',
+                width: isUser ? 'auto' : '100%',
                 maxWidth: '100%',
                 minWidth: 0,
                 display: 'flex',
@@ -210,38 +205,33 @@ const MessageBubble: React.FC<{
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                   {(() => {
                     const content = message.content;
-                    const slashIndex = content.indexOf('/');
-                    const spaceIndex = content.indexOf(' ');
-                    
-                    if (slashIndex === 0 && spaceIndex !== -1) {
-                      const cmd = content.substring(1, spaceIndex);
-                      const rest = content.substring(spaceIndex + 1);
-                      const item = suggestionItems.find(i => i.value === cmd);
-                      
-                      if (item) {
-                        return (
-                          <>
-                            <span style={{ 
-                              background: '#f6ffed', 
-                              border: '1px solid #b7eb8f', 
-                              color: '#389e0d',
-                              padding: '0 8px',
-                              borderRadius: 4,
-                              fontSize: 12,
-                              height: 22,
-                              lineHeight: '20px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              flexShrink: 0
-                            }}>
-                              {item.label}
-                            </span>
-                            <span>{rest}</span>
-                          </>
-                        );
-                      }
-                    }
-                    return content;
+                // 简单的关键字匹配来显示标签，不依赖严格的指令格式
+                for (const item of suggestionItems) {
+                  if (content.includes(item.label) || content.includes(item.value)) {
+                    return (
+                      <>
+                        <span style={{ 
+                          background: '#f6ffed', 
+                          border: '1px solid #b7eb8f', 
+                          color: '#389e0d',
+                          padding: '0 8px',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          height: 22,
+                          lineHeight: '20px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          flexShrink: 0
+                        }}>
+                          {item.label}
+                        </span>
+                        {/* 去除指令前缀，如 "/期权链 " */}
+                        <span>{content.replace(new RegExp(`^/?${item.value}\\s*`), '')}</span>
+                      </>
+                    );
+                  }
+                }
+                return content;
                   })()}
                 </div>
               )}
@@ -292,55 +282,44 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const senderRef = useRef<GetRef<typeof Sender>>(null);
   const [activeSkill, setActiveSkill] = useState<SenderProps['skill']>(undefined);
   const [slotConfig, setSlotConfig] = useState<SenderProps['slotConfig']>(undefined);
-  const [hotStocks, setHotStocks] = useState<string[]>([]);
+  const [subscriptions, setSubscriptions] = useState<string[]>([]);
   const skipNextChange = useRef(false);
   const [api, contextHolder] = notification.useNotification();
 
-  // 获取热门股票
-  useEffect(() => {
-    const fetchHotStocks = async () => {
-      try {
-        const res = await getHotStocks(50);
-        if (res.success && res.stocks) {
-          const options = res.stocks.map((s: any) => s.symbol);
-          setHotStocks(options);
-        }
-      } catch (err) {
-        console.error('获取热门股票失败:', err);
+  // 获取订阅股票
+  const fetchSubscriptions = async () => {
+    try {
+      const res = await getSubscriptions();
+      if (res.success && res.stocks) {
+        const options = res.stocks.map((s: any) => s.symbol);
+        setSubscriptions(options);
       }
-    };
-    fetchHotStocks();
+    } catch (err) {
+      console.error('获取订阅股票失败:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubscriptions();
   }, []);
 
+  // 当 subscriptions 更新时，如果当前有激活的技能，更新其 slotConfig 以反映最新的股票列表
+  useEffect(() => {
+    if (activeSkill && activeSkill.value) {
+      const item = commandSuggestions.find(i => i.value === activeSkill.value);
+      if (item) {
+        setSlotConfig(item.slotConfig as any);
+      }
+    }
+  }, [subscriptions]); // 依赖 subscriptions 更新
+
+
+  // 股票下拉选项
+  const stockOptions = (Array.isArray(subscriptions) ? subscriptions : [])
+    .filter(s => typeof s === 'string');
+
   // 快捷指令配置
-  const suggestionItems = [
-    {
-      label: '价格信息',
-      value: '价格信息',
-      icon: <DollarOutlined />,
-      extra: '展示当前价格、涨跌幅等',
-      skill: {
-        value: '价格信息',
-        label: '价格信息',
-        icon: <DollarOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '获取 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: hotStocks,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的最新价格信息。' },
-      ],
-    },
+  const commandSuggestions = [
     {
       label: 'K线图表',
       value: 'K线图表',
@@ -358,7 +337,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           type: 'select',
           key: 'symbol',
           props: {
-            options: hotStocks,
+            options: stockOptions,
             placeholder: '股票代码',
             style: { width: 100 },
             showSearch: true,
@@ -369,68 +348,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       ],
     },
     {
-      label: '技术指标',
-      value: '技术指标',
-      icon: <DashboardOutlined />,
-      extra: '展示 RSI, MACD, KDJ 等',
+      label: '新闻资讯',
+      value: '新闻资讯',
+      icon: <ReadOutlined />,
+      extra: '查询股票最新新闻资讯',
       skill: {
-        value: '技术指标',
-        label: '技术指标',
-        icon: <DashboardOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '分析 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: hotStocks,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的技术指标（RSI, MACD 等）。' },
-      ],
-    },
-    {
-      label: '基本面',
-      value: '基本面',
-      icon: <InfoCircleOutlined />,
-      extra: '展示市值、市盈率、财务等',
-      skill: {
-        value: '基本面',
-        label: '基本面',
-        icon: <InfoCircleOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '查询 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: hotStocks,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的基本面数据。' },
-      ],
-    },
-    {
-      label: '最新新闻',
-      value: '最新新闻',
-      icon: <FileTextOutlined />,
-      extra: '展示个股最新相关新闻',
-      skill: {
-        value: '最新新闻',
-        label: '最新新闻',
-        icon: <FileTextOutlined />,
+        value: '新闻资讯',
+        label: '新闻资讯',
+        icon: <ReadOutlined />,
         closable: true,
       },
       slotConfig: [
@@ -439,41 +364,41 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           type: 'select',
           key: 'symbol',
           props: {
-            options: hotStocks,
+            options: stockOptions,
             placeholder: '股票代码',
             style: { width: 100 },
             showSearch: true,
             listHeight: 50,
           },
         },
-        { type: 'text', value: ' 的最新相关新闻。' },
+        { type: 'text', value: ' 的最新新闻。' },
       ],
     },
     {
-      label: '市场行情',
-      value: '市场行情',
-      icon: <BarChartOutlined />,
-      extra: '展示 A 股、美股、港股行情',
+      label: '技术指标',
+      value: '技术指标',
+      icon: <ThunderboltOutlined />,
+      extra: '分析股票各项技术指标',
       skill: {
-        value: '市场行情',
-        label: '市场行情',
-        icon: <BarChartOutlined />,
+        value: '技术指标',
+        label: '技术指标',
+        icon: <ThunderboltOutlined />,
         closable: true,
       },
       slotConfig: [
-        { type: 'text', value: '获取 ' },
+        { type: 'text', value: '分析 ' },
         {
           type: 'select',
           key: 'symbol',
           props: {
-            options: hotStocks,
+            options: stockOptions,
             placeholder: '股票代码',
             style: { width: 100 },
             showSearch: true,
             listHeight: 50,
           },
         },
-        { type: 'text', value: ' 的市场行情。' },
+        { type: 'text', value: ' 的技术指标。' },
       ],
     },
     {
@@ -493,7 +418,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           type: 'select',
           key: 'symbol',
           props: {
-            options: hotStocks,
+            options: stockOptions,
             placeholder: '股票代码',
             style: { width: 100 },
             showSearch: true,
@@ -501,33 +426,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           },
         },
         { type: 'text', value: ' 进行周期性规律分析。' },
-      ],
-    },
-    {
-      label: '枢轴点',
-      value: '枢轴点',
-      icon: <DatabaseOutlined />,
-      extra: '展示支撑位与阻力位',
-      skill: {
-        value: '枢轴点',
-        label: '枢轴点',
-        icon: <DatabaseOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '计算 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: hotStocks,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的枢轴点（支撑位与阻力位）。' },
       ],
     },
     {
@@ -547,7 +445,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           type: 'select',
           key: 'symbol',
           props: {
-            options: hotStocks,
+            options: stockOptions,
             placeholder: '股票代码',
             style: { width: 100 },
             showSearch: true,
@@ -558,29 +456,30 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       ],
     },
     {
-      label: '智能选股',
-      value: '智能选股',
-      icon: <BarChartOutlined />,
-      extra: '通过条件筛选股票',
+      label: '基本面',
+      value: '基本面',
+      icon: <FundOutlined />,
+      extra: '分析股票基本面数据',
       skill: {
-        value: '智能选股',
-        label: '智能选股',
-        icon: <BarChartOutlined />,
+        value: '基本面',
+        label: '基本面',
+        icon: <FundOutlined />,
         closable: true,
       },
       slotConfig: [
-        { type: 'text', value: '根据 ' },
+        { type: 'text', value: '分析 ' },
         {
           type: 'select',
-          key: 'strategy',
+          key: 'symbol',
           props: {
-            options: ['热门增长', '高股息', '低估值'],
-            placeholder: '选股策略',
+            options: stockOptions,
+            placeholder: '股票代码',
             style: { width: 100 },
+            showSearch: true,
             listHeight: 50,
           },
         },
-        { type: 'text', value: ' 策略进行智能选股。' },
+        { type: 'text', value: ' 的基本面数据。' },
       ],
     },
   ];
@@ -933,34 +832,60 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setEditingMessageId(message.id);
     
     const content = message.content;
-    const slashIndex = content.indexOf('/');
-    const spaceIndex = content.indexOf(' ');
     
-    // 检查是否是指令消息
-    if (slashIndex === 0 && spaceIndex !== -1) {
-      const cmd = content.substring(1, spaceIndex);
-      const rest = content.substring(spaceIndex + 1);
-      const item = suggestionItems.find(i => i.value === cmd);
+    // 尝试解析指令格式 /指令 参数
+    const commandMatch = content.match(/^\/(\S+)\s+(.*)$/);
+    if (commandMatch) {
+      const commandValue = commandMatch[1];
+      const restMessage = commandMatch[2];
       
-      if (item) {
-        skipNextChange.current = true;
-        // 设置技能标签，但内容直接作为文本回填
-        setActiveSkill({
-          ...item.skill,
-          closable: {
-            onClose: () => {
-              setActiveSkill(undefined);
-              setSlotConfig(undefined);
-            }
+      const command = commandSuggestions.find(c => c.value === commandValue);
+      if (command) {
+        // 找到了对应的指令
+        
+        // 尝试解析参数
+        // 假设 slotConfig 结构是 [Text, Select(key=symbol), Text]
+        let symbol = '';
+        if (command.slotConfig && command.slotConfig.length === 3) {
+          const prefix = command.slotConfig[0].value as string;
+          const suffix = command.slotConfig[2].value as string;
+          
+          if (restMessage.startsWith(prefix) && restMessage.endsWith(suffix)) {
+            symbol = restMessage.substring(prefix.length, restMessage.length - suffix.length);
           }
-        } as any);
-        setSlotConfig(item.slotConfig as any);
-        setInputText(rest);
-        setTimeout(scrollToBottom, 100);
-        return;
+        }
+        
+        if (symbol) {
+          // 设置激活的 Skill
+          setActiveSkill({
+            ...command.skill,
+            closable: {
+              onClose: () => {
+                setActiveSkill(undefined);
+                setSlotConfig(undefined);
+              }
+            }
+          } as any);
+          
+          // 克隆 slotConfig 并设置默认值
+          const newSlotConfig = JSON.parse(JSON.stringify(command.slotConfig));
+          if (newSlotConfig[1] && newSlotConfig[1].props) {
+            newSlotConfig[1].props.defaultValue = symbol;
+            newSlotConfig[1].props.value = symbol; // 尝试同时设置 value
+          }
+          
+          setSlotConfig(newSlotConfig);
+          setInputText(''); // 清空纯文本输入
+          skipNextChange.current = true;
+          
+          // 滚动到底部
+          setTimeout(scrollToBottom, 100);
+          return;
+        }
       }
     }
 
+    // 如果无法解析为结构化指令，则回退到普通文本编辑
     setInputText(content);
     // 滚动到底部以确保输入框可见
     setTimeout(scrollToBottom, 100);
@@ -999,7 +924,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <Empty
               description="开始对话吧"
               style={{ marginTop: 60 }}
-              imageStyle={{ height: 80 }}
+              styles={{ image: { height: 80 } }}
             >
               <p style={{ color: '#999', fontSize: 14 }}>
                 输入消息询问股票相关问题
@@ -1056,8 +981,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             }
             value={inputText}
             onChange={(val) => {
-              console.log('onChange', val);
-              
               // 如果刚刚通过 onSelect 更新了输入框，则跳过本次 onChange
               if (skipNextChange.current) {
                 skipNextChange.current = false;
@@ -1085,15 +1008,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             autoSize={{ minRows: 1, maxRows: 6 }}
             slotConfig={slotConfig}
             footer={(actionNode: React.ReactNode) => {
-              const items: MenuProps['items'] = suggestionItems.map(item => ({
+              const items: MenuProps['items'] = commandSuggestions.map(item => ({
                 key: item.value,
                 label: item.label,
                 icon: item.icon,
               }));
 
               const handleMenuClick: MenuProps['onClick'] = (info) => {
-                const item = suggestionItems.find(i => i.value === info.key);
+                const item = commandSuggestions.find(i => i.value === info.key);
                 if (item) {
+                  // 选中指令时刷新股票列表
+                  fetchSubscriptions();
+                  
                   setActiveSkill({
                     ...item.skill,
                     closable: {
@@ -1160,7 +1086,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       />
                     ) : (
                       <>
-                        <Divider type="vertical" />
+                      <div style={{ width: 1, height: 14, background: 'rgba(0, 0, 0, 0.06)', margin: '0 8px' }} />
                         {actionNode}
                       </>
                     )}
@@ -1189,7 +1115,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
   return (
     <Drawer
       placement="right"
-      width={isMobile ? '100%' : 800}
       onClose={onClose}
       open={open}
       styles={{
@@ -1202,6 +1127,9 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
           flexDirection: 'column',
           height: '100%',
         },
+        wrapper: {
+          width: isMobile ? '100%' : 800
+        }
       }}
     >
       <ChatPanel

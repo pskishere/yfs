@@ -8,41 +8,28 @@ from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
 from django.utils import timezone
 
-from .models import StockAnalysis, ChatSession
-from .services import perform_analysis
+from .models import ChatSession
+from .services import perform_analysis, get_cached_news
 from .yfinance import get_stock_info, get_news, search_symbols, get_options
 
 logger = logging.getLogger(__name__)
 
-def _get_or_fetch_analysis(symbol: str, duration: str = "5y", bar_size: str = "1 day") -> Optional[StockAnalysis]:
+def _get_or_fetch_analysis(symbol: str, duration: str = "5y", bar_size: str = "1 day") -> Optional[Dict[str, Any]]:
     """
-    获取现有的分析记录，如果没有或已过期，则执行新分析
+    获取分析结果
     """
     symbol = symbol.upper().strip()
     try:
-        # 查找最新的成功记录
-        analysis = StockAnalysis.objects.filter(
-            symbol=symbol,
-            status=StockAnalysis.Status.SUCCESS
-        ).order_by('-updated_at').first()
+        # 直接调用服务层，利用其内部的 StockKLine 缓存机制
+        result, error = perform_analysis(symbol, duration, bar_size, use_cache=True)
         
-        # 如果没有记录，或者记录是昨天的（简单判断），则执行新分析
-        if not analysis or (timezone.now() - analysis.updated_at).total_seconds() > 3600 * 4: # 4小时过期
-            logger.info(f"为 Tool 调用触发新分析: {symbol}")
-            payload, error = perform_analysis(symbol, duration, bar_size, use_cache=False)
-            if not error:
-                analysis, _ = StockAnalysis.objects.get_or_create(
-                    symbol=symbol, duration=duration, bar_size=bar_size
-                )
-                analysis.mark_success(payload)
-                return analysis
-            else:
-                logger.error(f"Tool 调用触发分析失败: {symbol}, {error}")
-                return analysis # 返回旧的，总比没有强
-        
-        return analysis
+        if error or not result:
+            logger.error(f"Tool 调用获取分析失败: {symbol}, {error}")
+            return None
+            
+        return result
     except Exception as e:
-        logger.error(f"获取分析记录失败: {symbol}, {e}")
+        logger.error(f"获取分析结果失败: {symbol}, {e}")
         return None
 
 @tool
@@ -52,10 +39,10 @@ def get_technical_indicators(symbol: str) -> str:
     当用户询问股票走势、买卖点、技术面情况时使用。
     """
     analysis = _get_or_fetch_analysis(symbol)
-    if not analysis or not analysis.indicators:
+    if not analysis or 'indicators' not in analysis:
         return f"未能获取到 {symbol} 的技术指标数据。"
     
-    ind = analysis.indicators
+    ind = analysis['indicators']
     result = [
         f"### {symbol} 技术指标摘要",
         f"- 当前价格: {ind.get('current_price', 'N/A')}",
@@ -77,16 +64,8 @@ def get_stock_news(symbol: str) -> str:
     获取股票的最新相关新闻报道。
     当用户询问公司近况、重大事件、新闻面影响时使用。
     """
-    # 优先尝试从最新的分析记录获取
-    analysis = StockAnalysis.objects.filter(symbol=symbol.upper()).order_by('-updated_at').first()
-    news_data = []
-    
-    if analysis and analysis.indicators and 'news_data' in analysis.indicators:
-        news_data = analysis.indicators['news_data']
-    
-    # 如果分析记录里没新闻，或者新闻太旧，直接去取新鲜的
-    if not news_data:
-        news_data = get_news(symbol)
+    # 优先尝试从缓存获取
+    news_data = get_cached_news(symbol)
         
     if not news_data:
         return f"未能获取到 {symbol} 的最新新闻。"

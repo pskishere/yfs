@@ -2,8 +2,7 @@
  * 期权数据表格组件
  */
 import React, { useState } from 'react';
-import { Table, Tabs, Collapse, Typography, Descriptions, Tag, Select } from 'antd';
-import { DollarOutlined } from '@ant-design/icons';
+import { Table, Tabs, Typography, Descriptions, Tag, Select } from 'antd';
 import type { OptionsData } from '../types/index';
 
 const { Text } = Typography;
@@ -11,7 +10,6 @@ const { Option } = Select;
 
 interface OptionsTableProps {
   data: OptionsData;
-  createIndicatorLabel?: (label: string, indicatorKey: string) => React.ReactNode;
 }
 
 /**
@@ -38,7 +36,7 @@ const formatPercent = (value: number | undefined | null) => {
   );
 };
 
-export const OptionsTable: React.FC<OptionsTableProps> = ({ data, createIndicatorLabel }) => {
+export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
   const [activeDate, setActiveDate] = useState<string | undefined>(
     data?.expiration_dates?.[0]
   );
@@ -146,67 +144,48 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data, createIndicato
 
   return (
     <div id="section-options">
-      <Collapse
-        ghost
-        defaultActiveKey={[]}
-        items={[{
-          key: 'options',
-          label: (
-            <span>
-              <DollarOutlined style={{ marginRight: 8 }} />
-              {createIndicatorLabel ? createIndicatorLabel('期权分析', 'options') : '期权分析'}
-              <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
-                共 {data.expiration_dates.length} 个到期日
-              </span>
-            </span>
-          ),
-          children: (
-            <div>
-              <Descriptions
-                bordered
-                column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
-                size="small"
-                layout="horizontal"
-                items={[
-                  {
-                    label: '到期日',
-                    children: (
-                      <Select
-                        size="small"
-                        value={activeDate}
-                        onChange={setActiveDate}
-                        style={{ width: 140 }}
-                        variant="borderless"
-                      >
-                        {data.expiration_dates.slice(0, 10).map(date => (
-                          <Option key={date} value={date}>{date}</Option>
-                        ))}
-                      </Select>
-                    ),
-                  },
-                  {
-                    label: '合约总数',
-                    children: (
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>
-                        {currentChain ? (currentChain.calls.length + currentChain.puts.length) : '-'}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-
-              <div style={{ marginTop: 16 }}>
-                <Tabs
-                  activeKey={activeTab}
-                  onChange={setActiveTab}
+      <div>
+        <Descriptions
+          column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 2, xs: 1 }}
+          size="small"
+          layout="horizontal"
+          items={[
+            {
+              label: '到期日',
+              children: (
+                <Select
                   size="small"
-                  items={tabItems}
-                />
-              </div>
-            </div>
-          ),
-        }]}
-      />
+                  value={activeDate}
+                  onChange={setActiveDate}
+                  style={{ width: 140 }}
+                  variant="borderless"
+                >
+                  {data.expiration_dates.slice(0, 10).map(date => (
+                    <Option key={date} value={date}>{date}</Option>
+                  ))}
+                </Select>
+              ),
+            },
+            {
+              label: '合约总数',
+              children: (
+                <span style={{ fontSize: 14, fontWeight: 500 }}>
+                  {currentChain ? (currentChain.calls.length + currentChain.puts.length) : '-'}
+                </span>
+              ),
+            },
+          ]}
+        />
+
+        <div style={{ marginTop: 16 }}>
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            size="small"
+            items={tabItems}
+          />
+        </div>
+      </div>
     </div>
   );
 };

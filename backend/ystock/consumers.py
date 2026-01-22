@@ -10,6 +10,7 @@ from channels.db import database_sync_to_async
 
 from .agent import StockAIAgent
 from .models import ChatSession, ChatMessage
+from .tasks import generate_chat_response
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +88,10 @@ class StockChatConsumer(AsyncWebsocketConsumer):
         """
         断开 WebSocket 连接
         """
-        # 取消正在进行的生成任务
-        if self.current_streaming_task and not self.current_streaming_task.done():
-            self.should_cancel = True
-            self.current_streaming_task.cancel()
-            if self.current_message_id:
-                await self.update_message_status(self.current_message_id, 'cancelled')
+        # 注意：不再取消正在进行的生成任务，让其在后台继续运行
+        # if self.current_streaming_task and not self.current_streaming_task.done():
+        #     self.should_cancel = True
+        #     self.current_streaming_task.cancel()
         
         if self.room_group_name:
             try:
@@ -180,9 +179,14 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             # 更新消息状态
             await self.update_message_status(ai_message_id, 'streaming')
             
-            # 启动流式生成任务
+            # 启动流式生成任务（后台执行）
             self.current_streaming_task = asyncio.create_task(
-                self.stream_generation(user_input, ai_message_id)
+                generate_chat_response(
+                    session_id=self.session_id,
+                    message_id=ai_message_id,
+                    user_input=user_input,
+                    model_name=self.agent_service.model_name
+                )
             )
     
     async def handle_cancel(self, data: Dict[str, Any]):
@@ -278,9 +282,11 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             
             # 启动流式生成任务
             self.current_streaming_task = asyncio.create_task(
-                self.stream_generation(
-                    parent_message.content or '',
-                    ai_message_id
+                generate_chat_response(
+                    session_id=self.session_id,
+                    message_id=ai_message_id,
+                    user_input=parent_message.content or '',
+                    model_name=self.agent_service.model_name
                 )
             )
     
@@ -360,7 +366,12 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             
             # 启动流式生成任务
             self.current_streaming_task = asyncio.create_task(
-                self.stream_generation(new_content, ai_message_id)
+                generate_chat_response(
+                    session_id=self.session_id,
+                    message_id=ai_message_id,
+                    user_input=new_content,
+                    model_name=self.agent_service.model_name
+                )
             )
             
         except Exception as e:
@@ -371,98 +382,12 @@ class StockChatConsumer(AsyncWebsocketConsumer):
             })
     
     
-    async def stream_generation(self, user_input: str, message_id: int):
-        """流式生成 AI 回复"""
-        try:
-            full_response = ""
-            current_thoughts = []
-            
-            async for chunk in self.agent_service.stream_chat(
-                session_id=self.session_id,
-                user_input=user_input,
-                skip_save_context=True  # 消息已由 consumer 管理
-            ):
-                if self.should_cancel:
-                    break
-                
-                if chunk["type"] == "token":
-                    token = chunk["content"]
-                    full_response += token
-                    
-                    await self.send_json({
-                        'type': 'token',
-                        'message_id': message_id,
-                        'token': token,
-                        'status': 'streaming'
-                    })
-                elif chunk["type"] == "thought":
-                    # 更新本地思维链记录
-                    thought_data = {
-                        'key': chunk.get("tool"),
-                        'title': chunk["content"],
-                        'status': chunk["status"]
-                    }
-                    
-                    # 查找是否已存在该工具的记录
-                    existing_index = -1
-                    for i, t in enumerate(current_thoughts):
-                        if t.get('key') == thought_data['key']:
-                            existing_index = i
-                            break
-                    
-                    if existing_index > -1:
-                        current_thoughts[existing_index] = thought_data
-                    else:
-                        current_thoughts.append(thought_data)
-                    
-                    # 发送思维链/工具调用信息
-                    await self.send_json({
-                        'type': 'thought',
-                        'message_id': message_id,
-                        'thought': chunk["content"],
-                        'status': chunk["status"],
-                        'tool': chunk.get("tool")
-                    })
-            
-            if not self.should_cancel:
-                # 保存完整回复和思维链
-                await self.update_message_content(message_id, full_response)
-                await self.update_message_thoughts(message_id, current_thoughts)
-                await self.update_message_status(message_id, 'completed')
-                
-                await self.send_json({
-                    'type': 'generation_completed',
-                    'message_id': message_id,
-                    'message': full_response,
-                    'status': 'completed'
-                })
-            else:
-                # 保存部分回复（如果有的话）
-                if full_response:
-                    await self.update_message_content(message_id, full_response)
-                if current_thoughts:
-                    await self.update_message_thoughts(message_id, current_thoughts)
-                    
-        except asyncio.CancelledError:
-            # 任务被取消
-            if 'full_response' in locals() and full_response:
-                await self.update_message_content(message_id, full_response)
-            await self.update_message_status(message_id, 'cancelled')
-            raise
-        except Exception as e:
-            # 处理错误
-            error_msg = str(e)
-            logger.error(f"生成回复时出错: {error_msg}", exc_info=True)
-            await self.update_message_status(message_id, 'error', error_msg)
-            await self.send_json({
-                'type': 'generation_error',
-                'message_id': message_id,
-                'error': error_msg,
-                'status': 'error'
-            })
-        finally:
-            self.current_message_id = None
-            self.current_streaming_task = None
+    async def chat_stream(self, event):
+        """处理来自后台任务的流式消息"""
+        await self.send_json(event['data'])
+
+    # async def stream_generation(self, user_input: str, message_id: int):
+    #    ... 已移动到 tasks.py ...
     
     async def send_json(self, data: Dict[str, Any]):
         """发送 JSON 消息"""
