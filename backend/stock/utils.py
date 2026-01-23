@@ -1,0 +1,162 @@
+"""
+工具函数模块 - 通用辅助函数
+"""
+import logging
+import math
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+def clean_nan_values(obj: Any) -> Any:
+    """
+    清洗 NaN/inf 值，保证 JSON 可序列化
+    
+    Args:
+        obj: 需要清洗的对象（可以是字典、列表、浮点数等）
+        
+    Returns:
+        清洗后的对象，NaN 和 inf 值被替换为 None
+    """
+    if isinstance(obj, dict):
+        return {k: clean_nan_values(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [clean_nan_values(i) for i in obj]
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+    return obj
+
+
+def format_candle_data(hist_data: List[Dict]) -> List[Dict]:
+    """
+    格式化K线数据
+    
+    Args:
+        hist_data: 历史K线数据列表
+        
+    Returns:
+        格式化后的K线数据列表
+    """
+    formatted_candles = []
+    
+    if not hist_data:
+        return formatted_candles
+    
+    for bar in hist_data:
+        # 兼容不同的键名：date 或 time
+        date_str = str(bar.get('date') or bar.get('time') or '')
+        
+        try:
+            if not date_str:
+                continue
+                
+            if len(date_str) == 8 and date_str.isdigit():
+                dt = datetime.strptime(date_str, '%Y%m%d')
+                time_str = dt.strftime('%Y-%m-%d')
+            elif ' ' in date_str:
+                # 尝试多种时间格式
+                try:
+                    dt = datetime.strptime(date_str, '%Y%m%d %H:%M:%S')
+                    time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    # 已经是标准格式或其他格式，保持原样
+                    time_str = date_str
+            else:
+                time_str = date_str
+        except Exception as e:
+            logger.warning(f"日期解析失败: {date_str}, 错误: {e}")
+            time_str = date_str
+        
+        formatted_candles.append({
+            'time': time_str,
+            'open': float(bar.get('open', 0)),
+            'high': float(bar.get('high', 0)),
+            'low': float(bar.get('low', 0)),
+            'close': float(bar.get('close', 0)),
+            'volume': int(bar.get('volume', 0)),
+        })
+    
+    return formatted_candles
+
+
+def extract_stock_name(stock_info) -> Optional[str]:
+    """
+    从股票信息中提取股票名称
+    
+    Args:
+        stock_info: 股票信息（可能是dict或list）
+        
+    Returns:
+        股票名称，如果没有则返回None
+    """
+    stock_name = None
+    
+    if isinstance(stock_info, dict):
+        stock_name = stock_info.get('longName', '')
+    elif isinstance(stock_info, list) and len(stock_info) > 0:
+        stock_data = stock_info[0]
+        if isinstance(stock_data, dict):
+            stock_name = stock_data.get('longName', '')
+    
+    if stock_name and stock_name.strip():
+        return stock_name.strip()
+    
+    return None
+
+
+def create_error_response(error_info: Dict) -> Tuple[Dict, int]:
+    """
+    创建错误响应
+    
+    Args:
+        error_info: 错误信息字典，包含code和message
+        
+    Returns:
+        (响应字典, HTTP状态码)
+    """
+    return {
+        'success': False,
+        'error_code': error_info['code'],
+        'message': error_info['message']
+    }, 400
+
+
+def create_success_response(
+    indicators: Dict,
+    signals: Optional[Dict] = None,
+    candles: List[Dict] = None,
+    ai_analysis: Optional[str] = None,
+    model: Optional[str] = None
+) -> Dict:
+    """
+    创建成功响应
+    
+    Args:
+        indicators: 技术指标
+        signals: 交易信号 (可选)
+        candles: K线数据
+        ai_analysis: AI分析结果（可选）
+        model: AI模型名称（可选）
+        
+    Returns:
+        响应字典
+    """
+    result = {
+        'success': True,
+        'indicators': indicators,
+        'candles': candles or []
+    }
+    
+    if signals:
+        result['signals'] = signals
+    
+    if ai_analysis:
+        result['ai_analysis'] = ai_analysis
+        result['model'] = model
+        result['ai_available'] = True
+    else:
+        result['ai_available'] = False
+    
+    return result

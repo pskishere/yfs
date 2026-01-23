@@ -52,14 +52,15 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
-    'ystock',
+    'ai',
+    'stock',
 ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'ystock.cors.SimpleCorsMiddleware',
+    'ai.middleware.SimpleCorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -203,7 +204,12 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
-        'ystock': {
+        'stock': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'ai': {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,

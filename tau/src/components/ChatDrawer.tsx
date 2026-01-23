@@ -19,7 +19,8 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
-import { getSubscriptions } from '../services/api';
+import { getSubscriptions, createChatSession } from '../services/api';
+import { registry } from '../framework/core/registry';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ComponentRenderer from './ComponentRenderer';
@@ -85,14 +86,7 @@ const MessageBubble: React.FC<{
   const isCompleted = message.status === 'completed';
 
   // 快捷指令配置（用于渲染用户消息中的标签）
-  const suggestionItems = [
-    { label: 'K线图表', value: 'K线图表' },
-    { label: '新闻资讯', value: '新闻资讯' },
-    { label: '技术指标', value: '技术指标' },
-    { label: '周期分析', value: '周期分析' },
-    { label: '期权链', value: '期权链' },
-    { label: '基本面', value: '基本面' },
-  ];
+  const suggestionItems = registry.getSuggestions();
 
   return (
     <div
@@ -773,16 +767,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!message.trim() && !skill && !activeSkill) return;
 
     // 如果还没有连接，说明是第一次发送消息（或者是连接断开了）
-    if (!isConnected) {
+    if (!isConnected || !wsClient.isConnected()) {
       try {
         setIsStreaming(true); // 显示加载状态
-        const newSessionId = await wsClient.connect(sessionId, model);
-        setIsConnected(true);
         
-        // 如果是新创建的会话，通知父组件
-        if (!sessionId && onSessionCreated) {
-          onSessionCreated(newSessionId);
+        let targetSessionId = sessionId;
+        
+        // 如果没有 sessionId，先创建会话
+        if (!targetSessionId) {
+          try {
+            const session = await createChatSession(model);
+            targetSessionId = session.session_id;
+            // 通知父组件更新 session_id
+            if (onSessionCreated) {
+              onSessionCreated(targetSessionId);
+            }
+          } catch (error) {
+            console.error('创建会话失败:', error);
+            throw error;
+          }
         }
+        
+        await wsClient.connect(targetSessionId, model);
+        setIsConnected(true);
       } catch (error) {
         setIsStreaming(false);
         // 错误已经在 wsClient.connect 或 onError 回调中处理

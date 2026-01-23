@@ -1,11 +1,7 @@
-/**
- * 组件渲染器 - 用于在聊天气泡中动态加载并显示分析模块
- * 
- * 优化：仅作为触发器，实际内容在全局 ComponentDrawer 中渲染
- */
 import React from 'react';
 import { Button, Empty } from 'antd';
-import { LineChartOutlined, FundOutlined, HistoryOutlined } from '@ant-design/icons';
+import { AppstoreOutlined } from '@ant-design/icons';
+import { registry } from '../framework/core/registry';
 
 interface ComponentRendererProps {
   symbol: string;
@@ -20,30 +16,17 @@ const ComponentRenderer: React.FC<ComponentRendererProps> = ({
   module,
   onOpen,
 }) => {
-  let title = '';
-  let icon = null;
+  // Check if module is registered
+  const Component = registry.getComponent(module);
+  const metadata = registry.getMetadata(module);
 
-  // 根据 module 参数渲染对应组件
-  switch (module.toLowerCase()) {
-    case 'chart':
-    case '图表':
-    case 'k线':
-      title = `${symbol} K线图表`;
-      icon = <LineChartOutlined />;
-      break;
-    case 'options':
-    case '期权':
-      title = `${symbol} 期权链`;
-      icon = <FundOutlined />;
-      break;
-    case 'cycle':
-    case '周期':
-      title = `${symbol} 周期分析`;
-      icon = <HistoryOutlined />;
-      break;
-    default:
-      return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`不支持的模块: ${module}`} />;
+  if (!Component) {
+     return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`不支持的模块: ${module}`} />;
   }
+  
+  // Use metadata if available, otherwise fallback
+  const title = metadata?.title ? `${symbol} ${metadata.title}` : `${symbol} ${module}`;
+  const icon = metadata?.icon || <AppstoreOutlined />;
 
   return (
     <div style={{ margin: '8px 0' }}>

@@ -7,7 +7,6 @@ import type {
   AnalysisResult,
   SubscriptionStock,
   OptionsData,
-  IndicatorInfoResponse,
 } from '../types/index';
 
 // API基础URL
@@ -191,28 +190,7 @@ export const deleteStock = async (symbol: string): Promise<ApiResponse> => {
   }
 };
 
-/**
- * 获取技术指标解释和参考范围
- * @param indicator - 指标名称（可选），不提供则返回所有指标信息
- */
-export const getIndicatorInfo = async (indicator: string = ''): Promise<IndicatorInfoResponse> => {
-  try {
-    const params = new URLSearchParams();
-    if (indicator) {
-      params.append('indicator', indicator);
-    }
 
-    const url = indicator
-      ? `/api/indicator-info?${params.toString()}`
-      : '/api/indicator-info';
-
-    const response = await api.get<IndicatorInfoResponse>(url);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
 
 /**
  * 刷新分析 - 强制重新获取数据，不使用缓存（不包含AI分析）
@@ -232,7 +210,7 @@ export const refreshAnalyze = async (
     });
 
     const response = await api.post<AnalysisResult>(
-      `/api/refresh-analyze/${symbol.toUpperCase()}?${params.toString()}`,
+      `/api/stocks/${symbol.toUpperCase()}/refresh/?${params.toString()}`,
       {},
       {
         timeout: 60000, // 刷新超时时间60秒
@@ -252,6 +230,7 @@ export const refreshAnalyze = async (
  */
 export interface ChatSession {
   session_id: string;
+  title: string | null;
   summary: string | null;
   model: string | null;
   context_symbols: string[];
@@ -300,7 +279,16 @@ export const searchStocks = async (query: string): Promise<{ success: boolean; r
 export const getChatSessions = async (): Promise<ChatSession[]> => {
   try {
     const response = await api.get('/api/chat/sessions/');
-    return response.data.sessions;
+    const data = handleResponse(response);
+    // DRF 分页返回结构 { count: number, next: string, previous: string, results: [] }
+    if (data.results && Array.isArray(data.results)) {
+      return data.results;
+    }
+    // 如果未开启分页，直接返回数组
+    if (Array.isArray(data)) {
+      return data as unknown as ChatSession[];
+    }
+    return [];
   } catch (error) {
     handleError(error);
     throw error;
@@ -314,7 +302,7 @@ export const getChatSessions = async (): Promise<ChatSession[]> => {
 export const createChatSession = async (model?: string): Promise<ChatSession> => {
   try {
     const response = await api.post('/api/chat/sessions/', { model });
-    return response.data.session;
+    return handleResponse(response) as unknown as ChatSession;
   } catch (error) {
     handleError(error);
     throw error;

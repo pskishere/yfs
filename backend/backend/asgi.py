@@ -20,7 +20,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django_asgi_app = get_asgi_application()
 
 # 导入 WebSocket 路由
-from ystock import routing
+from ai import routing
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,

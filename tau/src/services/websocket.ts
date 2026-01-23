@@ -3,6 +3,8 @@
  * 参考 llgo 和 glrn 项目的实现
  */
 
+import { createChatSession } from './api';
+
 export interface ChatMessage {
   id?: number;
   role: 'user' | 'assistant';
@@ -45,23 +47,50 @@ export class WebSocketClient {
   private messageHandlers: MessageHandler[] = [];
   private callbacks: WebSocketCallbacks = {};
   private isManualClose = false;
+  private connectionPromise: Promise<string> | null = null;
+
+  /**
+   * 生成 UUID
+   */
+  private generateUUID(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
 
   /**
    * 连接到 WebSocket 服务器
    */
-  connect(sessionId?: string, model?: string): Promise<string> {
+  async connect(sessionId?: string, model?: string, namespace: string = 'stock'): Promise<string> {
     // 如果已经连接到相同的 sessionId 和 model，直接返回
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.sessionId === (sessionId || null) && this.model === (model || null)) {
       console.log('WebSocket 已经连接到相同会话:', this.sessionId);
       return Promise.resolve(this.sessionId!);
     }
 
-    return new Promise((resolve, reject) => {
+    // 如果正在连接中，返回当前的 Promise
+    if (this.connectionPromise) {
+      console.log('WebSocket 正在连接中，等待连接完成...');
+      return this.connectionPromise;
+    }
+
+    if (!sessionId) {
+      console.error('连接失败: 未提供 SessionID');
+      return Promise.reject(new Error('SessionID is required for WebSocket connection'));
+    }
+
+    const targetSessionId = sessionId;
+
+    this.connectionPromise = new Promise((resolve, reject) => {
       try {
         this.isManualClose = false;
-        this.sessionId = sessionId || null;
+        this.sessionId = targetSessionId || null;
         this.model = model || null;
-        const wsUrl = this.getWebSocketUrl(sessionId, model);
+        const wsUrl = this.getWebSocketUrl(targetSessionId, model, namespace);
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -69,44 +98,55 @@ export class WebSocketClient {
           this.reconnectAttempts = 0;
         };
 
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          // 处理连接消息
-          if (data.type === 'connection') {
-            this.sessionId = data.session_id;
-            resolve(data.session_id);
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // 处理连接消息
+            if (data.type === 'connection') {
+              this.sessionId = data.session_id;
+              this.connectionPromise = null; // 连接成功，清除 Promise
+              resolve(data.session_id);
+            }
+            
+            // 处理所有消息
+            this.handleMessage(data);
+          } catch (error) {
+            console.error('解析消息失败:', error);
           }
-          
-          // 处理所有消息
-          this.handleMessage(data);
-        } catch (error) {
-          console.error('解析消息失败:', error);
-        }
-      };
+        };
 
         this.ws.onerror = (error) => {
           console.error('WebSocket 错误:', error);
+          this.connectionPromise = null; // 错误，清除 Promise
           reject(error);
         };
 
         this.ws.onclose = () => {
           console.log('WebSocket 连接关闭');
+          this.connectionPromise = null; // 关闭，清除 Promise
+          
+          if (this.callbacks.onClose) {
+            this.callbacks.onClose();
+          }
+
           if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.attemptReconnect();
           }
         };
       } catch (error) {
+        this.connectionPromise = null;
         reject(error);
       }
     });
+
+    return this.connectionPromise;
   }
 
   /**
    * 获取 WebSocket URL
    */
-  private getWebSocketUrl(sessionId?: string, model?: string): string {
+  private getWebSocketUrl(sessionId?: string, model?: string, namespace: string = 'stock'): string {
     const envWsUrl = import.meta.env.VITE_WS_URL;
     const isHttps = window.location.protocol === 'https:';
     const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
@@ -127,7 +167,7 @@ export class WebSocketClient {
       if (isHttps && base.startsWith('ws://')) {
         base = base.replace('ws://', 'wss://');
       }
-      return this.buildWebSocketUrl(base, sessionId, model);
+      return this.buildWebSocketUrl(base, sessionId, namespace, model);
     }
 
     // 2. Tauri 环境下，不能用相对路径，回退到本机 Nginx 8086
@@ -135,21 +175,26 @@ export class WebSocketClient {
       const protocol = isHttps ? 'wss:' : 'ws:';
       const host = isAndroid ? '10.0.2.2' : 'localhost';
       const base = `${protocol}//${host}:8086`;
-      return this.buildWebSocketUrl(base, sessionId, model);
+      return this.buildWebSocketUrl(base, sessionId, namespace, model);
     }
 
     // 3. 浏览器环境：始终使用当前站点（通常由 Nginx 代理）
     const protocol = isHttps ? 'wss:' : 'ws:';
     const baseUrl = `${protocol}//${window.location.host}`;
-    return this.buildWebSocketUrl(baseUrl, sessionId, model);
+    return this.buildWebSocketUrl(baseUrl, sessionId, namespace, model);
   }
 
   /**
    * 构建完整 WebSocket URL
    */
-  private buildWebSocketUrl(baseUrl: string, sessionId?: string, model?: string): string {
+  private buildWebSocketUrl(baseUrl: string, sessionId?: string, namespace: string = 'stock', model?: string): string {
     
-    let path = sessionId ? `ws/stock-chat/${sessionId}/` : 'ws/stock-chat/';
+    // 新版后端要求必须有 session_id，且路径格式为 ws/chat/<namespace>/<session_id>/
+    if (!sessionId) {
+      console.warn('WebSocket URL 构建警告: 缺少 session_id，可能会导致连接失败');
+    }
+
+    let path = `ws/chat/${namespace}/${sessionId || 'unknown'}/`;
     const params = new URLSearchParams();
     if (model) {
       params.append('model', model);

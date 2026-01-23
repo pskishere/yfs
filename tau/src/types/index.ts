@@ -260,18 +260,7 @@ export interface SubscriptionStock {
   category: string;
 }
 
-/**
- * 指标信息
- */
-export interface IndicatorInfo {
-  key: string;
-  name: string;
-  description: string;
-  calculation?: string;
-  reference_range: Record<string, string>;
-  interpretation: string;
-  usage: string;
-}
+
 
 /**
  * 基本面数据 - 详细类型定义
@@ -366,16 +355,7 @@ export interface CashflowRecord {
   [key: string]: any;  // 动态字段，如 OperatingCashFlow, CapitalExpenditure 等
 }
 
-/**
- * 指标信息响应
- */
-export interface IndicatorInfoResponse {
-  success: boolean;
-  indicators?: Record<string, IndicatorInfo>;
-  indicator?: string;
-  info?: IndicatorInfo;
-  message?: string;
-}
+
 
 /**
  * 股票新闻项

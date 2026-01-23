@@ -21,7 +21,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('ystock.urls')),
+    path('api/', include('stock.urls')),
+    path('api/chat/', include('ai.urls')),
 ]
 
 if settings.DEBUG:
