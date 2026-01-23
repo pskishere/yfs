@@ -143,6 +143,25 @@ export const getAiModels = async (): Promise<AIModel[]> => {
     throw error;
   }
 };
+
+/**
+ * 上传文件
+ */
+export const uploadFile = async (file: File): Promise<{ name: string; url: string; path: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/api/chat/upload/`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error('Upload failed');
+  }
+
+  return response.json();
+};
 export const getChatSessions = async (): Promise<ChatSession[]> => {
   try {
     const response = await api.get('/api/chat/sessions/');

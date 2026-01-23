@@ -98,6 +98,16 @@
   font-size: 15px;
 }
 
+/* 隐藏滚动条但保留滚动功能 */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .markdown-content ul,
 .markdown-content ol {
   margin: 8px 0;

@@ -10,6 +10,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from django.utils import timezone
 
 from .services import perform_analysis, get_cached_news, get_stock_info, get_news, search_symbols, get_options
+from ai.tools import load_document
 
 logger = logging.getLogger(__name__)
 
@@ -361,5 +362,6 @@ STOCKS_TOOLS = [
     get_cycle_analysis,
     get_options_data,
     search_stock_symbol,
-    internet_search
+    internet_search,
+    load_document
 ]

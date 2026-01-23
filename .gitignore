@@ -81,6 +81,7 @@ secrets.json
 # Static files
 backend/staticfiles/
 backend/static/
+backend/media/
 
 # Node.js / Frontend
 node_modules/

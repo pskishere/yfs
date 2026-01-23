@@ -2,8 +2,8 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, notification, Empty, Flex, GetRef, Dropdown, Tag, type MenuProps } from 'antd';
-import { Sender, ThoughtChain, type SenderProps } from '@ant-design/x';
+import { Drawer, Button, notification, Empty, Flex, GetRef, Dropdown, Tag, type MenuProps, type GetProp, App, Badge } from 'antd';
+import { Sender, ThoughtChain, type SenderProps, Attachments, type AttachmentsProps } from '@ant-design/x';
 import {
   StopOutlined,
   EditOutlined,
@@ -17,9 +17,13 @@ import {
   ReadOutlined,
   FundOutlined,
   ThunderboltOutlined,
+  CloudUploadOutlined,
+  FileImageOutlined,
+  FileWordOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
-import { createChatSession } from '../services/api';
+import { createChatSession, uploadFile } from '../services/api';
 import { getSubscriptions } from '../domains/stock/service';
 import { registry } from '../framework/core/registry';
 import ReactMarkdown from 'react-markdown';
@@ -281,6 +285,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [activeSkill, setActiveSkill] = useState<SenderProps['skill']>(undefined);
   const [slotConfig, setSlotConfig] = useState<SenderProps['slotConfig']>(undefined);
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<GetProp<AttachmentsProps, 'items'>>([]);
+  const [openAttachments, setOpenAttachments] = useState(false);
+  const attachmentsRef = useRef<GetRef<typeof Attachments>>(null);
   const skipNextChange = useRef(false);
   const [api, contextHolder] = notification.useNotification();
   
@@ -290,6 +297,47 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     symbol: string;
     module: string;
   }>({ open: false, symbol: '', module: '' });
+
+  // 滚动自动隐藏输入框相关状态
+  const [isInputVisible, setIsInputVisible] = useState(true);
+  const scrollTimeoutRef = useRef<any>(null);
+  const hideTimeoutRef = useRef<any>(null);
+  const showTimeoutRef = useRef<any>(null);
+
+  const handleScroll = () => {
+    if (showTimeoutRef.current) {
+        clearTimeout(showTimeoutRef.current);
+        showTimeoutRef.current = null;
+    }
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    if (isInputVisible && !hideTimeoutRef.current) {
+      hideTimeoutRef.current = setTimeout(() => {
+        setIsInputVisible(false);
+        hideTimeoutRef.current = null;
+      }, 500);
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+            hideTimeoutRef.current = null;
+        }
+        showTimeoutRef.current = setTimeout(() => {
+            setIsInputVisible(true);
+        }, 500);
+    }, 100);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      if (showTimeoutRef.current) clearTimeout(showTimeoutRef.current);
+    };
+  }, []);
 
   const handleOpenComponentDrawer = (symbol: string, module: string) => {
     setDrawerState({ open: true, symbol, module });
@@ -765,7 +813,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [active, sessionId, model]);
 
   const handleSendMessage = async (message: string, _event?: any, skill?: any) => {
-    if (!message.trim() && !skill && !activeSkill) return;
+    // 如果有附件，将附件信息添加到消息中
+    let finalMessage = message;
+    if (attachments.length > 0) {
+      const attachmentText = attachments.map(item => {
+        // @ts-ignore
+        return `[Attachment: ${item.name}](${item.url})`;
+      }).join('\n');
+      finalMessage = `${message}\n\n${attachmentText}`.trim();
+    }
+
+    if (!finalMessage.trim() && !skill && !activeSkill) return;
 
     // 如果还没有连接，说明是第一次发送消息（或者是连接断开了）
     if (!isConnected || !wsClient.isConnected()) {
@@ -799,7 +857,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     const finalSkill = skill || activeSkill;
-    const fullMessage = finalSkill ? `/${finalSkill.value} ${message}` : message;
+    const fullMessage = finalSkill ? `/${finalSkill.value} ${finalMessage}` : finalMessage;
 
     // 如果处于编辑模式
     if (editingMessageId) {
@@ -809,6 +867,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       }
       setEditingMessageId(null);
       setInputText('');
+      setAttachments([]);
+      setOpenAttachments(false);
       setActiveSkill(undefined);
       setSlotConfig(undefined);
       return;
@@ -832,12 +892,200 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     currentStreamingIdRef.current = aiPlaceholder.id;
     setIsStreaming(true);
     setInputText('');
+    setAttachments([]);
+    setOpenAttachments(false);
 
     // 发送到服务器
     wsClient.sendMessage(fullMessage);
     setActiveSkill(undefined);
     setSlotConfig(undefined);
   };
+
+  const handleFileChange: AttachmentsProps['onChange'] = async (info) => {
+    const { fileList } = info;
+    
+    // 处理文件上传
+    for (const file of fileList) {
+       // 如果是新添加的文件（antd upload 会先添加一个 file 对象）
+       if (file.status === 'uploading' && !attachments.some(a => a.uid === file.uid && a.status === 'done')) {
+            try {
+              // 检查是否已经在上传中或已完成
+              const isProcessing = attachments.some(a => a.uid === file.uid);
+              if (!isProcessing) {
+                  // 添加到列表显示上传中
+                  setAttachments(prev => [...prev, {
+                    uid: file.uid,
+                    name: file.name,
+                    status: 'uploading',
+                  }]);
+
+                  const result = await uploadFile(file.originFileObj as File);
+                  
+                  setAttachments(prev => prev.map(item => {
+                    if (item.uid === file.uid) {
+                      return {
+                        uid: file.uid,
+                        name: file.name,
+                        status: 'done',
+                        url: result.url,
+                        // @ts-ignore
+                        path: result.path,
+                      };
+                    }
+                    return item;
+                  }));
+              }
+            } catch (error) {
+              console.error('File upload failed:', error);
+               setAttachments(prev => prev.map(item => {
+                if (item.uid === file.uid) {
+                  return {
+                    ...item,
+                    status: 'error',
+                  };
+                }
+                return item;
+              }));
+            }
+       }
+    }
+
+    // 处理删除
+    if (fileList.length < attachments.length) {
+        setAttachments(prev => prev.filter(item => fileList.some(f => f.uid === item.uid)));
+    }
+  };
+
+  // 简化版文件处理
+  const handleUploadChange: AttachmentsProps['onChange'] = async ({ file, fileList }) => {
+    if (file.status === 'removed') {
+        setAttachments(prev => prev.filter(item => item.uid !== file.uid));
+        return;
+    }
+    
+    // 添加新文件占位
+    if (!attachments.some(item => item.uid === file.uid)) {
+        // 确保有文件对象
+        const fileObj = file.originFileObj || (file as unknown as File);
+        if (!fileObj) {
+            console.error('No file object found', file);
+            return;
+        }
+
+        setAttachments(prev => [...prev, {
+            uid: file.uid,
+            name: file.name,
+            status: 'uploading',
+        }]);
+        
+        try {
+            console.log('Uploading file:', fileObj);
+            const result = await uploadFile(fileObj as File);
+            setAttachments(prev => prev.map(item => {
+                if (item.uid === file.uid) {
+                    return {
+                        ...item,
+                        status: 'done',
+                        url: result.url,
+                        // @ts-ignore
+                        path: result.path,
+                    };
+                }
+                return item;
+            }));
+        } catch (error) {
+             console.error('Upload failed:', error);
+             setAttachments(prev => prev.map(item => {
+                if (item.uid === file.uid) {
+                    return {
+                        ...item,
+                        status: 'error',
+                    };
+                }
+                return item;
+            }));
+        }
+    }
+  };
+
+  // 自动打开附件面板当有附件时
+  useEffect(() => {
+    if (attachments.length > 0) {
+      setOpenAttachments(true);
+    }
+  }, [attachments.length]);
+
+  const acceptItem = [
+    {
+      key: 'image',
+      label: (
+        <Flex gap="small">
+          <FileImageOutlined />
+          <span>图片</span>
+        </Flex>
+      ),
+    },
+    {
+      key: 'docs',
+      label: (
+        <Flex gap="small">
+          <FileWordOutlined />
+          <span>文档</span>
+        </Flex>
+      ),
+    },
+    {
+        key: 'all',
+        label: (
+            <Flex gap="small">
+                <LinkOutlined />
+                <span>所有文件</span>
+            </Flex>
+        )
+    }
+  ];
+
+  const selectFile = ({ key }: { key: string }) => {
+    attachmentsRef?.current?.select({
+      accept: key === 'image' ? '.png,.jpg,.jpeg,.gif,.webp' : 
+              key === 'docs' ? '.doc,.docx,.pdf,.txt,.md,.csv,.xlsx' : undefined,
+      multiple: true,
+    });
+  };
+
+  const senderHeader = (
+    <Sender.Header
+      title="附件"
+      open={openAttachments}
+      onOpenChange={setOpenAttachments}
+      forceRender
+      styles={{
+        content: {
+          padding: 0,
+        },
+      }}
+    >
+      <Attachments
+        ref={attachmentsRef}
+        multiple
+        beforeUpload={() => false} // 手动上传
+        items={attachments}
+        onChange={handleUploadChange}
+        placeholder={(type) =>
+          type === 'drop'
+            ? {
+                title: 'Drop file here',
+              }
+            : {
+                icon: <CloudUploadOutlined />,
+                title: '上传文件',
+                description: '点击或拖拽文件到此处上传',
+              }
+        }
+        getDropContainer={() => senderRef.current?.nativeElement}
+      />
+    </Sender.Header>
+  );
 
   const handleRegenerate = (messageId?: string) => {
     if (!isConnected || isStreaming) {
@@ -930,13 +1178,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          position: 'relative',
         }}
       >
         <div
+          className="no-scrollbar"
+          onScroll={handleScroll}
           style={{
             flex: 1,
             overflowY: 'auto',
             padding: '16px',
+            paddingBottom: '120px',
             background: '#fafafa',
           }}
         >
@@ -969,9 +1221,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
         <div
           style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 100,
             borderTop: '1px solid #f0f0f0',
             padding: '12px 16px',
             background: '#fff',
+            transition: 'transform 0.3s ease, opacity 0.3s ease',
+            transform: isInputVisible ? 'translateY(0)' : 'translateY(100%)',
+            opacity: isInputVisible ? 1 : 0,
           }}
         >
           {editingMessageId && (
@@ -1028,6 +1288,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             submitType="enter"
             autoSize={{ minRows: 1, maxRows: 6 }}
             slotConfig={slotConfig}
+            header={senderHeader}
             footer={(actionNode: React.ReactNode) => {
               const items: MenuProps['items'] = commandSuggestions.map(item => ({
                 key: item.value,
@@ -1076,6 +1337,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             backgroundColor: '#e6f4ff'
                           }}
                         />
+                    </Dropdown>
+                    <Dropdown 
+                      menu={{ items: acceptItem, onClick: selectFile }}
+                      placement="topLeft"
+                      trigger={['click']}
+                    >
+                      <Button 
+                        type="text" 
+                        icon={
+                          <Badge dot={attachments.length > 0 && !openAttachments}>
+                            <LinkOutlined />
+                          </Badge>
+                        }
+                      />
                     </Dropdown>
                     <div style={{ fontSize: 12, color: '#999' }}>
                       {isConnected ? (
@@ -1154,6 +1429,7 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          overflow: 'hidden',
         },
         wrapper: {
           width: isMobile ? '100%' : 800
