@@ -15,8 +15,7 @@ class ModelListView(APIView):
         models = [
             {"id": "deepseek-v3.1:671b-cloud", "name": "DeepSeek V3.1 (671B)", "provider": "DeepSeek"},
             {"id": "deepseek-v3.2:cloud", "name": "DeepSeek V3.2 (Cloud)", "provider": "DeepSeek"},
-            {"id": "gpt-4o", "name": "GPT-4o", "provider": "OpenAI"},
-            {"id": "qwen3:32b", "name": "Qwen3 32B", "provider": "Alibaba"},
+            {"id": "gpt-oss:120b-cloud", "name": "GPT-OSS 120B (Cloud)", "provider": "OpenAI"}
         ]
         return Response(models)
 
