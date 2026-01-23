@@ -1,5 +1,5 @@
 import { api, handleResponse, handleError } from '../../services/api';
-import type { ExampleItem, SystemStatus, GenerateRandomParams } from './types';
+import type { ExampleItem, GenerateRandomParams } from './types';
 import type { ApiResponse } from '../../types';
 
 const BASE_URL = '/api/example/items';

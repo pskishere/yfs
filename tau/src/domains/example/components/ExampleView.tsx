@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Typography, List, Alert, Button, Space, Table, Tag, message } from 'antd';
-import { SmileOutlined, ThunderboltOutlined, ReloadOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons';
+import { SmileOutlined, ReloadOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons';
 import { exampleService } from '../service';
 import type { ExampleItem } from '../types';
 
