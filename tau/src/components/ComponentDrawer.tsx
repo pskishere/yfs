@@ -1,25 +1,26 @@
 /**
- * 股票组件渲染器 - 用于在聊天气泡中动态加载并显示股票分析模块
+ * 组件详情抽屉组件 - 全局单例，用于显示详细信息
  */
 import React, { useState, useEffect } from 'react';
-import { Spin, Empty, Button, Drawer } from 'antd';
-import { LineChartOutlined, FundOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Spin, Empty, Drawer } from 'antd';
 import { analyze, getOptions } from '../services/api';
 import type { AnalysisResult, OptionsData } from '../types/index';
-
-// 导入所有股票分析组件
 import { ChartSection } from './ChartSection';
 import { OptionsTable } from './OptionsTable';
 import { CycleAnalysis } from './CycleAnalysis';
 
-interface StockComponentRendererProps {
+interface ComponentDrawerProps {
+  open: boolean;
+  onClose: () => void;
   symbol: string;
   module: string;
   duration?: string;
   barSize?: string;
 }
 
-const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
+export const ComponentDrawer: React.FC<ComponentDrawerProps> = ({
+  open,
+  onClose,
   symbol,
   module,
   duration = '5y',
@@ -28,12 +29,18 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AnalysisResult | null>(null);
   const [optionsData, setOptionsData] = useState<OptionsData | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+
+  // 当 symbol 或 module 变化时，重置状态
+  useEffect(() => {
+    setData(null);
+    setOptionsData(null);
+    setHasFetched(false);
+  }, [symbol, module]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!symbol || hasFetched || !drawerOpen) return;
+      if (!symbol || hasFetched || !open) return;
       setLoading(true);
       try {
         // 根据 module 决定请求的模块
@@ -66,23 +73,21 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
         setHasFetched(true);
       } catch (error) {
         console.error('加载股票组件数据失败:', error);
-        // message.error(`加载 ${symbol} 数据失败`);
       } finally {
         setLoading(false);
       }
     };
 
-    if (drawerOpen) {
+    if (open) {
       fetchData();
     }
-  }, [symbol, module, duration, barSize, drawerOpen, hasFetched]);
+  }, [symbol, module, duration, barSize, open, hasFetched]);
 
   const currencySymbol = (data as any)?.currency_symbol || (data?.extra_data as any)?.currency_symbol || '$';
 
   let content: React.ReactNode = null;
   let title = '';
   let drawerTitle: React.ReactNode = '';
-  let icon = null;
 
   // 根据 module 参数渲染对应组件
   switch (module.toLowerCase()) {
@@ -91,7 +96,6 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
     case 'k线':
       title = `${symbol} K线图表`;
       drawerTitle = title;
-      icon = <LineChartOutlined />;
       content = (
         <ChartSection
           analysisResult={data!}
@@ -112,7 +116,6 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
           )}
         </span>
       );
-      icon = <FundOutlined />;
       content = optionsData ? (
         <OptionsTable
           data={optionsData}
@@ -132,7 +135,6 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
           )}
         </span>
       );
-      icon = <HistoryOutlined />;
       content = (
         <CycleAnalysis
           analysisResult={data!}
@@ -141,47 +143,36 @@ const StockComponentRenderer: React.FC<StockComponentRendererProps> = ({
       );
       break;
     default:
-      return <Empty description={`不支持的模块: ${module}`} />;
+      content = <Empty description={`不支持的模块: ${module}`} />;
+      drawerTitle = `${symbol} ${module}`;
   }
 
   return (
-    <>
-      <Button 
-        type="primary" 
-        ghost 
-        size="small"
-        icon={icon} 
-        onClick={() => setDrawerOpen(true)}
-        style={{ margin: '4px 8px 4px 0' }}
-      >
-        {title}
-      </Button>
-      <Drawer
-        title={drawerTitle}
-        placement="right"
-        onClose={() => setDrawerOpen(false)}
-        open={drawerOpen}
-        destroyOnClose
-        styles={{ 
-          body: { padding: '0' },
-          wrapper: { width: window.innerWidth > 768 ? '85%' : '100%' }
-        }}
-      >
-        <div style={{ padding: '24px' }}>
-          {loading ? (
-            <div style={{ padding: '20px', textAlign: 'center', background: '#f9f9f9', borderRadius: '8px', margin: '10px 0' }}>
-              <Spin />
-              <div style={{ marginTop: 8, color: '#999' }}>正在加载 {symbol} {module} 数据...</div>
-            </div>
-          ) : (!data && module.toLowerCase() !== 'options' && module.toLowerCase() !== '期权') || (module.toLowerCase() === 'options' && !optionsData && !loading) ? (
-            <Empty description={`未能获取 ${symbol} 的数据`} />
-          ) : (
-            content
-          )}
-        </div>
-      </Drawer>
-    </>
+    <Drawer
+      title={drawerTitle}
+      placement="right"
+      onClose={onClose}
+      open={open}
+      destroyOnClose
+      styles={{ 
+        body: { padding: '0' },
+        wrapper: { width: window.innerWidth > 768 ? '85%' : '100%' }
+      }}
+    >
+      <div style={{ padding: '24px' }}>
+        {loading ? (
+          <div style={{ padding: '20px', textAlign: 'center', background: '#f9f9f9', borderRadius: '8px', margin: '10px 0' }}>
+            <Spin />
+            <div style={{ marginTop: 8, color: '#999' }}>正在加载 {symbol} {module} 数据...</div>
+          </div>
+        ) : (!data && module.toLowerCase() !== 'options' && module.toLowerCase() !== '期权') || (module.toLowerCase() === 'options' && !optionsData && !loading) ? (
+          <Empty description={`未能获取 ${symbol} 的数据`} />
+        ) : (
+          content
+        )}
+      </div>
+    </Drawer>
   );
 };
 
-export default StockComponentRenderer;
+export default ComponentDrawer;

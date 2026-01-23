@@ -22,7 +22,8 @@ import { wsClient } from '../services/websocket';
 import { getSubscriptions } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import StockComponentRenderer from './StockComponentRenderer';
+import ComponentRenderer from './ComponentRenderer';
+import ComponentDrawer from './ComponentDrawer';
 import './ChatDrawer.css';
 
 interface ChatDrawerProps {
@@ -78,7 +79,8 @@ const MessageBubble: React.FC<{
   onEdit?: (message: MessageItem) => void;
   onRegenerate?: (messageId: string) => void;
   isStreaming?: boolean;
-}> = ({ message, onEdit, onRegenerate, isStreaming }) => {
+  onOpenComponentDrawer?: (symbol: string, module: string) => void;
+}> = ({ message, onEdit, onRegenerate, isStreaming, onOpenComponentDrawer }) => {
   const isUser = message.role === 'user';
   const isCompleted = message.status === 'completed';
 
@@ -173,10 +175,11 @@ const MessageBubble: React.FC<{
                           }
 
                           parts.push(
-                            <StockComponentRenderer
+                            <ComponentRenderer
                               key={`stock-${match.index}`}
                               symbol={match[1]}
                               module={match[2]}
+                              onOpen={onOpenComponentDrawer || (() => {})}
                             />
                           );
 
@@ -285,6 +288,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
   const skipNextChange = useRef(false);
   const [api, contextHolder] = notification.useNotification();
+  
+  // 组件详情抽屉状态
+  const [drawerState, setDrawerState] = useState<{
+    open: boolean;
+    symbol: string;
+    module: string;
+  }>({ open: false, symbol: '', module: '' });
+
+  const handleOpenComponentDrawer = (symbol: string, module: string) => {
+    setDrawerState({ open: true, symbol, module });
+  };
 
   // 获取订阅股票
   const fetchSubscriptions = async () => {
@@ -937,6 +951,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   onEdit={handleStartEdit}
                   onRegenerate={handleRegenerate}
                   isStreaming={isStreaming}
+                  onOpenComponentDrawer={handleOpenComponentDrawer}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -1097,6 +1112,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           />
         </div>
       </div>
+      
+      <ComponentDrawer
+        open={drawerState.open}
+        onClose={() => setDrawerState(prev => ({ ...prev, open: false }))}
+        symbol={drawerState.symbol}
+        module={drawerState.module}
+      />
     </>
   );
 };

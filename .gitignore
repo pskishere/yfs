@@ -78,6 +78,10 @@ secrets.json
 *.backup
 *~.nib
 
+# Static files
+backend/staticfiles/
+backend/static/
+
 # Node.js / Frontend
 node_modules/
 npm-debug.log*
