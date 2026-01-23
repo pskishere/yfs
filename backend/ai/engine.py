@@ -158,6 +158,8 @@ class AIAgentEngine:
             # 监听工具调用开始
             elif kind == "on_tool_start":
                 tool_name = event['name']
+                tool_input = event['data'].get('input')
+                print(f"\n[Tool Call] Starting {tool_name} with input: {tool_input}")
                 display_name = self.config.tool_display_names.get(tool_name, tool_name)
                 yield {
                     "type": "thought",
@@ -169,6 +171,8 @@ class AIAgentEngine:
             # 监听工具调用结束
             elif kind == "on_tool_end":
                 tool_name = event['name']
+                tool_output = event['data'].get('output')
+                print(f"\n[Tool Call] Finished {tool_name} with output: {str(tool_output)[:500]}")
                 display_name = self.config.tool_display_names.get(tool_name, tool_name)
                 yield {
                     "type": "thought",
@@ -201,6 +205,7 @@ class AIAgentEngine:
             found_thoughts = think_pattern.findall(response_content)
             
             for thought in found_thoughts:
+                print(f"\n{'='*20} Chain of Thought {'='*20}\n{thought.strip()}\n{'='*58}\n")
                 thoughts.append({
                     "type": "thought",
                     "content": thought.strip(),

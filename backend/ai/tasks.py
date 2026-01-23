@@ -2,6 +2,7 @@
 后台任务模块 - 异步执行 AI 对话任务
 """
 import asyncio
+import re
 from channels.layers import get_channel_layer
 from asgiref.sync import sync_to_async
 import logging
@@ -109,31 +110,85 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
                 }
             elif chunk["type"] == "thought":
                 # 更新本地思维链记录
+                tool_name = chunk.get("tool")
+                status = chunk["status"]
+                
+                # 生成唯一key: 如果是 loading 状态，则可能是新的步骤；如果是 success，则更新对应的步骤
+                # 但简单起见，我们应该允许同名工具多次调用
+                # 策略：
+                # 1. 如果是 loading，始终追加新条目（即使同名）
+                # 2. 如果是 success，更新最后一个匹配同名且状态为 loading 的条目
+                
                 thought_data = {
-                    'key': chunk.get("tool"),
+                    'key': tool_name,
                     'title': chunk["content"],
-                    'status': chunk["status"]
+                    'status': status
                 }
                 
-                # 查找是否已存在该工具的记录
-                existing_index = -1
-                for i, t in enumerate(current_thoughts):
-                    if t.get('key') == thought_data['key']:
-                        existing_index = i
-                        break
-                
-                if existing_index > -1:
-                    current_thoughts[existing_index] = thought_data
-                else:
+                if status == "loading":
+                    # 新开始一个工具调用，直接追加
+                    # 为了前端唯一性，可以给 key 加后缀，或者前端使用 index 渲染
+                    # 这里我们在 key 中加入时间戳或随机数会更好，但为了保持协议简单，
+                    # 我们仅在 python list 中追加。
+                    # 注意：如果前端依赖 key 去重，会有问题。
+                    # 我们给 key 加一个唯一标识
+                    import uuid
+                    unique_key = f"{tool_name}_{uuid.uuid4().hex[:8]}"
+                    thought_data['key'] = unique_key
+                    # 同时保留原始 tool name 供显示用（如果需要）
+                    thought_data['toolName'] = tool_name
                     current_thoughts.append(thought_data)
-                
-                payload = {
-                    'type': 'thought',
-                    'message_id': message_id,
-                    'thought': chunk["content"],
-                    'status': chunk["status"],
-                    'tool': chunk.get("tool")
-                }
+                    
+                    # 发送给前端的 payload 也带上这个 unique key
+                    payload = {
+                        'type': 'thought',
+                        'message_id': message_id,
+                        'thought': chunk["content"],
+                        'status': status,
+                        'tool': unique_key # 使用唯一 key
+                    }
+                    
+                else: # success or other status
+                    # 找到最后一个同名且未完成的 task 进行更新
+                    target_index = -1
+                    for i in range(len(current_thoughts) - 1, -1, -1):
+                        t = current_thoughts[i]
+                        # 检查原始 toolName (如果有) 或者 key 前缀
+                        current_tool_name = t.get('toolName', t.get('key'))
+                        if current_tool_name == tool_name and t['status'] == 'loading':
+                            target_index = i
+                            break
+                    
+                    if target_index > -1:
+                        # 更新状态和标题
+                        current_thoughts[target_index]['status'] = status
+                        current_thoughts[target_index]['title'] = chunk["content"]
+                        
+                        # 使用已有的 unique key
+                        unique_key = current_thoughts[target_index]['key']
+                        
+                        payload = {
+                            'type': 'thought',
+                            'message_id': message_id,
+                            'thought': chunk["content"],
+                            'status': status,
+                            'tool': unique_key
+                        }
+                    else:
+                        # 找不到对应的开始记录（异常情况），就当作新的追加
+                        import uuid
+                        unique_key = f"{tool_name}_{uuid.uuid4().hex[:8]}"
+                        thought_data['key'] = unique_key
+                        thought_data['toolName'] = tool_name
+                        current_thoughts.append(thought_data)
+                        
+                        payload = {
+                            'type': 'thought',
+                            'message_id': message_id,
+                            'thought': chunk["content"],
+                            'status': status,
+                            'tool': unique_key
+                        }
 
             # 发送到 Group
             if payload:
@@ -146,6 +201,12 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
                 )
         
         # 完成 - 保存完整回复和思维链
+        # 提取并打印思维链
+        think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
+        found_thoughts = think_pattern.findall(full_response)
+        for thought in found_thoughts:
+            print(f"\n{'='*20} Chain of Thought {'='*20}\n{thought.strip()}\n{'='*58}\n")
+
         await sync_to_async(ChatMessage.objects.filter(id=message_id).update)(
             content=full_response,
             thoughts=current_thoughts,

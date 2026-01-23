@@ -122,8 +122,27 @@ export interface ChatSession {
 }
 
 /**
- * 获取热门股票列表（仅美股）
+ * 获取 AI 模型列表
  */
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+}
+
+export const getAiModels = async (): Promise<AIModel[]> => {
+  try {
+    const response = await api.get('/api/chat/models/');
+    const data = handleResponse(response);
+    if (Array.isArray(data)) {
+      return data as unknown as AIModel[];
+    }
+    return [];
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
 export const getChatSessions = async (): Promise<ChatSession[]> => {
   try {
     const response = await api.get('/api/chat/sessions/');

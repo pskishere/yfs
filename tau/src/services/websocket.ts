@@ -394,6 +394,7 @@ export class WebSocketClient {
    */
   disconnect() {
     this.isManualClose = true;
+    this.connectionPromise = null;
     if (this.ws) {
       this.ws.close();
       this.ws = null;

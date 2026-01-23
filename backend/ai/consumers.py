@@ -49,6 +49,7 @@ class AIChatConsumer(AsyncWebsocketConsumer):
         # 获取查询参数中的 model
         from urllib.parse import parse_qs
         query_string = self.scope.get('query_string', b'').decode('utf-8')
+        logger.info(f"WebSocket raw query string: {query_string}")
         query_params = parse_qs(query_string)
         model = query_params.get('model', [None])[0]
         
