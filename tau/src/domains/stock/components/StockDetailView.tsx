@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Spin, Empty } from 'antd';
 import { registry } from '../../../framework/core/registry';
-import { analyze, getOptions } from '../../../services/api';
+import { analyze, getOptions } from '../service';
 import type { AnalysisResult, OptionsData } from '../../../types/index';
 import { ChartSection } from './ChartSection';
 import { OptionsTable } from './OptionsTable';

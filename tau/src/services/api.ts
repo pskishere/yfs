@@ -4,9 +4,6 @@
 import axios, { type AxiosResponse } from 'axios';
 import type {
   ApiResponse,
-  AnalysisResult,
-  SubscriptionStock,
-  OptionsData,
 } from '../types/index';
 
 // API基础URL
@@ -57,7 +54,7 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 
 // 创建axios实例
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000, // 增加默认超时时间到60秒
   headers: {
@@ -71,7 +68,7 @@ const api = axios.create({
  * @param response - Axios响应对象
  * @returns 解析后的响应数据
  */
-const handleResponse = <T = any>(response: AxiosResponse<ApiResponse<T>>): ApiResponse<T> => {
+export const handleResponse = <T = any>(response: AxiosResponse<ApiResponse<T>>): ApiResponse<T> => {
   // 如果 response.data 是字符串，尝试解析为 JSON
   if (typeof response.data === 'string') {
     try {
@@ -90,7 +87,7 @@ const handleResponse = <T = any>(response: AxiosResponse<ApiResponse<T>>): ApiRe
  * @param error - 错误对象
  * @throws 抛出带有错误信息的Error
  */
-const handleError = (error: any): never => {
+export const handleError = (error: any): never => {
   if (error.response) {
     // 服务器返回了错误状态码
     throw new Error(error.response.data?.message || `请求失败: ${error.response.status}`);
@@ -100,126 +97,6 @@ const handleError = (error: any): never => {
   } else {
     // 其他错误
     throw new Error(error.message || '请求失败');
-  }
-};
-
-/**
- * 技术分析 - 获取数据并保存到数据库（不包含AI分析）
- * @param symbol - 股票代码
- * @param duration - 数据周期，默认 '5y'
- * @param barSize - K线周期，默认 '1 day'
- * @param modules - 需要加载的模块列表 (可选)
- */
-export const analyze = async (
-  symbol: string,
-  duration: string = '5y',
-  barSize: string = '1 day',
-  modules: string[] = []
-): Promise<AnalysisResult> => {
-  try {
-    const params = new URLSearchParams({
-      duration: duration,
-      bar_size: barSize,
-    });
-    
-    if (modules && modules.length > 0) {
-      params.append('modules', modules.join(','));
-    }
-
-    const response = await api.get<AnalysisResult>(
-      `/api/stocks/${symbol.toUpperCase()}/?${params.toString()}`,
-      {
-        timeout: 60000, // 数据获取超时时间60秒
-      }
-    );
-    return handleResponse<AnalysisResult>(response) as AnalysisResult;
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 查询分析状态
- */
-export const getAnalysisStatus = async (
-  symbol: string,
-  duration: string = '5y',
-  barSize: string = '1 day'
-): Promise<AnalysisResult> => {
-  try {
-    const params = new URLSearchParams({
-      duration: duration,
-      bar_size: barSize,
-    });
-    const response = await api.get<AnalysisResult>(
-      `/api/stocks/${symbol.toUpperCase()}/status/?${params.toString()}`
-    );
-    return handleResponse<AnalysisResult>(response) as AnalysisResult;
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 获取订阅股票列表（仅美股）
- */
-export const getSubscriptions = async (): Promise<ApiResponse<SubscriptionStock[]>> => {
-  try {
-    const response = await api.get<ApiResponse<SubscriptionStock[]>>(
-      `/api/stocks/subscriptions/`
-    );
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 删除股票缓存数据
- */
-export const deleteStock = async (symbol: string): Promise<ApiResponse> => {
-  try {
-    const response = await api.delete<ApiResponse>(`/api/stocks/${symbol.toUpperCase()}`);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-
-
-/**
- * 刷新分析 - 强制重新获取数据，不使用缓存（不包含AI分析）
- * @param symbol - 股票代码
- * @param duration - 数据周期，默认 '5y'
- * @param barSize - K线周期，默认 '1 day'
- */
-export const refreshAnalyze = async (
-  symbol: string,
-  duration: string = '5y',
-  barSize: string = '1 day'
-): Promise<AnalysisResult> => {
-  try {
-    const params = new URLSearchParams({
-      duration: duration,
-      bar_size: barSize,
-    });
-
-    const response = await api.post<AnalysisResult>(
-      `/api/stocks/${symbol.toUpperCase()}/refresh/?${params.toString()}`,
-      {},
-      {
-        timeout: 60000, // 刷新超时时间60秒
-      }
-    );
-    return handleResponse<AnalysisResult>(response) as AnalysisResult;
-  } catch (error) {
-    handleError(error);
-    throw error;
   }
 };
 
@@ -243,35 +120,6 @@ export interface ChatSession {
   created_at: string;
   updated_at: string;
 }
-
-/**
- * 获取期权数据
- */
-export const getOptions = async (symbol: string): Promise<ApiResponse<OptionsData>> => {
-  try {
-    const response = await api.get<ApiResponse<OptionsData>>(`/api/stocks/${symbol.toUpperCase()}/options/`);
-    return handleResponse(response);
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
-
-/**
- * 搜索股票代码
- * @param query - 关键词
- */
-export const searchStocks = async (query: string): Promise<{ success: boolean; results: any[] }> => {
-  try {
-    const params = new URLSearchParams({ q: query });
-    const response = await api.get(`/api/stocks/search/?${params.toString()}`);
-    const data = handleResponse(response);
-    return { success: data.success, results: data.results || [] };
-  } catch (error) {
-    handleError(error);
-    throw error;
-  }
-};
 
 /**
  * 获取热门股票列表（仅美股）

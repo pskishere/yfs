@@ -19,7 +19,8 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
-import { getSubscriptions, createChatSession } from '../services/api';
+import { createChatSession } from '../services/api';
+import { getSubscriptions } from '../domains/stock/service';
 import { registry } from '../framework/core/registry';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

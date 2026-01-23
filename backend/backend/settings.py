@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'channels',
     'ai',
     'stock',
+    'example',
 ]
 
 MIDDLEWARE = [
