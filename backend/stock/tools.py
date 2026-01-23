@@ -6,6 +6,7 @@ import logging
 import json
 from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
+from langchain_community.tools import DuckDuckGoSearchRun
 from django.utils import timezone
 
 from .services import perform_analysis, get_cached_news, get_stock_info, get_news, search_symbols, get_options
@@ -338,6 +339,19 @@ def get_options_data(symbol: str) -> str:
     result.append("\n*注：以上仅显示部分数据，完整数据请查看期权分析面板。*")
     return "\n".join(result)
 
+@tool
+def internet_search(query: str) -> str:
+    """
+    使用搜索引擎查询互联网上的实时信息。
+    当需要获取最新的市场新闻、宏观经济数据、公司公告、行业动态或任何现有工具无法提供的外部信息时使用。
+    """
+    try:
+        search = DuckDuckGoSearchRun(name='DuckDuckGo搜索')
+        return search.invoke(query)
+    except Exception as e:
+        logger.error(f"DuckDuckGo search failed for query '{query}': {e}")
+        return f"搜索遭遇错误: {str(e)}"
+
 # 定义所有可用工具列表
 STOCKS_TOOLS = [
     get_all_stock_data,
@@ -346,5 +360,6 @@ STOCKS_TOOLS = [
     get_fundamental_data,
     get_cycle_analysis,
     get_options_data,
-    search_stock_symbol
+    search_stock_symbol,
+    internet_search
 ]

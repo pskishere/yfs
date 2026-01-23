@@ -21,7 +21,8 @@ class StockConfig(AppConfig):
                 "get_fundamental_data": "分析基本面",
                 "get_cycle_analysis": "分析周期规律",
                 "get_options_data": "获取期权数据",
-                "search_stock_symbol": "搜索股票代码"
+                "search_stock_symbol": "搜索股票代码",
+                "internet_search": "联网搜索"
             }
 
             AgentRegistry.register(

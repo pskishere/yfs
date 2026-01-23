@@ -1,5 +1,5 @@
-import { api, handleResponse, handleError } from '../../../services/api';
-import type { AnalysisResult, SubscriptionStock, OptionsData, ApiResponse } from '../../../types';
+import { api, handleResponse, handleError } from '../../services/api';
+import type { AnalysisResult, SubscriptionStock, OptionsData, ApiResponse } from '../../types';
 
 /**
  * 技术分析 - 获取数据并保存到数据库（不包含AI分析）
