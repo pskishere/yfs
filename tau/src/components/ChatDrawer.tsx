@@ -2,7 +2,7 @@
  * 聊天抽屉组件 - 参考 MobileChatPage 的布局设计
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Button, notification, Empty, Flex, GetRef, Dropdown, Tag, type MenuProps, type GetProp, App, Badge } from 'antd';
+import { Drawer, Button, notification, Empty, Flex, GetRef, Dropdown, Tag, type MenuProps, type GetProp, Badge } from 'antd';
 import { Sender, ThoughtChain, type SenderProps, Attachments, type AttachmentsProps } from '@ant-design/x';
 import {
   StopOutlined,
@@ -901,63 +901,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setSlotConfig(undefined);
   };
 
-  const handleFileChange: AttachmentsProps['onChange'] = async (info) => {
-    const { fileList } = info;
-    
-    // 处理文件上传
-    for (const file of fileList) {
-       // 如果是新添加的文件（antd upload 会先添加一个 file 对象）
-       if (file.status === 'uploading' && !attachments.some(a => a.uid === file.uid && a.status === 'done')) {
-            try {
-              // 检查是否已经在上传中或已完成
-              const isProcessing = attachments.some(a => a.uid === file.uid);
-              if (!isProcessing) {
-                  // 添加到列表显示上传中
-                  setAttachments(prev => [...prev, {
-                    uid: file.uid,
-                    name: file.name,
-                    status: 'uploading',
-                  }]);
-
-                  const result = await uploadFile(file.originFileObj as File);
-                  
-                  setAttachments(prev => prev.map(item => {
-                    if (item.uid === file.uid) {
-                      return {
-                        uid: file.uid,
-                        name: file.name,
-                        status: 'done',
-                        url: result.url,
-                        // @ts-ignore
-                        path: result.path,
-                      };
-                    }
-                    return item;
-                  }));
-              }
-            } catch (error) {
-              console.error('File upload failed:', error);
-               setAttachments(prev => prev.map(item => {
-                if (item.uid === file.uid) {
-                  return {
-                    ...item,
-                    status: 'error',
-                  };
-                }
-                return item;
-              }));
-            }
-       }
-    }
-
-    // 处理删除
-    if (fileList.length < attachments.length) {
-        setAttachments(prev => prev.filter(item => fileList.some(f => f.uid === item.uid)));
-    }
-  };
-
   // 简化版文件处理
-  const handleUploadChange: AttachmentsProps['onChange'] = async ({ file, fileList }) => {
+  const handleUploadChange: AttachmentsProps['onChange'] = async ({ file }) => {
     if (file.status === 'removed') {
         setAttachments(prev => prev.filter(item => item.uid !== file.uid));
         return;
