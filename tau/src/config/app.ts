@@ -1,5 +1,5 @@
-import { FinancialModule } from '../domains/financial';
+import { StockModule } from '../domains/stock';
 
 export const initApp = () => {
-  FinancialModule.init();
+  StockModule.init();
 };

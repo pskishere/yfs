@@ -5,7 +5,7 @@ import React from 'react';
 import { Table } from 'antd';
 import { translateFinancialTerm } from '../../../utils/formatters';
 
-interface FinancialTableProps {
+interface StockTableProps {
   data: any[];
   currencySymbol?: string;
 }
@@ -16,7 +16,7 @@ interface FinancialTableProps {
  * @param value - 财务数值
  * @returns 格式化后的字符串
  */
-const renderFinancialValue = (value: any, currencySymbol: string): string => {
+const renderStockValue = (value: any, currencySymbol: string): string => {
   if (value === null || value === undefined || value === '') return '-';
   const num = parseFloat(value);
   if (!isNaN(num)) {
@@ -51,7 +51,7 @@ const getColumns = (firstRecord: any, currencySymbol: string) => {
       title: translateFinancialTerm(key),
       dataIndex: key,
       key: key,
-      render: (value: any) => renderFinancialValue(value, currencySymbol),
+      render: (value: any) => renderStockValue(value, currencySymbol),
     }));
 
   return dateCol ? [dateCol, ...otherCols] : otherCols;
@@ -60,7 +60,7 @@ const getColumns = (firstRecord: any, currencySymbol: string) => {
 /**
  * 财务报表表格组件
  */
-export const FinancialTable: React.FC<FinancialTableProps> = ({ data, currencySymbol = '$' }) => {
+export const StockTable: React.FC<StockTableProps> = ({ data, currencySymbol = '$' }) => {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return null;
   }

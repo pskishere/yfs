@@ -1,39 +1,39 @@
 import { registry } from '../../framework/core/registry';
-import { FinancialDetailView } from './components/FinancialDetailView';
+import { StockDetailView } from './components/StockDetailView';
 import { LineChartOutlined, FundOutlined, HistoryOutlined } from '@ant-design/icons';
 
-export const FinancialModule = {
+export const StockModule = {
   init: () => {
     // Register the main view for different modules
-    registry.registerComponent('chart', FinancialDetailView, {
+    registry.registerComponent('chart', StockDetailView, {
       title: 'K线图表',
       icon: <LineChartOutlined />
     });
     
-    registry.registerComponent('options', FinancialDetailView, {
+    registry.registerComponent('options', StockDetailView, {
       title: '期权链',
       icon: <FundOutlined />
     });
 
-    registry.registerComponent('cycle', FinancialDetailView, {
+    registry.registerComponent('cycle', StockDetailView, {
       title: '周期分析',
       icon: <HistoryOutlined />
     });
     
     // Chinese aliases
-    registry.registerComponent('图表', FinancialDetailView, {
+    registry.registerComponent('图表', StockDetailView, {
       title: 'K线图表',
       icon: <LineChartOutlined />
     });
-    registry.registerComponent('k线', FinancialDetailView, {
+    registry.registerComponent('k线', StockDetailView, {
       title: 'K线图表',
       icon: <LineChartOutlined />
     });
-    registry.registerComponent('期权', FinancialDetailView, {
+    registry.registerComponent('期权', StockDetailView, {
       title: '期权链',
       icon: <FundOutlined />
     });
-    registry.registerComponent('周期', FinancialDetailView, {
+    registry.registerComponent('周期', StockDetailView, {
       title: '周期分析',
       icon: <HistoryOutlined />
     });

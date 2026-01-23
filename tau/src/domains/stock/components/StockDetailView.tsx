@@ -7,14 +7,14 @@ import { ChartSection } from './ChartSection';
 import { OptionsTable } from './OptionsTable';
 import { CycleAnalysis } from './CycleAnalysis';
 
-interface FinancialDetailViewProps {
+interface StockDetailViewProps {
   symbol: string;
   module: string;
   duration?: string;
   barSize?: string;
 }
 
-export const FinancialDetailView: React.FC<FinancialDetailViewProps> = ({
+export const StockDetailView: React.FC<StockDetailViewProps> = ({
   symbol,
   module,
   duration = '5y',

@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from typing import Optional, Dict, Any, Sequence, List
 import operator
@@ -193,7 +194,21 @@ class AIAgentEngine:
         
         # 提取思维链 (如果模型支持)
         thoughts = []
-        # TODO: 解析思维链
+        
+        # 解析思维链 (<think>...</think>)
+        if isinstance(response_content, str):
+            think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
+            found_thoughts = think_pattern.findall(response_content)
+            
+            for thought in found_thoughts:
+                thoughts.append({
+                    "type": "thought",
+                    "content": thought.strip(),
+                    "status": "success"
+                })
+            
+            # 移除思维链内容，只保留最终回复
+            response_content = think_pattern.sub('', response_content).strip()
              
         # 保存记忆
         memory.save_context(
