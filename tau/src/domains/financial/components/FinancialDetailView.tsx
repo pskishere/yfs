@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Spin, Empty } from 'antd';
+import { registry } from '../../../framework/core/registry';
 import { analyze, getOptions } from '../../../services/api';
 import type { AnalysisResult, OptionsData } from '../../../types/index';
 import { ChartSection } from './ChartSection';
@@ -126,7 +127,7 @@ export const FinancialDetailView: React.FC<FinancialDetailViewProps> = ({
       {loading ? (
         <div style={{ padding: '20px', textAlign: 'center', background: '#f9f9f9', borderRadius: '8px', margin: '10px 0' }}>
           <Spin />
-          <div style={{ marginTop: 8, color: '#999' }}>正在加载 {symbol} {module} 数据...</div>
+          <div style={{ marginTop: 8, color: '#999' }}>正在加载 {symbol} {registry.getMetadata(module)?.title || module} 数据...</div>
         </div>
       ) : (!data && module.toLowerCase() !== 'options' && module.toLowerCase() !== '期权') || (module.toLowerCase() === 'options' && !optionsData && !loading) ? (
         <Empty description={`未能获取 ${symbol} 的数据`} />
