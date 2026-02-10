@@ -23,13 +23,12 @@ class StockConfig(AppConfig):
                 "get_options_data": "获取期权数据",
                 "search_stock_symbol": "搜索股票代码",
                 "internet_search": "联网搜索",
-                "load_document": "加载文档"
             }
 
             AgentRegistry.register(
                 namespace="stock",
                 config=AgentConfig(
-                    model_name="deepseek-v3.2:cloud",
+                    model_name="deepseek-v3.1:671b-cloud",
                     tools=STOCKS_TOOLS,
                     system_prompt=ANALYST_PROMPT,
                     tool_display_names=TOOL_DISPLAY_NAMES

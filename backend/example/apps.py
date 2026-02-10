@@ -21,7 +21,7 @@ class ExampleConfig(AppConfig):
             AgentRegistry.register(
                 namespace="example",
                 config=AgentConfig(
-                    model_name="deepseek-v3.2:cloud",
+                    model_name="deepseek-v3.1:671b-cloud",
                     tools=EXAMPLE_TOOLS,
                     system_prompt=EXAMPLE_AGENT_PROMPT,
                     tool_display_names=TOOL_DISPLAY_NAMES

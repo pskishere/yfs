@@ -11,7 +11,7 @@ import ChatPage from './pages/Chat';
 import './App.css';
 
 const App: React.FC = () => {
-  const [model, setModel] = useState('deepseek-v3.2:cloud');
+  const [model, setModel] = useState('deepseek-v3.1:671b-cloud');
 
   return (
     <ConfigProvider 
