@@ -1,6 +1,6 @@
 import { registry } from '../../framework/core/registry';
 import { StockDetailView } from './components/StockDetailView';
-import { LineChartOutlined, FundOutlined, HistoryOutlined } from '@ant-design/icons';
+import { LineChartOutlined, FundOutlined, HistoryOutlined, ReadOutlined, RadarChartOutlined } from '@ant-design/icons';
 
 export const StockModule = {
   init: () => {
@@ -19,6 +19,16 @@ export const StockModule = {
       title: '周期分析',
       icon: <HistoryOutlined />
     });
+
+    registry.registerComponent('news', StockDetailView, {
+      title: '新闻资讯',
+      icon: <ReadOutlined />
+    });
+
+    registry.registerComponent('technical', StockDetailView, {
+      title: '技术指标',
+      icon: <RadarChartOutlined />
+    });
     
     // Chinese aliases
     registry.registerComponent('图表', StockDetailView, {
@@ -36,6 +46,18 @@ export const StockModule = {
     registry.registerComponent('周期', StockDetailView, {
       title: '周期分析',
       icon: <HistoryOutlined />
+    });
+    registry.registerComponent('新闻', StockDetailView, {
+      title: '新闻资讯',
+      icon: <ReadOutlined />
+    });
+    registry.registerComponent('指标', StockDetailView, {
+      title: '技术指标',
+      icon: <RadarChartOutlined />
+    });
+    registry.registerComponent('技术', StockDetailView, {
+      title: '技术指标',
+      icon: <RadarChartOutlined />
     });
 
     // Register suggestions

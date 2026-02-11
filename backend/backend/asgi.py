@@ -20,14 +20,17 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django_asgi_app = get_asgi_application()
 
 # 导入 WebSocket 路由
-from ai import routing
+from ai import routing as ai_routing
+from stock import routing as stock_routing
+
+combined_urlpatterns = ai_routing.websocket_urlpatterns + stock_routing.websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
             URLRouter(
-                routing.websocket_urlpatterns
+                combined_urlpatterns
             )
         )
     ),

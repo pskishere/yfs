@@ -2,7 +2,7 @@
  * 期权数据表格组件
  */
 import React, { useState } from 'react';
-import { Table, Tabs, Typography, Descriptions, Tag, Select } from 'antd';
+import { Table, Tabs, Typography, Descriptions, Tag, Select, Empty } from 'antd';
 import type { OptionsData } from '../../../types/index';
 
 const { Text } = Typography;
@@ -37,13 +37,18 @@ const formatPercent = (value: number | undefined | null) => {
 };
 
 export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
+  // 兼容两种数据结构: OptionsData (多日期) 和 OptionsSummary (单日期汇总)
+  const isSummary = 'current_expiry' in data && 'calls' in data;
+  
   const [activeDate, setActiveDate] = useState<string | undefined>(
-    data?.expiration_dates?.[0]
+    isSummary ? (data as any).current_expiry : (data as any).expiration_dates?.[0]
   );
   const [activeTab, setActiveTab] = useState<string>('calls');
 
-  if (!data || !data.expiration_dates || data.expiration_dates.length === 0) {
-    return null;
+  const expirationDates = isSummary ? (data as any).expirations : (data as any).expiration_dates;
+
+  if (!data || !expirationDates || expirationDates.length === 0) {
+    return <Empty description="暂无期权数据" />;
   }
 
   const columns = [
@@ -107,7 +112,9 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
     },
   ];
 
-  const currentChain = activeDate ? data.chains[activeDate] : null;
+  const currentChain = isSummary 
+    ? { calls: (data as any).calls, puts: (data as any).puts }
+    : (activeDate ? (data as any).chains[activeDate] : null);
 
   const tabItems = [
     {
@@ -115,7 +122,7 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
       label: `看涨期权 (Calls) ${currentChain ? `(${currentChain.calls.length})` : ''}`,
       children: (
         <Table
-          dataSource={currentChain?.calls.map(item => ({ ...item, key: item.contractSymbol }))}
+          dataSource={currentChain?.calls.map((item: any) => ({ ...item, key: item.contractSymbol }))}
           columns={columns}
           size="small"
           pagination={{ pageSize: 10, size: 'small', showSizeChanger: false }}
@@ -130,7 +137,7 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
       label: `看跌期权 (Puts) ${currentChain ? `(${currentChain.puts.length})` : ''}`,
       children: (
         <Table
-          dataSource={currentChain?.puts.map(item => ({ ...item, key: item.contractSymbol }))}
+          dataSource={currentChain?.puts.map((item: any) => ({ ...item, key: item.contractSymbol }))}
           columns={columns}
           size="small"
           pagination={{ pageSize: 10, size: 'small', showSizeChanger: false }}
@@ -159,8 +166,9 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
                   onChange={setActiveDate}
                   style={{ width: 140 }}
                   variant="borderless"
+                  disabled={isSummary} // Summary 模式下暂时只支持单日期
                 >
-                  {data.expiration_dates.slice(0, 10).map(date => (
+                  {expirationDates.slice(0, 10).map((date: string) => (
                     <Option key={date} value={date}>{date}</Option>
                   ))}
                 </Select>
@@ -174,6 +182,12 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
                 </span>
               ),
             },
+            {
+              label: '当前状态',
+              children: (
+                <Tag color="blue">{isSummary ? '最新到期日汇总' : '全量数据'}</Tag>
+              )
+            }
           ]}
         />
 

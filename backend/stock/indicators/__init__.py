@@ -26,6 +26,8 @@ from .stoch_rsi import calculate_stoch_rsi
 from .volume_profile import calculate_volume_profile
 from .ichimoku import calculate_ichimoku
 from .cycle import calculate_cycle_analysis, analyze_yearly_cycles, analyze_monthly_cycles
+from .vwap import calculate_vwap
+from .pivot_points import calculate_pivot_points
 
 __all__ = [
     'calculate_ma',
@@ -53,5 +55,7 @@ __all__ = [
     'calculate_cycle_analysis',
     'analyze_yearly_cycles',
     'analyze_monthly_cycles',
+    'calculate_vwap',
+    'calculate_pivot_points',
 ]
 

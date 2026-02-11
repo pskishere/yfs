@@ -15,14 +15,10 @@ class StockConfig(AppConfig):
 
             # 定义工具显示名称映射
             TOOL_DISPLAY_NAMES = {
-                "get_all_stock_data": "获取股票全量数据",
-                "get_technical_indicators": "分析技术指标",
-                "get_stock_news": "获取新闻资讯",
-                "get_fundamental_data": "分析基本面",
-                "get_cycle_analysis": "分析周期规律",
-                "get_options_data": "获取期权数据",
+                "get_stock_data": "获取股票数据",
                 "search_stock_symbol": "搜索股票代码",
                 "internet_search": "联网搜索",
+                "load_document": "加载本地文档",
             }
 
             AgentRegistry.register(
@@ -35,5 +31,7 @@ class StockConfig(AppConfig):
                 )
             )
             logger.info("Stock agent registered successfully.")
-        except ImportError:
-            logger.warning("AI framework not found. Stock agent registration skipped.")
+        except ImportError as e:
+            logger.warning(f"AI framework not found or import error in tools/prompts: {e}. Stock agent registration skipped.")
+        except Exception as e:
+            logger.error(f"Failed to register stock agent: {e}")

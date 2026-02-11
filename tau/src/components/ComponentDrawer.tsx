@@ -37,7 +37,13 @@ const ComponentDrawer: React.FC<ComponentDrawerProps> = ({
       open={open}
       destroyOnClose
       styles={{ 
-        body: { padding: '0' },
+        header: {
+          paddingTop: 'calc(16px + var(--sat, 0px))',
+        },
+        body: { 
+          padding: '0',
+          paddingBottom: 'calc(16px + var(--sab, 0px))',
+        },
         wrapper: { width: typeof window !== 'undefined' && window.innerWidth > 768 ? '85%' : '100%' }
       }}
     >

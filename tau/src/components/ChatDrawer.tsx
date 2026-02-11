@@ -166,11 +166,14 @@ const MessageBubble: React.FC<{
 
                         while ((match = regex.exec(content)) !== null) {
                           if (match.index > lastIndex) {
-                            parts.push(
-                              <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
-                                {content.substring(lastIndex, match.index)}
-                              </ReactMarkdown>
-                            );
+                            const text = content.substring(lastIndex, match.index).trim();
+                            if (text && text !== '```' && text !== '```markdown') {
+                              parts.push(
+                                <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
+                                  {text}
+                                </ReactMarkdown>
+                              );
+                            }
                           }
 
                           parts.push(
@@ -186,11 +189,14 @@ const MessageBubble: React.FC<{
                         }
 
                         if (lastIndex < content.length) {
-                          parts.push(
-                            <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
-                              {content.substring(lastIndex)}
-                            </ReactMarkdown>
-                          );
+                          const text = content.substring(lastIndex).trim();
+                          if (text && text !== '```') {
+                            parts.push(
+                              <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
+                                {text}
+                              </ReactMarkdown>
+                            );
+                          }
                         }
 
                         return parts.length > 0 ? parts : (
@@ -297,47 +303,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     symbol: string;
     module: string;
   }>({ open: false, symbol: '', module: '' });
-
-  // 滚动自动隐藏输入框相关状态
-  const [isInputVisible, setIsInputVisible] = useState(true);
-  const scrollTimeoutRef = useRef<any>(null);
-  const hideTimeoutRef = useRef<any>(null);
-  const showTimeoutRef = useRef<any>(null);
-
-  const handleScroll = () => {
-    if (showTimeoutRef.current) {
-        clearTimeout(showTimeoutRef.current);
-        showTimeoutRef.current = null;
-    }
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-
-    if (isInputVisible && !hideTimeoutRef.current) {
-      hideTimeoutRef.current = setTimeout(() => {
-        setIsInputVisible(false);
-        hideTimeoutRef.current = null;
-      }, 500);
-    }
-
-    scrollTimeoutRef.current = setTimeout(() => {
-        if (hideTimeoutRef.current) {
-            clearTimeout(hideTimeoutRef.current);
-            hideTimeoutRef.current = null;
-        }
-        showTimeoutRef.current = setTimeout(() => {
-            setIsInputVisible(true);
-        }, 500);
-    }, 100);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      if (showTimeoutRef.current) clearTimeout(showTimeoutRef.current);
-    };
-  }, []);
 
   const handleOpenComponentDrawer = (symbol: string, module: string) => {
     setDrawerState({ open: true, symbol, module });
@@ -1128,12 +1093,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       >
         <div
           className="no-scrollbar"
-          onScroll={handleScroll}
           style={{
             flex: 1,
             overflowY: 'auto',
             padding: '16px',
-            paddingBottom: '120px',
+            paddingBottom: 'calc(140px + var(--sab, 0px))',
             background: '#fafafa',
           }}
         >
@@ -1173,10 +1137,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             zIndex: 100,
             borderTop: '1px solid #f0f0f0',
             padding: '12px 16px',
+            paddingBottom: 'calc(12px + var(--sab, 0px))',
+            paddingLeft: 'calc(16px + var(--sal, 0px))',
+            paddingRight: 'calc(16px + var(--sar, 0px))',
             background: '#fff',
-            transition: 'transform 0.3s ease, opacity 0.3s ease',
-            transform: isInputVisible ? 'translateY(0)' : 'translateY(100%)',
-            opacity: isInputVisible ? 1 : 0,
           }}
         >
           {editingMessageId && (
@@ -1298,13 +1262,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       />
                     </Dropdown>
                     <div style={{ fontSize: 12, color: '#999' }}>
-                      {isConnected ? (
-                        <span>按 Enter 发送</span>
-                      ) : !sessionId ? (
-                        <span>按 Enter 发送第一条消息并开始对话</span>
-                      ) : (
-                        <span>连接中...</span>
-                      )}
+                      {!isConnected && sessionId && <span>连接中...</span>}
                     </div>
                   </Flex>
                   <Flex align="center">

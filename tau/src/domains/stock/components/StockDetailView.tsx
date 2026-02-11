@@ -6,6 +6,8 @@ import type { AnalysisResult, OptionsData } from '../../../types/index';
 import { ChartSection } from './ChartSection';
 import { OptionsTable } from './OptionsTable';
 import { CycleAnalysis } from './CycleAnalysis';
+import NewsSection from './NewsSection';
+import IndicatorSection from './IndicatorSection';
 
 interface StockDetailViewProps {
   symbol: string;
@@ -44,8 +46,10 @@ export const StockDetailView: React.FC<StockDetailViewProps> = ({
           modules = ['chart'];
         } else if (['cycle', '周期'].includes(lowerModule)) {
           modules = ['cycle'];
-        } else if (['technical', '技术', '技术分析'].includes(lowerModule)) {
+        } else if (['technical', '技术', '技术分析', 'indicators', '指标'].includes(lowerModule)) {
           modules = ['technical'];
+        } else if (['news', '新闻'].includes(lowerModule)) {
+          modules = ['news'];
         }
 
         const promises: [Promise<AnalysisResult>, Promise<any> | null] = [
@@ -91,16 +95,39 @@ export const StockDetailView: React.FC<StockDetailViewProps> = ({
       break;
     case 'options':
     case '期权':
-      titleInfo = optionsData?.expiration_dates && (
+      // 优先使用 indicators 中的 options_summary
+      const currentOptions = (data?.indicators?.options_summary || optionsData) as any;
+      const expirations = currentOptions?.expirations || currentOptions?.expiration_dates || [];
+      titleInfo = expirations.length > 0 && (
         <span style={{ marginLeft: 12, fontSize: 12, color: '#999', fontWeight: 'normal' }}>
-          共 {optionsData.expiration_dates.length} 个到期日
+          共 {expirations.length} 个到期日
         </span>
       );
-      content = optionsData ? (
+      content = currentOptions ? (
         <OptionsTable
-          data={optionsData}
+          data={currentOptions}
         />
       ) : null;
+      break;
+    case 'technical':
+    case '技术':
+    case '技术分析':
+    case 'indicators':
+    case '指标':
+      content = (
+        <IndicatorSection
+          indicators={data?.indicators || {} as any}
+        />
+      );
+      break;
+    case 'news':
+    case '新闻':
+      content = (
+        <NewsSection
+          newsData={data?.indicators?.news_data || []}
+          currentSymbol={symbol}
+        />
+      );
       break;
     case 'cycle':
     case '周期':
@@ -129,7 +156,7 @@ export const StockDetailView: React.FC<StockDetailViewProps> = ({
           <Spin />
           <div style={{ marginTop: 8, color: '#999' }}>正在加载 {symbol} {registry.getMetadata(module)?.title || module} 数据...</div>
         </div>
-      ) : (!data && module.toLowerCase() !== 'options' && module.toLowerCase() !== '期权') || (module.toLowerCase() === 'options' && !optionsData && !loading) ? (
+      ) : (!data && !['options', '期权', 'news', '新闻', 'technical', '指标'].includes(module.toLowerCase())) || (['options', '期权'].includes(module.toLowerCase()) && !optionsData && !data?.indicators?.options_summary && !loading) ? (
         <Empty description={`未能获取 ${symbol} 的数据`} />
       ) : (
         content

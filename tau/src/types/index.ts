@@ -105,6 +105,8 @@ export interface Indicators {
   pivot_s3?: number;
   fundamental_data?: FundamentalData;
   news_data?: NewsItem[];
+  options_summary?: OptionsSummary;
+  holders_data?: HoldersData;
   resistance_20d_high?: number;
   support_20d_low?: number;
   // 周期分析
@@ -367,14 +369,8 @@ export interface NewsItem {
   link: string;
   provider_publish_time: number;
   type: string;
-  thumbnail?: {
-    resolutions: Array<{
-      url: string;
-      width: number;
-      height: number;
-      tag: string;
-    }>;
-  };
+  thumbnail?: string;
+  related_tickers?: string[];
 }
 
 /**
@@ -395,6 +391,25 @@ export interface OptionItem {
   inTheMoney: boolean;
   contractSize: string;
   currency: string;
+}
+
+/**
+ * 期权汇总数据 (最新到期日)
+ */
+export interface OptionsSummary {
+  expirations: string[];
+  current_expiry: string;
+  calls: OptionItem[];
+  puts: OptionItem[];
+}
+
+/**
+ * 持股数据
+ */
+export interface HoldersData {
+  major_holders: any[];
+  institutional_holders: any[];
+  mutualfund_holders: any[];
 }
 
 /**

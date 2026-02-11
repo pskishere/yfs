@@ -91,9 +91,15 @@ class StockAnalysisViewSet(viewsets.ViewSet):
             if 'chart' not in module_list and 'k线' not in module_list and '图表' not in module_list:
                 data.pop('candles', None)
                 
-            # 如果不包含 chart, cycle, technical，移除 indicators
-            # 注意: CycleAnalysis 组件需要 indicators 中的周期数据
-            needed_indicators = {'chart', 'k线', '图表', 'cycle', '周期', 'technical', '技术', '技术分析'}
+            # 如果不包含 chart, cycle, technical, news, options，移除 indicators
+            # 注意: indicators 中包含了新闻、期权和技术指标数据
+            needed_indicators = {
+                'chart', 'k线', '图表', 
+                'cycle', '周期', 
+                'technical', '技术', '技术分析', 'indicators', '指标',
+                'news', '新闻',
+                'options', '期权'
+            }
             if not any(m in needed_indicators for m in module_list):
                 data.pop('indicators', None)
 

@@ -2,10 +2,11 @@
  * 布局组件 - 无顶栏，直接显示内容
  */
 import React, { type ReactNode, useState, useEffect } from 'react';
-import { Layout as AntLayout, Button, Space, Select } from 'antd';
-import { MenuOutlined } from '@ant-design/icons';
+import { Layout as AntLayout, Button, Select } from 'antd';
+import { MenuOutlined, LineChartOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import ChatSessionDrawer from './ChatSessionDrawer';
+import StockLiveDrawer from '../domains/stock/components/StockLiveDrawer';
 import { getAiModels } from '../services/api';
 import './Layout.css';
 
@@ -38,6 +39,7 @@ const getPlatformClass = () => {
 
 const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
   const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
+  const [stockDrawerOpen, setStockDrawerOpen] = useState(false);
   const [modelOptions, setModelOptions] = useState<{label: string, value: string}[]>([]);
   const navigate = useNavigate();
   const platformClass = getPlatformClass();
@@ -88,15 +90,16 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
           top: 0,
           zIndex: 10,
           width: '100%',
+          // 移除 inline padding，统一由 Layout.css 处理安全区域
         }}
       >
-        <Space size="small">
+        <div style={{ width: 40 }}>
           <Button
             type="text"
             icon={<MenuOutlined />}
             onClick={() => setSessionDrawerOpen(true)}
           />
-        </Space>
+        </div>
         
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
           <Select
@@ -109,7 +112,13 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
           />
         </div>
 
-        <Space size="small" style={{ width: 32 }} />
+        <div style={{ width: 40, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            type="text"
+            icon={<LineChartOutlined />}
+            onClick={() => setStockDrawerOpen(true)}
+          />
+        </div>
       </div>
 
       <Content className="app-content">
@@ -129,6 +138,10 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
             navigate('/');
           }
         }}
+      />
+      <StockLiveDrawer
+        open={stockDrawerOpen}
+        onClose={() => setStockDrawerOpen(false)}
       />
     </AntLayout>
   );
