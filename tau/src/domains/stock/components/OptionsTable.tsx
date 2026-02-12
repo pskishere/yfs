@@ -185,7 +185,7 @@ export const OptionsTable: React.FC<OptionsTableProps> = ({ data }) => {
             {
               label: '当前状态',
               children: (
-                <Tag color="blue">{isSummary ? '最新到期日汇总' : '全量数据'}</Tag>
+                <Tag color="blue">{isSummary ? '最新到期日汇总' : '指定到期日详情'}</Tag>
               )
             }
           ]}

@@ -3,6 +3,7 @@
 定义供 AI Agent 调用的各种股票数据获取工具
 """
 import logging
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -39,6 +40,7 @@ def _format_technical_data(analysis: Dict[str, Any], symbol: str) -> str:
     ind = analysis['indicators']
     result = [
         f"### {symbol} 技术指标详情",
+        f"- **最新K线日期**: {ind.get('latest_date', '未知')}",
         f"- **价格信息**: 当前价 {ind.get('current_price', 'N/A')}, 变动 {ind.get('price_change_pct', 0):.2f}%",
         f"- **趋势概览**: 方向 {ind.get('trend_direction', '未知')}, 强度 {ind.get('trend_strength', 0):.1f}%",
         f"- **移动平均线**: MA5={ind.get('ma5', 'N/A')}, MA20={ind.get('ma20', 'N/A')}, MA50={ind.get('ma50', 'N/A')}, MA200={ind.get('ma200', 'N/A')}",
@@ -146,8 +148,9 @@ def _format_fundamental_data(analysis: Dict[str, Any], symbol: str) -> str:
         
     return "\n".join(result)
 
-def _format_holders_data(symbol: str) -> str:
-    holders = get_holders(symbol)
+def _format_holders_data(symbol: str, holders: Dict[str, Any] = None) -> str:
+    if not holders:
+        holders = get_holders(symbol)
     if not holders:
         return ""
     
@@ -220,15 +223,16 @@ def _format_upcoming_events(fundamental: Dict[str, Any], symbol: str) -> str:
     
     return "\n".join(result) if has_data else ""
 
-def _format_financial_summary(symbol: str) -> str:
-    fins = get_financials(symbol)
-    if not fins:
+def _format_financial_summary(symbol: str, financials: Dict[str, Any] = None) -> str:
+    if not financials:
+        financials = get_financials(symbol)
+    if not financials:
         return ""
     
     result = [f"### {symbol} 财务报表摘要 (最新)"]
     
     # 提取利润表关键项
-    income = fins.get('income_stmt', {})
+    income = financials.get('income_stmt', {})
     if income:
         try:
             # yfinance 返回的字典键通常是 Timestamp，我们需要找最近的一个
@@ -253,7 +257,7 @@ def _format_financial_summary(symbol: str) -> str:
         except: pass
 
     # 提取资产负债表关键项
-    balance = fins.get('balance_sheet', {})
+    balance = financials.get('balance_sheet', {})
     if balance:
         try:
             latest_date = sorted(balance.keys(), reverse=True)[0]
@@ -264,6 +268,28 @@ def _format_financial_summary(symbol: str) -> str:
                 'Total Liabilities Net Minority Interest': '总负债',
                 'Total Equity Gross Minority Interest': '总权益',
                 'Cash And Cash Equivalents': '现金储备'
+            }
+            for k, label in mapping.items():
+                val = data.get(k)
+                if val is not None:
+                    if abs(val) >= 1e12: v_str = f"{val/1e12:.2f}T"
+                    elif abs(val) >= 1e9: v_str = f"{val/1e9:.2f}B"
+                    elif abs(val) >= 1e6: v_str = f"{val/1e6:.2f}M"
+                    else: v_str = f"{val}"
+                    result.append(f"- {label}: {v_str}")
+        except: pass
+
+    # 提取现金流量表关键项
+    cashflow = financials.get('cashflow', {})
+    if cashflow:
+        try:
+            latest_date = sorted(cashflow.keys(), reverse=True)[0]
+            data = cashflow[latest_date]
+            result.append("\n**现金流量表亮点**:")
+            mapping = {
+                'Free Cash Flow': '自由现金流',
+                'Operating Cash Flow': '经营现金流',
+                'Capital Expenditure': '资本支出'
             }
             for k, label in mapping.items():
                 val = data.get(k)
@@ -414,38 +440,42 @@ def get_stock_data(symbol: str) -> str:
     if not analysis:
         return f"未能获取到 {symbol} 的数据。"
     
+    indicators = analysis.get('indicators', {})
     sections = []
     
     # 1. 技术指标
     sections.append(_format_technical_data(analysis, symbol))
     
     # 2. 基本面 (包含分析师评级)
-    fundamental = analysis.get('indicators', {}).get('fundamental_data')
+    fundamental = indicators.get('fundamental_data')
     if not fundamental:
         info = get_stock_info(symbol)
         fundamental = info if info else {}
     
     sections.append(_format_fundamental_data(analysis, symbol))
     
-    # 3. 持股结构 (新增)
-    sections.append(_format_holders_data(symbol))
+    # 3. 持股结构
+    holders_data = indicators.get('holders_data')
+    sections.append(_format_holders_data(symbol, holders_data))
     
-    # 4. 财务报表摘要 (新增)
-    sections.append(_format_financial_summary(symbol))
+    # 4. 财务报表摘要
+    financials = indicators.get('financials')
+    sections.append(_format_financial_summary(symbol, financials))
     
-    # 5. 分红与重要事件 (新增)
+    # 5. 分红与重要事件
     sections.append(_format_upcoming_events(fundamental, symbol))
     
     # 6. 周期分析
     sections.append(_format_cycle_analysis(analysis, symbol, full=True))
     
-    # 6. 新闻
-    news_data = analysis.get('indicators', {}).get('news_data')
+    # 7. 新闻 (不使用 DuckDuckGo)
+    news_data = indicators.get('news_data')
     news_content = _format_stock_news(symbol, news_data)
     sections.append(news_content)
     
-    # 7. 期权 (摘要)
-    sections.append(_format_options_data(symbol))
+    # 8. 期权 (摘要)
+    options_summary = indicators.get('options_summary')
+    sections.append(_format_options_data(symbol, options_summary))
     
     # 过滤掉空部分并合并
     active_sections = [s for s in sections if s.strip()]
@@ -490,54 +520,9 @@ def search_stock_symbol(query: str) -> str:
         
     return "\n".join(result)
 
-@tool
-def internet_search(query: str) -> str:
-    """
-    使用搜索引擎（优先检索雅虎金融 Yahoo Finance）查询互联网上的实时信息。
-    当需要获取最新的市场新闻、宏观经济数据、公司公告、行业动态时使用。
-    """
-    wrapper = DuckDuckGoSearchAPIWrapper(max_results=10)
-    # 尝试使用不同的后端或配置
-    search = DuckDuckGoSearchRun(api_wrapper=wrapper, name='DuckDuckGo搜索')
-    
-    # 尝试多种搜索策略
-    search_queries = []
-    
-    # 策略 1: 原始查询 + 雅虎金融限制
-    if "site:finance.yahoo.com" not in query:
-        search_queries.append(f"{query} site:finance.yahoo.com")
-    else:
-        search_queries.append(query)
-        
-    # 策略 2: 原始查询 (去掉限制，增加成功率)
-    clean_query = query.replace("site:finance.yahoo.com", "").strip()
-    if clean_query:
-        search_queries.append(clean_query)
-        
-    last_error = None
-    for sq in search_queries:
-        try:
-            logger.info(f"正在尝试互联网搜索: {sq}")
-            result = search.invoke(sq)
-            if result and "No good DuckDuckGo Search Result" not in result:
-                return result
-        except Exception as e:
-            last_error = str(e)
-            logger.warning(f"搜索策略失败 ({sq}): {e}")
-            continue
-            
-    if last_error:
-        # 尝试返回一个稍微干净点的错误信息
-        if "return None" in last_error and "bing.com" in last_error:
-            return "当前搜索引擎服务繁忙或受限，请稍后再试，或尝试更简短的关键词。"
-        return f"搜索遭遇错误: {last_error}"
-    
-    return "未能搜索到相关实时资讯，建议更换关键词重试。"
-
 # 定义所有可用工具列表
 STOCKS_TOOLS = [
     get_stock_data,
     search_stock_symbol,
-    internet_search,
     load_document
 ]

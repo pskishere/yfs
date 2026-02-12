@@ -43,6 +43,8 @@ interface ChatDrawerProps {
 interface ThoughtItem {
   key: string;
   title: string;
+  content?: string;
+  description?: string;
   status: 'loading' | 'success' | 'error' | 'pending' | 'streaming';
 }
 
@@ -93,6 +95,14 @@ const MessageBubble: React.FC<{
   // 快捷指令配置（用于渲染用户消息中的标签）
   const suggestionItems = registry.getSuggestions();
 
+  // 过滤掉思维链标签内容
+  const displayContent = message.content
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thought>[\s\S]*/gi, '') // 处理未闭合的情况
+    .replace(/<think>[\s\S]*/gi, '')
+    .trim();
+
   return (
     <div
       style={{
@@ -118,11 +128,21 @@ const MessageBubble: React.FC<{
               <div style={{ marginBottom: 4, width: '100%' }}>
                 <ThoughtChain 
                   items={message.thoughts.map(t => {
-                    const isLoading = t.status !== 'success' && t.status !== 'error';
+                    const isReasoning = t.key === 'reasoning' || t.key.startsWith('reasoning_');
+                    const isLoading = t.status === 'loading' || t.status === 'streaming' || t.status === 'pending';
+                    
                     return {
                       key: t.key,
                       title: t.title || (isLoading ? '正在处理...' : ''),
                       status: isLoading ? 'loading' : (t.status as any),
+                      collapsible: isReasoning,
+                      defaultCollapsed: false,
+                      description: !isReasoning ? (t.content || t.description) : undefined,
+                      content: isReasoning && t.content ? (
+                        <div style={{ fontSize: '13px', color: '#666', marginTop: '4px', padding: '0 8px' }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.content}</ReactMarkdown>
+                        </div>
+                      ) : undefined,
                       icon: isLoading ? <LoadingOutlined spin /> : 
                              t.status === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : undefined
                     };
@@ -142,14 +162,15 @@ const MessageBubble: React.FC<{
                 width: isUser ? 'auto' : '100%',
                 maxWidth: '100%',
                 minWidth: 0,
-                display: 'flex',
                 flexDirection: 'column',
-                gap: 4
+                gap: 4,
+                // 如果过滤后内容为空且不是正在生成，则不显示气泡
+                display: (!isUser && !displayContent && message.status !== 'streaming') ? 'none' : 'flex'
               }}
             >
               {message.role === 'assistant' ? (
                 <div className="markdown-content">
-                  {(message.status === 'streaming' || message.status === 'pending') && !message.content ? (
+                  {(message.status === 'streaming' || message.status === 'pending') && !displayContent ? (
                     <div className="thinking-dots">
                       <span className="thinking-dot"></span>
                       <span className="thinking-dot"></span>
@@ -158,7 +179,7 @@ const MessageBubble: React.FC<{
                   ) : (
                     <>
                       {(() => {
-                        const content = message.content;
+                        const content = displayContent;
                         const regex = /(?:<|\[)(?:stock-analysis|股票分析)\s+symbol=["']([^"']+)["']\s+module=["']([^"']+)["']\s*\/?(?:>|\])/gi;
                         const parts = [];
                         let lastIndex = 0;
@@ -606,31 +627,31 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         const targetId = data.message_id?.toString() || currentStreamingIdRef.current || '';
         setMessages((prev) =>
           prev.map((msg) => {
-            if (msg.id === targetId) {
-              const thoughts = [...(msg.thoughts || [])];
-              const existingThoughtIndex = thoughts.findIndex(t => t.key === data.tool);
-              
-              if (existingThoughtIndex > -1) {
-                thoughts[existingThoughtIndex] = {
-                  ...thoughts[existingThoughtIndex],
-                  title: data.thought,
-                  status: data.status,
-                };
-              } else {
-                thoughts.push({
-                  key: data.tool,
-                  title: data.thought,
-                  status: data.status,
-                });
-              }
-              
-              return {
-                ...msg,
-                thoughts,
-                status: 'streaming',
+            if (msg.id !== targetId) return msg;
+
+            const thoughts = [...(msg.thoughts || [])];
+            const key = data.tool || 'reasoning';
+            const isReasoning = key === 'reasoning' || key.startsWith('reasoning_');
+            const index = thoughts.findIndex(t => t.key === key);
+            
+            if (index > -1) {
+              const existing = thoughts[index];
+              thoughts[index] = {
+                ...existing,
+                status: data.status,
+                content: isReasoning ? (existing.content || '') + (data.thought || '') : existing.content,
+                title: !isReasoning ? data.thought : existing.title,
               };
+            } else {
+              thoughts.push({
+                key: key,
+                title: isReasoning ? '思考过程' : data.thought,
+                content: isReasoning ? data.thought : undefined,
+                status: data.status,
+              });
             }
-            return msg;
+            
+            return { ...msg, thoughts, status: 'streaming' };
           })
         );
       },

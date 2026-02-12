@@ -257,6 +257,15 @@ def get_cached_news(symbol: str) -> List[Dict[str, Any]]:
             
             if news:
                 cache.set(key, news, timeout=60*15) # 15分钟缓存
+            
+            # 打印获取到的新闻
+            print(f"\n{'='*20} Fetched News for {symbol} {'='*20}")
+            if news:
+                for i, n in enumerate(news, 1):
+                    print(f"{i}. [{n.get('provider_publish_time_fmt')}] {n.get('title')} ({n.get('publisher')})")
+            else:
+                print("No news found.")
+            print(f"{'='*50}\n")
         except Exception as e:
             logger.warning(f"获取新闻失败: {symbol}, {e}")
             news = []
@@ -453,7 +462,7 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
     
     indicators['news_data'] = get_cached_news(symbol)
     
-    # 获取期权和持股信息 (带缓存控制)
+    # 获取期权、持股和财务信息 (带缓存控制)
     indicators['options_summary'] = cache.get(f"stock_options_{symbol}") if use_cache else None
     if indicators['options_summary'] is None:
         indicators['options_summary'] = get_options_chain(symbol)
@@ -463,6 +472,11 @@ def perform_analysis(symbol: str, duration: str, bar_size: str, use_cache: bool 
     if indicators['holders_data'] is None:
         indicators['holders_data'] = get_holders(symbol)
         cache.set(f"stock_holders_{symbol}", indicators['holders_data'], timeout=60*60*24) # 24小时缓存
+
+    indicators['financials'] = cache.get(f"stock_financials_{symbol}") if use_cache else None
+    if indicators['financials'] is None:
+        indicators['financials'] = get_financials(symbol)
+        cache.set(f"stock_financials_{symbol}", indicators['financials'], timeout=60*60*24) # 24小时缓存
 
     # 6. 构建并返回结果
     currency_code = profile.raw_info.get("currency") if profile and profile.raw_info else "USD"

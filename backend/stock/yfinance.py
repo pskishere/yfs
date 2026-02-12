@@ -614,6 +614,10 @@ def get_news(symbol: str) -> List[Dict[str, Any]]:
                 'thumbnail': thumbnail,
                 'related_tickers': item.get('relatedTickers', []) # 暂时保持原样，如果新格式没有则为空
             })
+        
+        # 打印 yfinance 新闻获取结果
+        print(f"--- yfinance fetched {len(results)} articles for {symbol} ---")
+            
         return sanitize_data(results)
     except Exception as e:
         logger.error(f"获取新闻失败: {symbol}, {e}")
@@ -636,6 +640,13 @@ def crawl_news_article(url: str) -> Dict[str, Any]:
         article = Article(url, config=config)
         article.download()
         article.parse()
+        
+        # 打印抓取到的新闻详情
+        print(f"\n{'-'*15} Crawled News Detail {'-'*15}")
+        print(f"URL: {url}")
+        print(f"Title: {article.title}")
+        print(f"Text Length: {len(article.text) if article.text else 0} chars")
+        print(f"{'-'*47}\n")
         
         # 如果需要 NLP (摘要、关键词)，需要先下载 nltk 数据
         try:

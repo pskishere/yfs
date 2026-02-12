@@ -77,6 +77,15 @@ class AIAgentEngine:
                 messages[0] = SystemMessage(content=system_prompt)
             
             response = self.llm.invoke(messages)
+            
+            # 打印 LLM 的完整响应
+            print(f"\n{'='*20} LLM Response [{self.namespace}] {'='*20}")
+            if response.content:
+                print(f"Content: {response.content}")
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                print(f"Tool Calls: {response.tool_calls}")
+            print(f"{'='*60}\n")
+            
             return {"messages": [response]}
 
         workflow = StateGraph(WorkflowState)
@@ -113,73 +122,110 @@ class AIAgentEngine:
 
     async def stream_chat(self, session_id: str, user_input: str, skip_save_context: bool = False):
         """
-        流式对话接口
+        流式对话接口，支持思维链标签解析
         """
-        # 异步初始化 Memory (因为 __init__ 包含 DB 操作)
+        # 异步初始化 Memory
         memory = await sync_to_async(SessionMemory)(session_id)
-        
-        # 异步加载历史记录
         history_messages = await sync_to_async(memory.get_messages)(limit=10)
         
         messages = list(history_messages)
         
-        # 1. 移除末尾的空 AI 消息 (占位符)
+        # 移除末尾的空 AI 消息并确保用户输入正确添加
         if messages and isinstance(messages[-1], AIMessage) and not messages[-1].content.strip():
             messages = messages[:-1]
             
-        # 2. 检查末尾是否已经包含当前用户输入
-        if messages and isinstance(messages[-1], HumanMessage) and messages[-1].content == user_input:
-            pass # 已经包含，不用添加
-        else:
-            # 构建当前输入
+        if not (messages and isinstance(messages[-1], HumanMessage) and messages[-1].content == user_input):
             messages.append(HumanMessage(content=user_input))
         
         inputs = {"messages": messages, "session_id": session_id}
         
-        # 使用 astream_events 获取流式事件
+        full_content = []
+        is_thinking = False
+        tag_buffer = ""
+        
+        # 定义标签
+        START_TAGS = ["<thought>", "<think>"]
+        END_TAGS = ["</thought>", "</think>"]
+
         async for event in self.workflow.astream_events(inputs, version="v1"):
             kind = event["event"]
             
-            # 监听 LLM 生成的 token
             if kind == "on_chat_model_stream":
-                # 忽略工具调用的流式输出，只关注最终回复
-                # 但 ReAct 模式下，Agent 思考过程也是 chat_model_stream
-                # 我们需要区分是 Tool Call 还是 Final Response
-                # 这里简单处理：只要有 content 就输出
                 chunk = event["data"]["chunk"]
                 content = chunk.content
-                if content:
-                    yield {
-                        "type": "token",
-                        "content": content,
-                        "status": "streaming"
-                    }
+                if not content: continue
+                
+                tag_buffer += content
+                
+                while tag_buffer:
+                    # 1. 检查开始标签
+                    found_start = False
+                    for tag in START_TAGS:
+                        if tag in tag_buffer:
+                            parts = tag_buffer.split(tag, 1)
+                            if parts[0]:
+                                yield self._format_chunk(parts[0], is_thinking, full_content)
+                            
+                            is_thinking = True
+                            tag_buffer = parts[1]
+                            found_start = True
+                            break
+                    if found_start: continue
+                        
+                    # 2. 检查结束标签
+                    found_end = False
+                    for tag in END_TAGS:
+                        if tag in tag_buffer:
+                            parts = tag_buffer.split(tag, 1)
+                            if parts[0]:
+                                yield self._format_chunk(parts[0], True, full_content)
+                            
+                            is_thinking = False
+                            yield {"type": "thought", "thought": "", "tool": "reasoning", "status": "success"}
+                            tag_buffer = parts[1]
+                            found_end = True
+                            break
+                    if found_end: continue
+                        
+                    # 3. 处理部分标签 (Partial Tags)
+                    potential_tags = START_TAGS + END_TAGS
+                    max_partial_len = 0
+                    for tag in potential_tags:
+                        for i in range(len(tag) - 1, 0, -1):
+                            if tag_buffer.endswith(tag[:i]):
+                                max_partial_len = max(max_partial_len, i)
+                                break
+                    
+                    if max_partial_len > 0:
+                        content_to_send = tag_buffer[:-max_partial_len]
+                        if content_to_send:
+                            yield self._format_chunk(content_to_send, is_thinking, full_content)
+                            tag_buffer = tag_buffer[-max_partial_len:]
+                        break # 等待更多数据来匹配完整标签
+                    else:
+                        yield self._format_chunk(tag_buffer, is_thinking, full_content)
+                        tag_buffer = ""
+                        break
             
-            # 监听工具调用开始
             elif kind == "on_tool_start":
                 tool_name = event['name']
-                tool_input = event['data'].get('input')
-                print(f"\n[Tool Call] Starting {tool_name} with input: {tool_input}")
                 display_name = self.config.tool_display_names.get(tool_name, tool_name)
-                yield {
-                    "type": "thought",
-                    "content": f"正在{display_name}...",
-                    "tool": tool_name,
-                    "status": "loading"
-                }
+                logger.debug(f"Tool Start: {tool_name}")
+                yield {"type": "thought", "thought": f"正在{display_name}...", "tool": tool_name, "status": "loading"}
                 
-            # 监听工具调用结束
             elif kind == "on_tool_end":
                 tool_name = event['name']
-                tool_output = event['data'].get('output')
-                print(f"\n[Tool Call] Finished {tool_name} with output: {str(tool_output)[:500]}")
                 display_name = self.config.tool_display_names.get(tool_name, tool_name)
-                yield {
-                    "type": "thought",
-                    "content": f"已完成{display_name}",
-                    "tool": tool_name,
-                    "status": "success"
-                }
+                logger.debug(f"Tool End: {tool_name}")
+                yield {"type": "thought", "thought": f"已完成{display_name}", "tool": tool_name, "status": "success"}
+
+    def _format_chunk(self, content: str, is_thinking: bool, full_content_list: list) -> dict:
+        """辅助方法：格式化输出 chunk"""
+        if is_thinking:
+            return {"type": "thought", "thought": content, "tool": "reasoning", "status": "loading"}
+        else:
+            full_content_list.append(content)
+            return {"type": "token", "content": content, "status": "streaming"}
 
     def process_message(self, session_id: str, message: str) -> Dict[str, Any]:
         """
@@ -199,21 +245,26 @@ class AIAgentEngine:
         # 提取思维链 (如果模型支持)
         thoughts = []
         
-        # 解析思维链 (<think>...</think>)
+        # 解析思维链 (<thought>...</thought> 或 <think>...</think>)
         if isinstance(response_content, str):
-            think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
-            found_thoughts = think_pattern.findall(response_content)
+            # 同时支持 thought 和 think 标签
+            patterns = [
+                re.compile(r'<thought>(.*?)</thought>', re.DOTALL),
+                re.compile(r'<think>(.*?)</think>', re.DOTALL)
+            ]
             
-            for thought in found_thoughts:
-                print(f"\n{'='*20} Chain of Thought {'='*20}\n{thought.strip()}\n{'='*58}\n")
-                thoughts.append({
-                    "type": "thought",
-                    "content": thought.strip(),
-                    "status": "success"
-                })
-            
-            # 移除思维链内容，只保留最终回复
-            response_content = think_pattern.sub('', response_content).strip()
+            for pattern in patterns:
+                found_thoughts = pattern.findall(response_content)
+                for thought in found_thoughts:
+                    print(f"\n{'='*20} Chain of Thought {'='*20}\n{thought.strip()}\n{'='*58}\n")
+                    thoughts.append({
+                        "key": "reasoning",
+                        "title": "思考过程",
+                        "content": thought.strip(),
+                        "status": "success"
+                    })
+                # 移除思维链内容
+                response_content = pattern.sub('', response_content).strip()
              
         # 保存记忆
         memory.save_context(

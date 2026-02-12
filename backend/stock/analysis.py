@@ -92,9 +92,11 @@ def calculate_technical_indicators(symbol: str, duration: str = '1 M', bar_size:
         logger.warning(f"数据量较少({data_len})，部分长周期指标可能无法计算: {symbol}")
     
     # 3. 初始化结果
+    timestamps = _extract_timestamps(hist_data)
     result = {
         'symbol': symbol,
         'current_price': float(closes[-1]),
+        'latest_date': timestamps[-1] if timestamps else '未知',
         'data_points': data_len,
     }
     

@@ -51,6 +51,10 @@ def fetch_news_api(query: str, days: int = 7) -> List[Dict[str, Any]]:
                 'thumbnail': art.get('urlToImage'),
                 'content': art.get('content')
             })
+        
+        # 打印 NewsAPI 获取结果
+        print(f"--- NewsAPI fetched {len(results)} articles for '{query}' ---")
+        
         return results
     except Exception as e:
         logger.error(f"NewsAPI 抓取失败: {e}")
