@@ -52,7 +52,7 @@ export class WebSocketClient {
   /**
    * 连接到 WebSocket 服务器
    */
-  async connect(sessionId?: string, model?: string, namespace: string = 'stock'): Promise<string> {
+  async connect(sessionId?: string, model?: string, namespace: string = 'example'): Promise<string> {
     // 如果已经连接到相同的 sessionId 和 model，直接返回
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.sessionId === (sessionId || null) && this.model === (model || null)) {
       console.log('WebSocket 已经连接到相同会话:', this.sessionId);
@@ -133,7 +133,7 @@ export class WebSocketClient {
   /**
    * 获取 WebSocket URL
    */
-  private getWebSocketUrl(sessionId?: string, model?: string, namespace: string = 'stock'): string {
+  private getWebSocketUrl(sessionId?: string, model?: string, namespace: string = 'example'): string {
     const envWsUrl = import.meta.env.VITE_WS_URL;
     const isHttps = window.location.protocol === 'https:';
     const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
@@ -174,7 +174,7 @@ export class WebSocketClient {
   /**
    * 构建完整 WebSocket URL
    */
-  private buildWebSocketUrl(baseUrl: string, sessionId?: string, namespace: string = 'stock', model?: string): string {
+  private buildWebSocketUrl(baseUrl: string, sessionId?: string, namespace: string = 'example', model?: string): string {
     
     // 新版后端要求必须有 session_id，且路径格式为 ws/chat/<namespace>/<session_id>/
     if (!sessionId) {

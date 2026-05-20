@@ -108,24 +108,6 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
     }
     if (session.last_message) {
       const content = session.last_message.content;
-      
-      // 尝试解析 stock-analysis 标签
-      const stockMatch = content.match(/(?:<|\[)(?:stock-analysis|股票分析)\s+symbol=["']([^"']+)["']\s+module=["']([^"']+)["']/i);
-      if (stockMatch) {
-        const [, symbol, module] = stockMatch;
-        // 模块名称映射
-        const moduleMap: Record<string, string> = {
-          'chart': 'K线图表',
-          'options': '期权链',
-          'cycle': '周期分析',
-          'technical': '技术指标',
-          'news': '新闻资讯',
-          'fundamental': '基本面',
-          'financial': '财务分析'
-        };
-        const moduleName = moduleMap[module.toLowerCase()] || module;
-        return `${symbol} ${moduleName}`;
-      }
 
       // 清理 Markdown 符号和多余空格
       const plainText = content

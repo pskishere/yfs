@@ -53,8 +53,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'channels',
     'ai',
-    'stock',
-    # 'example',
+    'example',
 ]
 
 MIDDLEWARE = [
@@ -211,11 +210,6 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
-        'stock': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
         'ai': {
             'handlers': ['console'],
             'level': 'DEBUG',
