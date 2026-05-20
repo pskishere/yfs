@@ -31,13 +31,15 @@ class ChatMessage(models.Model):
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
-        SUCCESS = "success", "Success"
-        FAILED = "failed", "Failed"
+        STREAMING = "streaming", "Streaming"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+        ERROR = "error", "Error"
 
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages', verbose_name="所属会话")
     role = models.CharField(max_length=20, choices=Role.choices, verbose_name="角色")
     content = models.TextField(verbose_name="消息内容")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUCCESS, verbose_name="状态")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.COMPLETED, verbose_name="状态")
     error_message = models.TextField(null=True, blank=True, verbose_name="错误信息")
     thoughts = models.JSONField(null=True, blank=True, verbose_name="思维链")
     metadata = models.JSONField(null=True, blank=True, verbose_name="元数据")

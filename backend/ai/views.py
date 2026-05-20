@@ -52,13 +52,22 @@ class FileUploadView(APIView):
 
 class ModelListView(APIView):
     """
-    获取可用 AI 模型列表
+    从 AgentRegistry 动态读取已注册的模型列表
     """
     def get(self, request):
-        models = [
-            {"id": "deepseek-v3.1:671b-cloud", "name": "DeepSeek V3.1 (671B)", "provider": "DeepSeek"},
-            {"id": "gpt-oss:120b-cloud", "name": "GPT-OSS 120B (Cloud)", "provider": "OpenAI"}
-        ]
+        from .registry import AgentRegistry
+        models = []
+        seen = set()
+        for ns in AgentRegistry.get_all_namespaces():
+            config = AgentRegistry.get_config(ns)
+            if config and config.model_name not in seen:
+                seen.add(config.model_name)
+                models.append({
+                    "id": config.model_name,
+                    "name": config.model_name,
+                    "provider": config.provider,
+                    "namespace": ns,
+                })
         return Response(models)
 
 class ChatSessionViewSet(viewsets.ModelViewSet):

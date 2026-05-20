@@ -1,73 +1,80 @@
 import logging
-from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
-from langchain_community.document_loaders import (
-    WebBaseLoader,
-    TextLoader,
-    CSVLoader,
-)
+from langchain_community.document_loaders import WebBaseLoader, TextLoader, CSVLoader
 
 logger = logging.getLogger(__name__)
+
+
+@tool
+def internet_search(query: str) -> str:
+    """
+    Search the internet for current information using DuckDuckGo.
+
+    Args:
+        query: The search query string
+
+    Returns:
+        Search results as text
+    """
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=5))
+        if not results:
+            return "No results found."
+        lines = []
+        for r in results:
+            lines.append(f"**{r.get('title', '')}**\n{r.get('body', '')}\n{r.get('href', '')}")
+        return "\n\n".join(lines)
+    except Exception as e:
+        logger.error(f"internet_search failed: {e}")
+        return f"Search failed: {e}"
+
 
 @tool
 def load_document(source: str, type: str = "auto") -> str:
     """
-    加载并解析文档内容。支持 URL (网页) 和本地文件路径。
-    
+    Load and parse document content from a URL or local file path.
+
     Args:
-        source: 文档来源，可以是 URL (以 http/https 开头) 或本地文件绝对路径
-        type: 文档类型，可选值: 'auto', 'web', 'pdf', 'csv', 'txt'。默认为 'auto' (根据后缀或内容推断)
-        
+        source: URL (http/https) or absolute local file path
+        type: 'auto' | 'web' | 'pdf' | 'csv' | 'txt'
+
     Returns:
-        解析后的文档文本内容
+        Parsed text content (truncated to 20 000 characters)
     """
     try:
-        loader = None
         source = source.strip()
-        
-        # 自动推断类型
+
         if type == "auto":
-            if source.startswith("http://") or source.startswith("https://"):
+            if source.startswith(("http://", "https://")):
                 type = "web"
             elif source.lower().endswith(".pdf"):
                 type = "pdf"
             elif source.lower().endswith(".csv"):
                 type = "csv"
-            elif source.lower().endswith(".txt") or source.lower().endswith(".md"):
-                type = "txt"
             else:
-                # 默认尝试 TextLoader
                 type = "txt"
-        
-        # 选择 Loader
+
         if type == "web":
-            # WebBaseLoader requires beautifulsoup4
             loader = WebBaseLoader(source)
         elif type == "csv":
             loader = CSVLoader(source)
-        elif type == "txt":
-            loader = TextLoader(source)
         elif type == "pdf":
             try:
                 from langchain_community.document_loaders import PyPDFLoader
                 loader = PyPDFLoader(source)
             except ImportError:
-                return "Error: pypdf package not installed. Cannot load PDF."
+                return "Error: pypdf not installed. Run: pip install pypdf"
         else:
-            return f"Error: Unsupported document type: {type}"
-            
-        # 加载文档
+            loader = TextLoader(source)
+
         docs = loader.load()
-        
-        # 合并内容
-        content = "\n\n".join([d.page_content for d in docs])
-        
-        # 限制返回长度，避免 Context Window 爆炸
-        if len(content) > 20000:
-            content = content[:20000] + "\n...(content truncated)..."
-            
+        content = "\n\n".join(d.page_content for d in docs)
+        if len(content) > 20_000:
+            content = content[:20_000] + "\n...(truncated)"
         return content
-        
+
     except Exception as e:
-        logger.error(f"Failed to load document {source}: {e}")
-        return f"Error loading document: {str(e)}"
+        logger.error(f"load_document({source}): {e}")
+        return f"Error loading document: {e}"
