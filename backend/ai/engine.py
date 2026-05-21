@@ -34,8 +34,16 @@ class WorkflowState(TypedDict):
 
 class AIAgentEngine:
     """
-    通用 AI Agent 引擎，支持 Ollama 和 OpenAI 兼容接口
+    通用 AI Agent 引擎，通过 LiteLLM 支持 100+ LLM 提供商。
+
+    model_name 遵循 LiteLLM 命名规范：
+      ollama/deepseek-v3.1:671b-cloud  → 本地 Ollama
+      claude-sonnet-4-6                → Anthropic
+      gpt-4o                           → OpenAI
+      deepseek/deepseek-chat           → DeepSeek API
+      openai/model-name                → 任意 OpenAI 兼容接口（配合 base_url）
     """
+
     def __init__(self, namespace: str, model_name: str = None):
         self.config = AgentRegistry.get_config(namespace)
         if not self.config:
@@ -48,31 +56,21 @@ class AIAgentEngine:
         self.workflow = self._build_workflow()
 
     def _create_llm(self):
-        provider = self.config.provider
-        base_url = self.config.base_url
+        from langchain_community.chat_models import ChatLiteLLM
 
-        if provider == 'openai':
-            from langchain_openai import ChatOpenAI
-            api_key = (
-                self.config.api_key
-                or os.getenv('OPENAI_API_KEY', 'sk-placeholder')
-            )
-            kwargs: Dict[str, Any] = dict(
-                model=self.model_name,
-                temperature=0.7,
-                api_key=api_key,
-            )
-            if base_url:
-                kwargs['base_url'] = base_url
-            logger.info(f"[{self.namespace}] LLM: OpenAI-compatible {self.model_name} @ {base_url}")
-            from langchain_openai import ChatOpenAI
-            return ChatOpenAI(**kwargs)
+        kwargs: Dict[str, Any] = {
+            "model": self.model_name,
+            "temperature": 0.7,
+        }
+        if self.config.base_url:
+            kwargs["api_base"] = self.config.base_url
+        if self.config.api_key:
+            kwargs["api_key"] = self.config.api_key
+        if self.config.litellm_params:
+            kwargs.update(self.config.litellm_params)
 
-        # default: ollama
-        from langchain_ollama import ChatOllama
-        ollama_url = (base_url or os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')).rstrip('/')
-        logger.info(f"[{self.namespace}] LLM: Ollama {self.model_name} @ {ollama_url}")
-        return ChatOllama(model=self.model_name, base_url=ollama_url, temperature=0.7)
+        logger.info(f"[{self.namespace}] LiteLLM: {self.model_name}")
+        return ChatLiteLLM(**kwargs)
 
     def _build_workflow(self):
         def call_model(state: WorkflowState):

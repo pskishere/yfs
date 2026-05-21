@@ -62,10 +62,12 @@ class ModelListView(APIView):
             config = AgentRegistry.get_config(ns)
             if config and config.model_name not in seen:
                 seen.add(config.model_name)
+                # model_name 格式如 "ollama/deepseek-v3" 或 "claude-sonnet-4-6"
+                provider = config.model_name.split("/")[0] if "/" in config.model_name else "anthropic"
                 models.append({
                     "id": config.model_name,
                     "name": config.model_name,
-                    "provider": config.provider,
+                    "provider": provider,
                     "namespace": ns,
                 })
         return Response(models)
