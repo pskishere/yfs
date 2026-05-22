@@ -21,7 +21,6 @@ import { createChatSession, uploadFile } from '../services/api';
 import { registry } from '../framework/core/registry';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ComponentRenderer from './ComponentRenderer';
 import ComponentDrawer from './ComponentDrawer';
 import './ChatDrawer.css';
 
@@ -80,8 +79,7 @@ const MessageBubble: React.FC<{
   onEdit?: (message: MessageItem) => void;
   onRegenerate?: (messageId: string) => void;
   isStreaming?: boolean;
-  onOpenComponentDrawer?: (symbol: string, module: string) => void;
-}> = ({ message, onEdit, onRegenerate, isStreaming, onOpenComponentDrawer }) => {
+}> = ({ message, onEdit, onRegenerate, isStreaming }) => {
   const isUser = message.role === 'user';
   const isCompleted = message.status === 'completed';
 
@@ -274,10 +272,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     symbol: string;
     module: string;
   }>({ open: false, symbol: '', module: '' });
-
-  const handleOpenComponentDrawer = (symbol: string, module: string) => {
-    setDrawerState({ open: true, symbol, module });
-  };
 
   const commandSuggestions: any[] = [];
 
@@ -895,7 +889,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   onEdit={handleStartEdit}
                   onRegenerate={handleRegenerate}
                   isStreaming={isStreaming}
-                  onOpenComponentDrawer={handleOpenComponentDrawer}
                 />
               ))}
               <div ref={messagesEndRef} />
