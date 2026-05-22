@@ -14,6 +14,7 @@ import {
   FileImageOutlined,
   FileWordOutlined,
   LinkOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { wsClient } from '../services/websocket';
 import { createChatSession, uploadFile } from '../services/api';
@@ -882,7 +883,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               styles={{ image: { height: 80 } }}
             >
               <p style={{ color: '#999', fontSize: 14 }}>
-                输入消息询问股票相关问题
+                输入消息开始对话
               </p>
             </Empty>
           ) : (
@@ -982,9 +983,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               const handleMenuClick: MenuProps['onClick'] = (info) => {
                 const item = commandSuggestions.find(i => i.value === info.key);
                 if (item) {
-                  // 选中指令时刷新股票列表
-                  fetchSubscriptions();
-                  
                   setActiveSkill({
                     ...item.skill,
                     closable: {

@@ -147,26 +147,26 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
 
 def _handle_thought_chunk(chunk, message_id, current_thoughts):
     """处理思维链 chunk 的辅助函数"""
-    import uuid
     tool_name = chunk.get("tool")
     status = chunk["status"]
     thought_text = chunk.get("thought", "")
     is_reasoning = tool_name == "reasoning"
-    
+
+    # Stable key: scoped to message + tool so the frontend can reliably find it
+    stable_key = f"{message_id}_{tool_name}"
+
     # 查找匹配的现有条目
     target_index = -1
     for i in range(len(current_thoughts) - 1, -1, -1):
         t = current_thoughts[i]
-        # 匹配逻辑：toolName 相同且状态为 loading
-        if t.get('toolName') == tool_name and t['status'] == 'loading':
+        if t.get('key') == stable_key and t['status'] == 'loading':
             target_index = i
             break
-            
-    # 如果是 loading 且没找到现有条目，或者是新的 tool call，创建新条目
+
+    # 如果是 loading 且没找到现有条目，创建新条目
     if status == "loading" and target_index == -1:
-        unique_key = f"{tool_name}_{uuid.uuid4().hex[:8]}"
         thought_data = {
-            'key': unique_key,
+            'key': stable_key,
             'toolName': tool_name,
             'title': "思考过程" if is_reasoning else thought_text,
             'content': thought_text if is_reasoning else None,
@@ -178,7 +178,7 @@ def _handle_thought_chunk(chunk, message_id, current_thoughts):
             'message_id': message_id,
             'thought': thought_text,
             'status': status,
-            'tool': unique_key
+            'tool': stable_key
         }
     
     # 更新现有条目

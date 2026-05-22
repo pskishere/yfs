@@ -37,6 +37,7 @@ class ChatMessage(models.Model):
         ERROR = "error", "Error"
 
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages', verbose_name="所属会话")
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children', verbose_name="父消息")
     role = models.CharField(max_length=20, choices=Role.choices, verbose_name="角色")
     content = models.TextField(verbose_name="消息内容")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.COMPLETED, verbose_name="状态")

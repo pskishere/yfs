@@ -4,6 +4,7 @@ WebSocket 消费者，处理通用 AI 对话
 import json
 import asyncio
 import logging
+import time
 from typing import Optional, Dict, Any
 from channels.generic.websocket import AsyncWebsocketConsumer
 
@@ -20,6 +21,10 @@ class AIChatConsumer(AsyncWebsocketConsumer):
     支持多业务命名空间、流式输出、停止生成、获取历史记录等功能
     """
     
+    # Rate limit: 10 messages per 60 seconds per session
+    _RATE_LIMIT = 10
+    _RATE_WINDOW = 60
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.session_id = None
@@ -31,6 +36,7 @@ class AIChatConsumer(AsyncWebsocketConsumer):
         self.should_cancel: bool = False
         self.streaming_lock = asyncio.Lock()
         self.agent_service = None
+        self._msg_timestamps: list = []  # sliding window for rate limiting
     
     async def send_json(self, content, close=False):
         """
@@ -137,6 +143,7 @@ class AIChatConsumer(AsyncWebsocketConsumer):
                 'get_history': self.handle_get_history,
                 'regenerate': self.handle_regenerate,
                 'edit_message': self.handle_edit_message,
+                'ping': self.handle_ping,
             }
             
             handler = handlers.get(message_type)
@@ -160,15 +167,36 @@ class AIChatConsumer(AsyncWebsocketConsumer):
                 'message': str(e)
             })
     
+    async def handle_ping(self, data: Dict[str, Any]):
+        """响应客户端心跳"""
+        await self.send_json({'type': 'pong'})
+
+    def _check_rate_limit(self) -> bool:
+        """Return True if within limit, False if exceeded."""
+        now = time.monotonic()
+        cutoff = now - self._RATE_WINDOW
+        self._msg_timestamps = [t for t in self._msg_timestamps if t > cutoff]
+        if len(self._msg_timestamps) >= self._RATE_LIMIT:
+            return False
+        self._msg_timestamps.append(now)
+        return True
+
     async def handle_message(self, data: Dict[str, Any]):
         """处理新消息"""
         async with self.streaming_lock:
             user_input = data.get('message', '').strip()
-            
+
             if not user_input:
                 await self.send_json({
                     'type': 'error',
                     'message': '消息内容不能为空'
+                })
+                return
+
+            if not self._check_rate_limit():
+                await self.send_json({
+                    'type': 'error',
+                    'message': '发送过于频繁，请稍后再试'
                 })
                 return
             
@@ -390,11 +418,13 @@ class AIChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def get_session_history(self, limit: int = 50):
-        messages = ChatMessage.objects.filter(session__session_id=self.session_id).order_by('-created_at')[:limit]
-        result = []
-        for msg in reversed(messages):
-            result.append(msg.to_dict())
-        return result
+        messages = ChatMessage.objects.filter(session__session_id=self.session_id).order_by('created_at')
+        if limit:
+            # Take the last `limit` messages in chronological order
+            total = messages.count()
+            if total > limit:
+                messages = messages[total - limit:]
+        return [msg.to_dict() for msg in messages]
 
     @sync_to_async
     def save_user_message(self, content: str):
@@ -457,15 +487,10 @@ class AIChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def delete_message_and_children(self, message_id: int):
-        # 简单实现：删除该消息及其后所有消息
-        try:
-            msg = ChatMessage.objects.get(id=message_id)
-            ChatMessage.objects.filter(
-                session__session_id=self.session_id,
-                created_at__gte=msg.created_at
-            ).delete()
-        except ChatMessage.DoesNotExist:
-            pass
+        ChatMessage.objects.filter(
+            session__session_id=self.session_id,
+            id__gte=message_id
+        ).delete()
 
     @sync_to_async
     def update_message_content(self, message_id: int, content: str):
@@ -473,11 +498,7 @@ class AIChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def delete_messages_after(self, message_id: int):
-        try:
-            msg = ChatMessage.objects.get(id=message_id)
-            ChatMessage.objects.filter(
-                session__session_id=self.session_id,
-                created_at__gt=msg.created_at
-            ).delete()
-        except ChatMessage.DoesNotExist:
-            pass
+        ChatMessage.objects.filter(
+            session__session_id=self.session_id,
+            id__gt=message_id
+        ).delete()
