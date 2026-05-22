@@ -71,7 +71,8 @@ class AIChatConsumer(AsyncWebsocketConsumer):
 
         # 初始化 AI Agent 服务
         try:
-            self.agent_service = AIAgentEngine(self.namespace, model_name=model)
+            from .engine import create_engine
+            self.agent_service = create_engine(self.namespace, model_name=model)
         except Exception as e:
             logger.error(f"Failed to initialize AI Agent for {self.namespace}: {e}")
             await self.close()
@@ -428,15 +429,23 @@ class AIChatConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def save_user_message(self, content: str):
-        # 确保 Session 存在
         session, _ = ChatSession.objects.get_or_create(session_id=self.session_id)
-             
         msg = ChatMessage.objects.create(
             session=session,
             role='user',
             content=content,
             status='completed'
         )
+        # 向量索引（fire-and-forget，不阻塞响应）
+        try:
+            from .registry import AgentRegistry
+            from .memory import VectorMemory
+            config = AgentRegistry.get_config(self.namespace)
+            if config and config.enable_vector_memory:
+                vm = VectorMemory(self.session_id)
+                vm.add_message(msg.id, 'user', content)
+        except Exception as e:
+            logger.warning(f"User message vector index skipped: {e}")
         return msg.id
 
     @sync_to_async

@@ -34,6 +34,10 @@ class ExampleConfig(AppConfig):
                     tool_display_names=TOOL_DISPLAY_NAMES,
                     base_url=os.getenv('EXAMPLE_BASE_URL', os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')),
                     api_key=os.getenv('EXAMPLE_API_KEY'),
+                    # 语义记忆：设 EXAMPLE_VECTOR_MEMORY=true 启用
+                    enable_vector_memory=os.getenv('EXAMPLE_VECTOR_MEMORY', 'false').lower() == 'true',
+                    # 自我修正示例（取消注释即启用）：
+                    # critic_prompt="你是质量评估员。检查回复是否完整准确。不合格回复 'RETRY: <原因>'，合格回复 'PASS'。",
                 ),
             )
             logger.info("Example agent registered.")

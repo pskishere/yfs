@@ -1,4 +1,3 @@
-import os
 import logging
 from typing import Optional, Dict, Any, Sequence, List
 import operator
@@ -30,18 +29,16 @@ def _extract_text(content) -> str:
 class WorkflowState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     session_id: str
+    correction_count: int  # tracks self-correction iterations (LastValue semantics)
 
 
 class AIAgentEngine:
     """
     通用 AI Agent 引擎，通过 LiteLLM 支持 100+ LLM 提供商。
 
-    model_name 遵循 LiteLLM 命名规范：
-      ollama/deepseek-v3.1:671b-cloud  → 本地 Ollama
-      claude-sonnet-4-6                → Anthropic
-      gpt-4o                           → OpenAI
-      deepseek/deepseek-chat           → DeepSeek API
-      openai/model-name                → 任意 OpenAI 兼容接口（配合 base_url）
+    可选特性（通过 AgentConfig 启用）：
+      enable_vector_memory  — 语义记忆，按相关性召回历史而非截断
+      critic_prompt         — 自我修正，每次生成后评估质量并重试
     """
 
     def __init__(self, namespace: str, model_name: str = None):
@@ -73,33 +70,70 @@ class AIAgentEngine:
         return ChatLiteLLM(**kwargs)
 
     def _build_workflow(self):
+        has_tools = bool(self.config.tools)
+        has_critic = bool(self.config.critic_prompt)
+
         def call_model(state: WorkflowState):
             messages = list(state["messages"])
             system_prompt = self.config.system_prompt.format(session_id=state["session_id"])
-
             if not messages or not isinstance(messages[0], SystemMessage):
                 messages = [SystemMessage(content=system_prompt)] + messages
             else:
                 messages[0] = SystemMessage(content=system_prompt)
-
             response = self.llm_with_tools.invoke(messages)
             return {"messages": [response]}
 
         graph = StateGraph(WorkflowState)
         graph.add_node("agent", call_model)
+        graph.add_edge(START, "agent")
 
-        if self.config.tools:
+        if has_tools:
             graph.add_node("tools", ToolNode(self.config.tools))
-            graph.add_edge(START, "agent")
-
-            def should_continue(state: WorkflowState):
-                return "tools" if state["messages"][-1].tool_calls else END
-
-            graph.add_conditional_edges("agent", should_continue)
             graph.add_edge("tools", "agent")
-        else:
-            graph.add_edge(START, "agent")
-            graph.add_edge("agent", END)
+
+        def route_after_agent(state: WorkflowState):
+            last = state["messages"][-1]
+            if has_tools and isinstance(last, AIMessage) and last.tool_calls:
+                return "tools"
+            if has_critic:
+                return "critic"
+            return END
+
+        destinations = (["tools"] if has_tools else []) + (["critic"] if has_critic else []) + [END]
+        graph.add_conditional_edges("agent", route_after_agent, destinations)
+
+        if has_critic:
+            def critic_node(state: WorkflowState):
+                if state.get("correction_count", 0) >= self.config.max_correction_retries:
+                    return {}
+                last = state["messages"][-1]
+                if not isinstance(last, AIMessage) or last.tool_calls:
+                    return {}
+                critic_msgs = [
+                    SystemMessage(content=self.config.critic_prompt),
+                    HumanMessage(content=(
+                        f"请评估以下 AI 回复的质量。\n"
+                        f"如需改进，回复 'RETRY: <改进说明>'；如果合格，回复 'PASS'。\n\n"
+                        f"回复内容：\n{last.content}"
+                    )),
+                ]
+                evaluation = self.llm.invoke(critic_msgs)
+                if "RETRY:" in evaluation.content:
+                    feedback = evaluation.content.split("RETRY:", 1)[-1].strip()
+                    return {
+                        "messages": [HumanMessage(content=f"[自动反馈] {feedback}，请重新回答")],
+                        "correction_count": state.get("correction_count", 0) + 1,
+                    }
+                return {}
+
+            def route_after_critic(state: WorkflowState):
+                last = state["messages"][-1]
+                if isinstance(last, HumanMessage) and str(last.content).startswith("[自动反馈]"):
+                    return "agent"
+                return END
+
+            graph.add_node("critic", critic_node)
+            graph.add_conditional_edges("critic", route_after_critic, ["agent", END])
 
         return graph.compile()
 
@@ -116,10 +150,9 @@ class AIAgentEngine:
     async def stream_chat(self, session_id: str, user_input: str, skip_save_context: bool = False):
         """
         流式对话，使用 LangGraph astream_events v2 API。
-        支持 <think>/<thought> 思维链标签解析。
+        支持语义记忆（enable_vector_memory）、自我修正（critic_prompt）、思维链标签解析。
         """
-        memory = await sync_to_async(SessionMemory)(session_id)
-        history = await sync_to_async(memory.get_messages)(limit=10)
+        history = await self._build_history(session_id, user_input)
 
         messages = list(history)
         if messages and isinstance(messages[-1], AIMessage) and not messages[-1].content.strip():
@@ -127,7 +160,7 @@ class AIAgentEngine:
         if not (messages and isinstance(messages[-1], HumanMessage) and messages[-1].content == user_input):
             messages.append(HumanMessage(content=user_input))
 
-        inputs = {"messages": messages, "session_id": session_id}
+        inputs = {"messages": messages, "session_id": session_id, "correction_count": 0}
 
         START_TAGS = ["<thought>", "<think>"]
         END_TAGS = ["</thought>", "</think>"]
@@ -172,7 +205,6 @@ class AIAgentEngine:
                     if matched:
                         continue
 
-                    # Partial tag at buffer end — wait for more data
                     partial_len = 0
                     for tag in START_TAGS + END_TAGS:
                         for i in range(len(tag) - 1, 0, -1):
@@ -201,11 +233,65 @@ class AIAgentEngine:
                 display = self.config.tool_display_names.get(tool_name, tool_name)
                 yield {"type": "thought", "thought": f"已完成{display}", "tool": tool_name, "status": "success"}
 
-        # Flush remaining buffer
         if tag_buffer:
             yield self._make_chunk(tag_buffer, is_thinking)
+
+    async def _build_history(self, session_id: str, user_input: str) -> List[BaseMessage]:
+        """
+        构建对话历史。
+        普通模式：取最近 10 条。
+        向量记忆模式：最近 5 条 + 语义相关的更早消息（去重）。
+        """
+        memory = await sync_to_async(SessionMemory)(session_id)
+
+        if not self.config.enable_vector_memory:
+            return await sync_to_async(memory.get_messages)(limit=10)
+
+        # 最近 5 条（带 DB id 用于去重）
+        from .models import ChatMessage
+        recent_db = await sync_to_async(
+            lambda: list(
+                ChatMessage.objects
+                .filter(session__session_id=session_id)
+                .order_by('-created_at')[:5]
+                .values('id', 'role', 'content')
+            )
+        )()
+        recent_ids = {r['id'] for r in recent_db}
+        recent_messages = []
+        for r in reversed(recent_db):
+            if r['role'] == 'user':
+                recent_messages.append(HumanMessage(content=r['content']))
+            elif r['role'] == 'assistant':
+                recent_messages.append(AIMessage(content=r['content']))
+
+        # 语义相关的更早消息
+        from .memory import VectorMemory
+        vector_mem = await sync_to_async(VectorMemory)(session_id)
+        semantic = await sync_to_async(vector_mem.search)(user_input, k=5, exclude_ids=list(recent_ids))
+
+        extra: List[BaseMessage] = []
+        for r in semantic:
+            if r['role'] == 'user':
+                extra.append(HumanMessage(content=r['content']))
+            elif r['role'] == 'assistant':
+                extra.append(AIMessage(content=r['content']))
+
+        # 语义上下文在前，最近消息在后
+        return extra + recent_messages
 
     def _make_chunk(self, content: str, is_thinking: bool) -> dict:
         if is_thinking:
             return {"type": "thought", "thought": content, "tool": "reasoning", "status": "loading"}
         return {"type": "token", "content": content, "status": "streaming"}
+
+
+def create_engine(namespace: str, model_name: str = None):
+    """
+    工厂函数：根据 AgentConfig.sub_namespaces 决定返回 SupervisorEngine 还是 AIAgentEngine。
+    """
+    config = AgentRegistry.get_config(namespace)
+    if config and config.sub_namespaces:
+        from .supervisor import SupervisorEngine
+        return SupervisorEngine(namespace)
+    return AIAgentEngine(namespace, model_name=model_name)

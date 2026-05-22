@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 import logging
 
 from ai.models import ChatMessage, ChatSession
-from ai.engine import AIAgentEngine
+from ai.registry import AgentRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,8 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
     
     # 使用 AI 引擎，指定业务命名空间
     try:
-        agent_service = AIAgentEngine(namespace, model_name=model_name)
+        from .engine import create_engine
+        agent_service = create_engine(namespace, model_name=model_name)
         
         # 触发标题生成任务 (不等待)
         asyncio.create_task(generate_title(session_id, user_input, namespace, model_name))
@@ -126,7 +127,10 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
             thoughts=current_thoughts,
             status='completed'
         )
-        
+
+        # 向量索引（如果启用）
+        await _index_message(namespace, session_id, message_id, 'assistant', full_response)
+
         # 发送完成消息
         await channel_layer.group_send(
             group_name,
@@ -199,6 +203,19 @@ def _handle_thought_chunk(chunk, message_id, current_thoughts):
         }
     
     return None
+
+async def _index_message(namespace: str, session_id: str, message_id: int, role: str, content: str):
+    """向量索引：仅当该 namespace 启用了 enable_vector_memory 时才执行。"""
+    try:
+        config = AgentRegistry.get_config(namespace)
+        if not config or not config.enable_vector_memory:
+            return
+        from ai.memory import VectorMemory
+        vm = await sync_to_async(VectorMemory)(session_id)
+        await sync_to_async(vm.add_message)(message_id, role, content)
+    except Exception as e:
+        logger.warning(f"Vector indexing skipped: {e}")
+
 
 async def _send_error(channel_layer, group_name, message_id, error_msg):
     """发送错误消息并更新数据库"""

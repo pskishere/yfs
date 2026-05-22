@@ -25,6 +25,13 @@ class AgentConfig:
         api_key: Optional[str] = None,
         tool_display_names: Optional[Dict[str, str]] = None,
         litellm_params: Optional[Dict[str, Any]] = None,
+        # 语义记忆：启用后历史消息按相关性检索而非截断
+        enable_vector_memory: bool = False,
+        # 自我修正：提供 critic 提示词后每次生成都会评估并重试
+        critic_prompt: Optional[str] = None,
+        max_correction_retries: int = 2,
+        # 多 Agent 路由：填入子命名空间列表后此 namespace 变为 Supervisor
+        sub_namespaces: Optional[List[str]] = None,
     ):
         self.model_name = model_name
         self.tools = tools
@@ -33,6 +40,10 @@ class AgentConfig:
         self.api_key = api_key
         self.tool_display_names = tool_display_names or {}
         self.litellm_params = litellm_params or {}
+        self.enable_vector_memory = enable_vector_memory
+        self.critic_prompt = critic_prompt
+        self.max_correction_retries = max_correction_retries
+        self.sub_namespaces = sub_namespaces or []
 
 
 class AgentRegistry:
