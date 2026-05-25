@@ -40,24 +40,28 @@ export class WebSocketClient {
   private ws: WebSocket | null = null;
   private sessionId: string | null = null;
   private model: string | null = null;
+  private namespace: string = 'example';
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private baseReconnectDelay = 1000;
   private messageHandlers: MessageHandler[] = [];
   private callbacks: WebSocketCallbacks = {};
   private isManualClose = false;
   private connectionPromise: Promise<string> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly HEARTBEAT_INTERVAL = 30_000;
 
 
   /**
    * 连接到 WebSocket 服务器
    */
-  async connect(sessionId?: string, model?: string, namespace: string = 'stock'): Promise<string> {
+  async connect(sessionId?: string, model?: string, namespace: string = 'example'): Promise<string> {
     // 如果已经连接到相同的 sessionId 和 model，直接返回
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.sessionId === (sessionId || null) && this.model === (model || null)) {
       console.log('WebSocket 已经连接到相同会话:', this.sessionId);
       return Promise.resolve(this.sessionId!);
     }
+    this.namespace = namespace;
 
     // 如果正在连接中，返回当前的 Promise
     if (this.connectionPromise) {
@@ -83,6 +87,7 @@ export class WebSocketClient {
         this.ws.onopen = () => {
           console.log('WebSocket 连接成功');
           this.reconnectAttempts = 0;
+          this.startHeartbeat();
         };
 
         this.ws.onmessage = (event) => {
@@ -111,8 +116,9 @@ export class WebSocketClient {
 
         this.ws.onclose = () => {
           console.log('WebSocket 连接关闭');
-          this.connectionPromise = null; // 关闭，清除 Promise
-          
+          this.connectionPromise = null;
+          this.stopHeartbeat();
+
           if (this.callbacks.onClose) {
             this.callbacks.onClose();
           }
@@ -133,7 +139,7 @@ export class WebSocketClient {
   /**
    * 获取 WebSocket URL
    */
-  private getWebSocketUrl(sessionId?: string, model?: string, namespace: string = 'stock'): string {
+  private getWebSocketUrl(sessionId?: string, model?: string, namespace: string = 'example'): string {
     const envWsUrl = import.meta.env.VITE_WS_URL;
     const isHttps = window.location.protocol === 'https:';
     const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
@@ -174,7 +180,7 @@ export class WebSocketClient {
   /**
    * 构建完整 WebSocket URL
    */
-  private buildWebSocketUrl(baseUrl: string, sessionId?: string, namespace: string = 'stock', model?: string): string {
+  private buildWebSocketUrl(baseUrl: string, sessionId?: string, namespace: string = 'example', model?: string): string {
     
     // 新版后端要求必须有 session_id，且路径格式为 ws/chat/<namespace>/<session_id>/
     if (!sessionId) {
@@ -198,16 +204,33 @@ export class WebSocketClient {
     return url;
   }
 
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, WebSocketClient.HEARTBEAT_INTERVAL);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer !== null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
   /**
-   * 尝试重新连接
+   * 尝试重新连接（指数退避）
    */
   private attemptReconnect() {
     this.reconnectAttempts++;
-    console.log(`尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-    
+    const delay = this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    console.log(`尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts}) 延迟 ${delay}ms...`);
+
     setTimeout(() => {
-      this.connect(this.sessionId || undefined, this.model || undefined);
-    }, this.reconnectDelay);
+      this.connect(this.sessionId || undefined, this.model || undefined, this.namespace);
+    }, delay);
   }
 
   /**
@@ -395,6 +418,7 @@ export class WebSocketClient {
   disconnect() {
     this.isManualClose = true;
     this.connectionPromise = null;
+    this.stopHeartbeat();
     if (this.ws) {
       this.ws.close();
       this.ws = null;

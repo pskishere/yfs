@@ -10,7 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# 优先加载项目根目录的 .env，再加载 backend/ 目录的 .env
+load_dotenv(Path(__file__).resolve().parent.parent.parent / '.env', override=False)
+load_dotenv(Path(__file__).resolve().parent.parent / '.env', override=False)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,13 +27,15 @@ DB_DIR = BASE_DIR / 'data'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-f69899qv+b0-bgktdh0=cw8bp2)t79*_i)#l6_lfjs*%b#ih+q'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-f69899qv+b0-bgktdh0=cw8bp2)t79*_i)#l6_lfjs*%b#ih+q'
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() == 'true'
 
-ALLOWED_HOSTS = ["*"]
+_allowed = os.getenv('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = _allowed.split(',') if _allowed else ['localhost', '127.0.0.1', '[::1]']
 
 # 代理 SSL 配置，支持 ngrok 等反向代理
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -53,8 +61,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'channels',
     'ai',
-    'stock',
-    # 'example',
+    'example',
 ]
 
 MIDDLEWARE = [
@@ -154,7 +161,6 @@ TASKS = {
 }
 
 # Channels 配置
-import os
 
 # 根据环境变量决定使用 Redis 还是内存
 REDIS_URL = os.getenv('REDIS_URL', None)
@@ -211,11 +217,6 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
-        'stock': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
         'ai': {
             'handlers': ['console'],
             'level': 'DEBUG',

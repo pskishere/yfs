@@ -5,12 +5,11 @@ import React, { useState, useEffect } from 'react';
 import { Drawer, List, Button, Typography, Space, Tag, Popconfirm, message, Empty } from 'antd';
 import { DeleteOutlined, MessageOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getChatSessions, deleteChatSession, type ChatSession } from '../services/api';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import 'dayjs/locale/zh-cn';
 
 dayjs.extend(relativeTime);
-dayjs.locale('zh-cn');
 
 const { Text } = Typography;
 
@@ -31,6 +30,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth <= 768);
+  const { t } = useTranslation();
 
   // 监听窗口大小变化
   useEffect(() => {
@@ -51,7 +51,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
       setSessions(data);
     } catch (error) {
       console.error('加载会话列表失败:', error);
-      message.error('加载会话列表失败');
+      message.error(t('session.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -73,11 +73,11 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   const handleDeleteSession = async (sessionId: string) => {
     try {
       await deleteChatSession(sessionId);
-      message.success('会话已删除');
+      message.success(t('session.deleted'));
       await loadSessions();
     } catch (error) {
       console.error('删除会话失败:', error);
-      message.error('删除会话失败');
+      message.error(t('session.deleteFailed'));
     }
   };
 
@@ -108,34 +108,14 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
     }
     if (session.last_message) {
       const content = session.last_message.content;
-      
-      // 尝试解析 stock-analysis 标签
-      const stockMatch = content.match(/(?:<|\[)(?:stock-analysis|股票分析)\s+symbol=["']([^"']+)["']\s+module=["']([^"']+)["']/i);
-      if (stockMatch) {
-        const [, symbol, module] = stockMatch;
-        // 模块名称映射
-        const moduleMap: Record<string, string> = {
-          'chart': 'K线图表',
-          'options': '期权链',
-          'cycle': '周期分析',
-          'technical': '技术指标',
-          'news': '新闻资讯',
-          'fundamental': '基本面',
-          'financial': '财务分析'
-        };
-        const moduleName = moduleMap[module.toLowerCase()] || module;
-        return `${symbol} ${moduleName}`;
-      }
-
-      // 清理 Markdown 符号和多余空格
       const plainText = content
         .replace(/[#*`]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-        
       return plainText.slice(0, 30) + (plainText.length > 30 ? '...' : '');
     }
-    return session.model ? `新对话 (${session.model})` : '新对话';
+    const base = t('session.newTitle');
+    return session.model ? `${base} (${session.model})` : base;
   };
 
   useEffect(() => {
@@ -149,7 +129,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
       title={
         <Space>
           <MessageOutlined />
-          <span>会话列表</span>
+          <span>{t('session.title')}</span>
         </Space>
       }
       placement="left"
@@ -173,7 +153,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
             icon={<ReloadOutlined />}
             onClick={loadSessions}
             loading={loading}
-            title="刷新"
+            title={t('session.refresh')}
           />
           <Button
             type="primary"
@@ -181,7 +161,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
             onClick={handleCreateSession}
             size="small"
           >
-            新建
+            {t('session.new')}
           </Button>
         </Space>
       }
@@ -192,11 +172,11 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
         locale={{
           emptyText: (
             <Empty
-              description="暂无会话"
+              description={t('session.empty')}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateSession}>
-                创建第一个会话
+                {t('session.createFirst')}
               </Button>
             </Empty>
           ),
@@ -231,7 +211,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
                   </Text>
                   <Space size={4} wrap>
                     <Tag color="blue" style={{ fontSize: 11 }}>
-                      {session.message_count} 条消息
+                      {t('session.messageCount', { count: session.message_count })}
                     </Tag>
                     {session.context_symbols && session.context_symbols.length > 0 && (
                       <>
@@ -257,15 +237,15 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
               }
             />
             <Popconfirm
-              title="确认删除此会话？"
-              description="删除后将无法恢复所有消息"
+              title={t('session.confirmDelete')}
+              description={t('session.confirmDeleteDesc')}
               onConfirm={(e) => {
                 e?.stopPropagation();
                 handleDeleteSession(session.session_id);
               }}
               onCancel={(e) => e?.stopPropagation()}
-              okText="确认"
-              cancelText="取消"
+              okText={t('session.ok')}
+              cancelText={t('session.cancel')}
             >
               <Button
                 type="text"

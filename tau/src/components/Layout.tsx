@@ -3,10 +3,10 @@
  */
 import React, { type ReactNode, useState, useEffect } from 'react';
 import { Layout as AntLayout, Button, Select } from 'antd';
-import { MenuOutlined, LineChartOutlined } from '@ant-design/icons';
+import { MenuOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ChatSessionDrawer from './ChatSessionDrawer';
-import StockLiveDrawer from '../domains/stock/components/StockLiveDrawer';
 import { getAiModels } from '../services/api';
 import './Layout.css';
 
@@ -39,10 +39,12 @@ const getPlatformClass = () => {
 
 const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
   const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
-  const [stockDrawerOpen, setStockDrawerOpen] = useState(false);
   const [modelOptions, setModelOptions] = useState<{label: string, value: string}[]>([]);
   const navigate = useNavigate();
   const platformClass = getPlatformClass();
+  const { i18n } = useTranslation();
+  const isEnglish = i18n.language === 'en-US';
+  const toggleLanguage = () => i18n.changeLanguage(isEnglish ? 'zh-CN' : 'en-US');
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -112,12 +114,15 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
           />
         </div>
 
-        <div style={{ width: 40, display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
           <Button
             type="text"
-            icon={<LineChartOutlined />}
-            onClick={() => setStockDrawerOpen(true)}
-          />
+            size="small"
+            onClick={toggleLanguage}
+            style={{ fontSize: 11, color: '#888', padding: '0 4px', minWidth: 0 }}
+          >
+            {isEnglish ? '中' : 'EN'}
+          </Button>
         </div>
       </div>
 
@@ -138,10 +143,6 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
             navigate('/');
           }
         }}
-      />
-      <StockLiveDrawer
-        open={stockDrawerOpen}
-        onClose={() => setStockDrawerOpen(false)}
       />
     </AntLayout>
   );

@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 import logging
 
 from ai.models import ChatMessage, ChatSession
-from ai.engine import AIAgentEngine
+from ai.registry import AgentRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,8 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
     
     # 使用 AI 引擎，指定业务命名空间
     try:
-        agent_service = AIAgentEngine(namespace, model_name=model_name)
+        from .engine import create_engine
+        agent_service = create_engine(namespace, model_name=model_name)
         
         # 触发标题生成任务 (不等待)
         asyncio.create_task(generate_title(session_id, user_input, namespace, model_name))
@@ -126,7 +127,10 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
             thoughts=current_thoughts,
             status='completed'
         )
-        
+
+        # 向量索引（如果启用）
+        await _index_message(namespace, session_id, message_id, 'assistant', full_response)
+
         # 发送完成消息
         await channel_layer.group_send(
             group_name,
@@ -147,26 +151,26 @@ async def generate_chat_response(session_id: str, message_id: int, user_input: s
 
 def _handle_thought_chunk(chunk, message_id, current_thoughts):
     """处理思维链 chunk 的辅助函数"""
-    import uuid
     tool_name = chunk.get("tool")
     status = chunk["status"]
     thought_text = chunk.get("thought", "")
     is_reasoning = tool_name == "reasoning"
-    
+
+    # Stable key: scoped to message + tool so the frontend can reliably find it
+    stable_key = f"{message_id}_{tool_name}"
+
     # 查找匹配的现有条目
     target_index = -1
     for i in range(len(current_thoughts) - 1, -1, -1):
         t = current_thoughts[i]
-        # 匹配逻辑：toolName 相同且状态为 loading
-        if t.get('toolName') == tool_name and t['status'] == 'loading':
+        if t.get('key') == stable_key and t['status'] == 'loading':
             target_index = i
             break
-            
-    # 如果是 loading 且没找到现有条目，或者是新的 tool call，创建新条目
+
+    # 如果是 loading 且没找到现有条目，创建新条目
     if status == "loading" and target_index == -1:
-        unique_key = f"{tool_name}_{uuid.uuid4().hex[:8]}"
         thought_data = {
-            'key': unique_key,
+            'key': stable_key,
             'toolName': tool_name,
             'title': "思考过程" if is_reasoning else thought_text,
             'content': thought_text if is_reasoning else None,
@@ -178,7 +182,7 @@ def _handle_thought_chunk(chunk, message_id, current_thoughts):
             'message_id': message_id,
             'thought': thought_text,
             'status': status,
-            'tool': unique_key
+            'tool': stable_key
         }
     
     # 更新现有条目
@@ -199,6 +203,19 @@ def _handle_thought_chunk(chunk, message_id, current_thoughts):
         }
     
     return None
+
+async def _index_message(namespace: str, session_id: str, message_id: int, role: str, content: str):
+    """向量索引：仅当该 namespace 启用了 enable_vector_memory 时才执行。"""
+    try:
+        config = AgentRegistry.get_config(namespace)
+        if not config or not config.enable_vector_memory:
+            return
+        from ai.memory import VectorMemory
+        vm = await sync_to_async(VectorMemory)(session_id)
+        await sync_to_async(vm.add_message)(message_id, role, content)
+    except Exception as e:
+        logger.warning(f"Vector indexing skipped: {e}")
+
 
 async def _send_error(channel_layer, group_name, message_id, error_msg):
     """发送错误消息并更新数据库"""

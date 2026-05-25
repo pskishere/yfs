@@ -10,25 +10,18 @@ import {
   ReloadOutlined,
   CheckCircleOutlined,
   LoadingOutlined,
-  LineChartOutlined,
-  HistoryOutlined,
-  DatabaseOutlined,
-  AppstoreOutlined,
-  ReadOutlined,
-  FundOutlined,
-  ThunderboltOutlined,
   CloudUploadOutlined,
   FileImageOutlined,
   FileWordOutlined,
   LinkOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { wsClient } from '../services/websocket';
 import { createChatSession, uploadFile } from '../services/api';
-import { getSubscriptions } from '../domains/stock/service';
 import { registry } from '../framework/core/registry';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ComponentRenderer from './ComponentRenderer';
 import ComponentDrawer from './ComponentDrawer';
 import './ChatDrawer.css';
 
@@ -87,8 +80,7 @@ const MessageBubble: React.FC<{
   onEdit?: (message: MessageItem) => void;
   onRegenerate?: (messageId: string) => void;
   isStreaming?: boolean;
-  onOpenComponentDrawer?: (symbol: string, module: string) => void;
-}> = ({ message, onEdit, onRegenerate, isStreaming, onOpenComponentDrawer }) => {
+}> = ({ message, onEdit, onRegenerate, isStreaming }) => {
   const isUser = message.role === 'user';
   const isCompleted = message.status === 'completed';
 
@@ -180,49 +172,7 @@ const MessageBubble: React.FC<{
                     <>
                       {(() => {
                         const content = displayContent;
-                        const regex = /(?:<|\[)(?:stock-analysis|股票分析)\s+symbol=["']([^"']+)["']\s+module=["']([^"']+)["']\s*\/?(?:>|\])/gi;
-                        const parts = [];
-                        let lastIndex = 0;
-                        let match;
-
-                        while ((match = regex.exec(content)) !== null) {
-                          if (match.index > lastIndex) {
-                            const text = content.substring(lastIndex, match.index).trim();
-                            if (text && text !== '```' && text !== '```markdown') {
-                              parts.push(
-                                <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
-                                  {text}
-                                </ReactMarkdown>
-                              );
-                            }
-                          }
-
-                          parts.push(
-                            <ComponentRenderer
-                              key={`stock-${match.index}`}
-                              symbol={match[1]}
-                              module={match[2]}
-                              onOpen={onOpenComponentDrawer || (() => {})}
-                            />
-                          );
-
-                          lastIndex = regex.lastIndex;
-                        }
-
-                        if (lastIndex < content.length) {
-                          const text = content.substring(lastIndex).trim();
-                          if (text && text !== '```') {
-                            parts.push(
-                              <ReactMarkdown key={`text-${lastIndex}`} remarkPlugins={[remarkGfm]}>
-                                {text}
-                              </ReactMarkdown>
-                            );
-                          }
-                        }
-
-                        return parts.length > 0 ? parts : (
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-                        );
+                        return <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>;
                       })()}
                       {message.status === 'streaming' && message.content && (
                         <span className="streaming-cursor"></span>
@@ -311,13 +261,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const senderRef = useRef<GetRef<typeof Sender>>(null);
   const [activeSkill, setActiveSkill] = useState<SenderProps['skill']>(undefined);
   const [slotConfig, setSlotConfig] = useState<SenderProps['slotConfig']>(undefined);
-  const [subscriptions, setSubscriptions] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<GetProp<AttachmentsProps, 'items'>>([]);
   const [openAttachments, setOpenAttachments] = useState(false);
   const attachmentsRef = useRef<GetRef<typeof Attachments>>(null);
   const skipNextChange = useRef(false);
   const [api, contextHolder] = notification.useNotification();
-  
+  const { t } = useTranslation();
+
   // 组件详情抽屉状态
   const [drawerState, setDrawerState] = useState<{
     open: boolean;
@@ -325,207 +275,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     module: string;
   }>({ open: false, symbol: '', module: '' });
 
-  const handleOpenComponentDrawer = (symbol: string, module: string) => {
-    setDrawerState({ open: true, symbol, module });
-  };
-
-  // 获取订阅股票
-  const fetchSubscriptions = async () => {
-    try {
-      const res = await getSubscriptions();
-      if (res.success && res.stocks) {
-        const options = res.stocks.map((s: any) => s.symbol);
-        setSubscriptions(options);
-      }
-    } catch (err) {
-      console.error('获取订阅股票失败:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchSubscriptions();
-  }, []);
-
-  // 当 subscriptions 更新时，如果当前有激活的技能，更新其 slotConfig 以反映最新的股票列表
-  useEffect(() => {
-    if (activeSkill && activeSkill.value) {
-      const item = commandSuggestions.find(i => i.value === activeSkill.value);
-      if (item) {
-        setSlotConfig(item.slotConfig as any);
-      }
-    }
-  }, [subscriptions]); // 依赖 subscriptions 更新
-
-
-  // 股票下拉选项
-  const stockOptions = (Array.isArray(subscriptions) ? subscriptions : [])
-    .filter(s => typeof s === 'string');
-
-  // 快捷指令配置
-  const commandSuggestions = [
-    {
-      label: 'K线图表',
-      value: 'K线图表',
-      icon: <LineChartOutlined />,
-      extra: '展示交互式 K 线图',
-      skill: {
-        value: 'K线图表',
-        label: 'K线图表',
-        icon: <LineChartOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '查看 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: stockOptions,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的 K 线图表。' },
-      ],
-    },
-    {
-      label: '新闻资讯',
-      value: '新闻资讯',
-      icon: <ReadOutlined />,
-      extra: '查询股票最新新闻资讯',
-      skill: {
-        value: '新闻资讯',
-        label: '新闻资讯',
-        icon: <ReadOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '查看 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: stockOptions,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的最新新闻。' },
-      ],
-    },
-    {
-      label: '技术指标',
-      value: '技术指标',
-      icon: <ThunderboltOutlined />,
-      extra: '分析股票各项技术指标',
-      skill: {
-        value: '技术指标',
-        label: '技术指标',
-        icon: <ThunderboltOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '分析 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: stockOptions,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的技术指标。' },
-      ],
-    },
-    {
-      label: '周期分析',
-      value: '周期分析',
-      icon: <HistoryOutlined />,
-      extra: '分析股票的时间周期规律',
-      skill: {
-        value: '周期分析',
-        label: '周期分析',
-        icon: <HistoryOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '对 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: stockOptions,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 进行周期性规律分析。' },
-      ],
-    },
-    {
-      label: '期权链',
-      value: '期权链',
-      icon: <DatabaseOutlined />,
-      extra: '展示期权行权价与波动率',
-      skill: {
-        value: '期权链',
-        label: '期权链',
-        icon: <DatabaseOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '查看 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: stockOptions,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的期权链信息。' },
-      ],
-    },
-    {
-      label: '基本面',
-      value: '基本面',
-      icon: <FundOutlined />,
-      extra: '分析股票基本面数据',
-      skill: {
-        value: '基本面',
-        label: '基本面',
-        icon: <FundOutlined />,
-        closable: true,
-      },
-      slotConfig: [
-        { type: 'text', value: '分析 ' },
-        {
-          type: 'select',
-          key: 'symbol',
-          props: {
-            options: stockOptions,
-            placeholder: '股票代码',
-            style: { width: 100 },
-            showSearch: true,
-            listHeight: 50,
-          },
-        },
-        { type: 'text', value: ' 的基本面数据。' },
-      ],
-    },
-  ];
+  const commandSuggestions: any[] = [];
 
   /**
    * 自动滚动到底部
@@ -687,8 +437,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       onGenerationError: (data) => {
         setIsStreaming(false);
         api.error({
-          message: '生成失败',
-          description: data.error || '未知错误',
+          message: t('chat.generationFailed'),
+          description: data.error || t('chat.unknownError'),
         });
         setMessages((prev) =>
           prev.map((msg) => {
@@ -705,7 +455,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       },
       onError: (error) => {
         api.error({
-          message: '错误',
+          message: t('chat.error'),
           description: error,
         });
       },
@@ -737,7 +487,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         console.log('开始编辑:', data);
         setIsStreaming(true);
         api.info({
-          message: '正在重新生成回复',
+          message: t('chat.regenerating'),
           duration: 2,
         });
       },
@@ -779,8 +529,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       } catch (error) {
         console.error('连接 WebSocket 失败:', error);
         api.error({
-          message: '连接失败',
-          description: '无法连接到聊天服务器',
+          message: t('chat.connectionFailed'),
+          description: t('chat.cannotConnect'),
         });
       }
     };
@@ -952,7 +702,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       label: (
         <Flex gap="small">
           <FileImageOutlined />
-          <span>图片</span>
+          <span>{t('attachment.image')}</span>
         </Flex>
       ),
     },
@@ -961,19 +711,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       label: (
         <Flex gap="small">
           <FileWordOutlined />
-          <span>文档</span>
+          <span>{t('attachment.document')}</span>
         </Flex>
       ),
     },
     {
-        key: 'all',
-        label: (
-            <Flex gap="small">
-                <LinkOutlined />
-                <span>所有文件</span>
-            </Flex>
-        )
-    }
+      key: 'all',
+      label: (
+        <Flex gap="small">
+          <LinkOutlined />
+          <span>{t('attachment.allFiles')}</span>
+        </Flex>
+      ),
+    },
   ];
 
   const selectFile = ({ key }: { key: string }) => {
@@ -986,7 +736,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const senderHeader = (
     <Sender.Header
-      title="附件"
+      title={t('attachment.title')}
       open={openAttachments}
       onOpenChange={setOpenAttachments}
       forceRender
@@ -1004,13 +754,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         onChange={handleUploadChange}
         placeholder={(type) =>
           type === 'drop'
-            ? {
-                title: 'Drop file here',
-              }
+            ? { title: t('attachment.drop') }
             : {
                 icon: <CloudUploadOutlined />,
-                title: '上传文件',
-                description: '点击或拖拽文件到此处上传',
+                title: t('attachment.upload'),
+                description: t('attachment.hint'),
               }
         }
         getDropContainer={() => senderRef.current?.nativeElement}
@@ -1124,12 +872,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         >
           {messages.length === 0 ? (
             <Empty
-              description="开始对话吧"
+              description={t('chat.startHint')}
               style={{ marginTop: 60 }}
               styles={{ image: { height: 80 } }}
             >
               <p style={{ color: '#999', fontSize: 14 }}>
-                输入消息询问股票相关问题
+                {t('chat.emptyDesc')}
               </p>
             </Empty>
           ) : (
@@ -1141,7 +889,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   onEdit={handleStartEdit}
                   onRegenerate={handleRegenerate}
                   isStreaming={isStreaming}
-                  onOpenComponentDrawer={handleOpenComponentDrawer}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -1175,7 +922,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                取消编辑
+                {t('chat.cancelEdit')}
               </Tag>
             </div>
           )}
@@ -1185,10 +932,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             skill={activeSkill}
             placeholder={
               isConnected
-                ? '输入消息...'
+                ? t('chat.placeholder')
                 : !sessionId
-                ? '输入消息开始新对话...'
-                : '连接中...'
+                ? t('chat.newPlaceholder')
+                : t('chat.connectingPlaceholder')
             }
             value={inputText}
             onChange={(val) => {
@@ -1229,9 +976,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               const handleMenuClick: MenuProps['onClick'] = (info) => {
                 const item = commandSuggestions.find(i => i.value === info.key);
                 if (item) {
-                  // 选中指令时刷新股票列表
-                  fetchSubscriptions();
-                  
                   setActiveSkill({
                     ...item.skill,
                     closable: {

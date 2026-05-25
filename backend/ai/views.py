@@ -12,6 +12,18 @@ from .serializers import ChatSessionSerializer
 
 logger = logging.getLogger(__name__)
 
+_ALLOWED_MIME_TYPES = {
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'application/pdf',
+    'text/plain', 'text/csv', 'text/markdown',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+}
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
 class FileUploadView(APIView):
     """
     文件上传接口
@@ -25,21 +37,22 @@ class FileUploadView(APIView):
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 简单保存到 media 目录 (需配置 MEDIA_ROOT)
-        # 这里为了演示，假设 MEDIA_ROOT 已配置或使用默认
-        # 实际生产环境建议使用对象存储
-        
+
+        if file_obj.size > _MAX_UPLOAD_BYTES:
+            return Response({"error": "File too large (max 20 MB)"}, status=status.HTTP_400_BAD_REQUEST)
+
+        content_type = file_obj.content_type or ''
+        if content_type not in _ALLOWED_MIME_TYPES:
+            return Response({"error": f"File type not allowed: {content_type}"}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            # 确保目录存在
             upload_dir = os.path.join(settings.MEDIA_ROOT, 'uploads')
             if not os.path.exists(upload_dir):
                 os.makedirs(upload_dir)
-            
+
             file_path = default_storage.save(os.path.join('uploads', file_obj.name), ContentFile(file_obj.read()))
             full_path = default_storage.path(file_path)
-            
-            # 返回文件信息
+
             return Response({
                 "name": file_obj.name,
                 "url": request.build_absolute_uri(settings.MEDIA_URL + file_path),
@@ -52,13 +65,24 @@ class FileUploadView(APIView):
 
 class ModelListView(APIView):
     """
-    获取可用 AI 模型列表
+    从 AgentRegistry 动态读取已注册的模型列表
     """
     def get(self, request):
-        models = [
-            {"id": "deepseek-v3.1:671b-cloud", "name": "DeepSeek V3.1 (671B)", "provider": "DeepSeek"},
-            {"id": "gpt-oss:120b-cloud", "name": "GPT-OSS 120B (Cloud)", "provider": "OpenAI"}
-        ]
+        from .registry import AgentRegistry
+        models = []
+        seen = set()
+        for ns in AgentRegistry.get_all_namespaces():
+            config = AgentRegistry.get_config(ns)
+            if config and config.model_name not in seen:
+                seen.add(config.model_name)
+                # model_name 格式如 "ollama/deepseek-v3" 或 "claude-sonnet-4-6"
+                provider = config.model_name.split("/")[0] if "/" in config.model_name else "anthropic"
+                models.append({
+                    "id": config.model_name,
+                    "name": config.model_name,
+                    "provider": provider,
+                    "namespace": ns,
+                })
         return Response(models)
 
 class ChatSessionViewSet(viewsets.ModelViewSet):

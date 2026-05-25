@@ -170,36 +170,6 @@
   background-color: #fafafa;
 }
 
-/* 股票分析模块气泡样式 */
-.stock-module-bubble {
-  margin: 12px 0;
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.stock-module-bubble .ant-collapse-content-box {
-  padding: 0 !important;
-  overflow-x: auto;
-}
-
-.stock-module-bubble .ant-descriptions {
-  width: 100%;
-  min-width: 0;
-}
-
-.stock-module-bubble .ant-collapse {
-  background: transparent;
-}
-
-.stock-module-bubble .ant-descriptions {
-  padding: 12px;
-}
 
 .markdown-content a {
   color: #00b96b;

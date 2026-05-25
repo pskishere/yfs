@@ -1,7 +1,10 @@
 from typing import Dict, List, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from .models import ChatSession, ChatMessage
+import logging
 import uuid
+
+logger = logging.getLogger(__name__)
 
 class SessionMemory:
     """
@@ -105,3 +108,66 @@ class SessionMemory:
 
     def clear(self):
         ChatMessage.objects.filter(session=self.session).delete()
+
+
+class VectorMemory:
+    """
+    基于 ChromaDB 的语义记忆。
+
+    首次使用时自动下载 ~80 MB 的 all-MiniLM-L6-v2 嵌入模型（本地推理，无需 API）。
+    数据持久化到 data/chroma/ 目录。
+    """
+
+    _client = None
+
+    @classmethod
+    def _get_client(cls):
+        if cls._client is None:
+            import chromadb
+            from django.conf import settings
+            path = str(settings.BASE_DIR / 'data' / 'chroma')
+            cls._client = chromadb.PersistentClient(path=path)
+        return cls._client
+
+    def __init__(self, session_id: str):
+        self.session_id = session_id
+        client = self._get_client()
+        # ChromaDB 集合名只允许 3-63 字符，字母数字加连字符/下划线
+        safe = 's_' + session_id.replace('-', '_')
+        self._col = client.get_or_create_collection(name=safe)
+
+    def add_message(self, message_id: int, role: str, content: str) -> None:
+        if not content or not content.strip():
+            return
+        try:
+            self._col.upsert(
+                ids=[str(message_id)],
+                documents=[content],
+                metadatas=[{'role': role, 'message_id': message_id}],
+            )
+        except Exception as e:
+            logger.warning(f"VectorMemory.add_message failed: {e}")
+
+    def search(self, query: str, k: int = 5, exclude_ids: Optional[List[int]] = None) -> List[Dict]:
+        """返回与 query 语义最相关的 k 条消息，排除 exclude_ids 中的 ID。"""
+        try:
+            count = self._col.count()
+            if count == 0:
+                return []
+            results = self._col.query(
+                query_texts=[query],
+                n_results=min(k + len(exclude_ids or []), count),
+            )
+            docs = results['documents'][0]
+            metas = results['metadatas'][0]
+            exclude = set(exclude_ids or [])
+            out = []
+            for doc, meta in zip(docs, metas):
+                if meta['message_id'] not in exclude:
+                    out.append({'content': doc, 'role': meta['role'], 'message_id': meta['message_id']})
+                    if len(out) >= k:
+                        break
+            return out
+        except Exception as e:
+            logger.warning(f"VectorMemory.search failed: {e}")
+            return []
