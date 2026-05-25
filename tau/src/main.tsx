@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { initApp } from "./config/app";
+import "./i18n";
 
 // Initialize application modules
 initApp();

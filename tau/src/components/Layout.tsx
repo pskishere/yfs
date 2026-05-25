@@ -5,6 +5,7 @@ import React, { type ReactNode, useState, useEffect } from 'react';
 import { Layout as AntLayout, Button, Select } from 'antd';
 import { MenuOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ChatSessionDrawer from './ChatSessionDrawer';
 import { getAiModels } from '../services/api';
 import './Layout.css';
@@ -41,6 +42,9 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
   const [modelOptions, setModelOptions] = useState<{label: string, value: string}[]>([]);
   const navigate = useNavigate();
   const platformClass = getPlatformClass();
+  const { i18n } = useTranslation();
+  const isEnglish = i18n.language === 'en-US';
+  const toggleLanguage = () => i18n.changeLanguage(isEnglish ? 'zh-CN' : 'en-US');
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -110,7 +114,16 @@ const Layout: React.FC<LayoutProps> = ({ children, model, onModelChange }) => {
           />
         </div>
 
-        <div style={{ width: 40 }} />
+        <div style={{ width: 40, display: 'flex', justifyContent: 'center' }}>
+          <Button
+            type="text"
+            size="small"
+            onClick={toggleLanguage}
+            style={{ fontSize: 11, color: '#888', padding: '0 4px', minWidth: 0 }}
+          >
+            {isEnglish ? '中' : 'EN'}
+          </Button>
+        </div>
       </div>
 
       <Content className="app-content">

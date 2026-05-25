@@ -16,6 +16,7 @@ import {
   LinkOutlined,
   AppstoreOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { wsClient } from '../services/websocket';
 import { createChatSession, uploadFile } from '../services/api';
 import { registry } from '../framework/core/registry';
@@ -265,7 +266,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const attachmentsRef = useRef<GetRef<typeof Attachments>>(null);
   const skipNextChange = useRef(false);
   const [api, contextHolder] = notification.useNotification();
-  
+  const { t } = useTranslation();
+
   // 组件详情抽屉状态
   const [drawerState, setDrawerState] = useState<{
     open: boolean;
@@ -435,8 +437,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       onGenerationError: (data) => {
         setIsStreaming(false);
         api.error({
-          message: '生成失败',
-          description: data.error || '未知错误',
+          message: t('chat.generationFailed'),
+          description: data.error || t('chat.unknownError'),
         });
         setMessages((prev) =>
           prev.map((msg) => {
@@ -453,7 +455,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       },
       onError: (error) => {
         api.error({
-          message: '错误',
+          message: t('chat.error'),
           description: error,
         });
       },
@@ -485,7 +487,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         console.log('开始编辑:', data);
         setIsStreaming(true);
         api.info({
-          message: '正在重新生成回复',
+          message: t('chat.regenerating'),
           duration: 2,
         });
       },
@@ -527,8 +529,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       } catch (error) {
         console.error('连接 WebSocket 失败:', error);
         api.error({
-          message: '连接失败',
-          description: '无法连接到聊天服务器',
+          message: t('chat.connectionFailed'),
+          description: t('chat.cannotConnect'),
         });
       }
     };
@@ -700,7 +702,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       label: (
         <Flex gap="small">
           <FileImageOutlined />
-          <span>图片</span>
+          <span>{t('attachment.image')}</span>
         </Flex>
       ),
     },
@@ -709,19 +711,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       label: (
         <Flex gap="small">
           <FileWordOutlined />
-          <span>文档</span>
+          <span>{t('attachment.document')}</span>
         </Flex>
       ),
     },
     {
-        key: 'all',
-        label: (
-            <Flex gap="small">
-                <LinkOutlined />
-                <span>所有文件</span>
-            </Flex>
-        )
-    }
+      key: 'all',
+      label: (
+        <Flex gap="small">
+          <LinkOutlined />
+          <span>{t('attachment.allFiles')}</span>
+        </Flex>
+      ),
+    },
   ];
 
   const selectFile = ({ key }: { key: string }) => {
@@ -734,7 +736,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const senderHeader = (
     <Sender.Header
-      title="附件"
+      title={t('attachment.title')}
       open={openAttachments}
       onOpenChange={setOpenAttachments}
       forceRender
@@ -752,13 +754,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         onChange={handleUploadChange}
         placeholder={(type) =>
           type === 'drop'
-            ? {
-                title: 'Drop file here',
-              }
+            ? { title: t('attachment.drop') }
             : {
                 icon: <CloudUploadOutlined />,
-                title: '上传文件',
-                description: '点击或拖拽文件到此处上传',
+                title: t('attachment.upload'),
+                description: t('attachment.hint'),
               }
         }
         getDropContainer={() => senderRef.current?.nativeElement}
@@ -872,12 +872,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         >
           {messages.length === 0 ? (
             <Empty
-              description="开始对话吧"
+              description={t('chat.startHint')}
               style={{ marginTop: 60 }}
               styles={{ image: { height: 80 } }}
             >
               <p style={{ color: '#999', fontSize: 14 }}>
-                输入消息开始对话
+                {t('chat.emptyDesc')}
               </p>
             </Empty>
           ) : (
@@ -922,7 +922,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                取消编辑
+                {t('chat.cancelEdit')}
               </Tag>
             </div>
           )}
@@ -932,10 +932,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             skill={activeSkill}
             placeholder={
               isConnected
-                ? '输入消息...'
+                ? t('chat.placeholder')
                 : !sessionId
-                ? '输入消息开始新对话...'
-                : '连接中...'
+                ? t('chat.newPlaceholder')
+                : t('chat.connectingPlaceholder')
             }
             value={inputText}
             onChange={(val) => {
