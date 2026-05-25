@@ -21,11 +21,11 @@ class ExampleConfig(AppConfig):
             }
 
             # model_name 使用 LiteLLM 命名规范，通过环境变量覆盖：
-            #   AI_MODEL=claude-sonnet-4-6               → Anthropic
-            #   AI_MODEL=gpt-4o                          → OpenAI
-            #   AI_MODEL=deepseek/deepseek-chat          → DeepSeek API
-            #   AI_MODEL=ollama/deepseek-v3.1:671b-cloud → Ollama（默认）
-            _model = os.getenv('AI_MODEL', 'ollama/deepseek-v3.1:671b-cloud')
+            #   LLM_MODEL=claude-sonnet-4-6               → Anthropic
+            #   LLM_MODEL=gpt-4o                          → OpenAI
+            #   LLM_MODEL=deepseek/deepseek-chat          → DeepSeek API
+            #   LLM_MODEL=ollama/deepseek-v3.1:671b-cloud → Ollama（默认）
+            _model = os.getenv('LLM_MODEL', 'ollama/deepseek-v3.1:671b-cloud')
             AgentRegistry.register(
                 namespace="example",
                 config=AgentConfig(
@@ -33,14 +33,14 @@ class ExampleConfig(AppConfig):
                     tools=EXAMPLE_TOOLS,
                     system_prompt=EXAMPLE_AGENT_PROMPT,
                     tool_display_names=TOOL_DISPLAY_NAMES,
-                    base_url=os.getenv('AI_BASE_URL') or (
+                    base_url=os.getenv('LLM_BASE_URL') or (
                         os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
                         if _model.startswith('ollama/')
                         else None
                     ),
-                    api_key=os.getenv('AI_API_KEY'),
-                    # 语义记忆：设 AI_VECTOR_MEMORY=true 启用
-                    enable_vector_memory=os.getenv('AI_VECTOR_MEMORY', 'false').lower() == 'true',
+                    api_key=os.getenv('LLM_API_KEY'),
+                    # 语义记忆：设 LLM_VECTOR_MEMORY=true 启用
+                    enable_vector_memory=os.getenv('LLM_VECTOR_MEMORY', 'false').lower() == 'true',
                     # 自我修正示例（取消注释即启用）：
                     # critic_prompt="你是质量评估员。检查回复是否完整准确。不合格回复 'RETRY: <原因>'，合格回复 'PASS'。",
                 ),
