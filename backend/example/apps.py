@@ -32,7 +32,11 @@ class ExampleConfig(AppConfig):
                     tools=EXAMPLE_TOOLS,
                     system_prompt=EXAMPLE_AGENT_PROMPT,
                     tool_display_names=TOOL_DISPLAY_NAMES,
-                    base_url=os.getenv('EXAMPLE_BASE_URL', os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')),
+                    base_url=os.getenv('EXAMPLE_BASE_URL') or (
+                        os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+                        if os.getenv('EXAMPLE_MODEL', 'ollama/').startswith('ollama/')
+                        else None
+                    ),
                     api_key=os.getenv('EXAMPLE_API_KEY'),
                     # 语义记忆：设 EXAMPLE_VECTOR_MEMORY=true 启用
                     enable_vector_memory=os.getenv('EXAMPLE_VECTOR_MEMORY', 'false').lower() == 'true',
