@@ -21,14 +21,16 @@ django_asgi_app = get_asgi_application()
 
 # 导入 WebSocket 路由
 from ai import routing as ai_routing
+from django.conf import settings
+
+_ws_stack = AuthMiddlewareStack(
+    URLRouter(ai_routing.websocket_urlpatterns)
+)
+
+# DEBUG 环境跳过 Origin 校验，方便本地前端（任意端口）直连
+_ws_handler = _ws_stack if settings.DEBUG else AllowedHostsOriginValidator(_ws_stack)
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": AllowedHostsOriginValidator(
-        AuthMiddlewareStack(
-            URLRouter(
-                ai_routing.websocket_urlpatterns
-            )
-        )
-    ),
+    "websocket": _ws_handler,
 })

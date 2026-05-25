@@ -53,10 +53,23 @@ class AIAgentEngine:
         self.workflow = self._build_workflow()
 
     def _create_llm(self):
-        from langchain_community.chat_models import ChatLiteLLM
+        # Anthropic-compatible endpoint with custom base_url: use ChatAnthropic directly
+        # because the Anthropic SDK rejects non-Anthropic hosts when routed through LiteLLM.
+        model = self.model_name
+        if self.config.base_url and model.startswith("anthropic/"):
+            from langchain_anthropic import ChatAnthropic
+            actual_model = model.split("/", 1)[1]
+            logger.info(f"[{self.namespace}] ChatAnthropic (custom base): {actual_model} @ {self.config.base_url}")
+            return ChatAnthropic(
+                model=actual_model,
+                anthropic_api_key=self.config.api_key or "placeholder",
+                anthropic_api_url=self.config.base_url,
+                temperature=0.7,
+            )
 
+        from langchain_litellm import ChatLiteLLM
         kwargs: Dict[str, Any] = {
-            "model": self.model_name,
+            "model": model,
             "temperature": 0.7,
         }
         if self.config.base_url:
@@ -66,7 +79,7 @@ class AIAgentEngine:
         if self.config.litellm_params:
             kwargs.update(self.config.litellm_params)
 
-        logger.info(f"[{self.namespace}] LiteLLM: {self.model_name}")
+        logger.info(f"[{self.namespace}] LiteLLM: {model}")
         return ChatLiteLLM(**kwargs)
 
     def _build_workflow(self):
