@@ -24,12 +24,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ComponentDrawer from './ComponentDrawer';
 import './ChatDrawer.css';
+import { useKeyboardHeight } from '../utils/useKeyboardHeight';
+import { useAppStore } from '../store/appStore';
 
 interface ChatDrawerProps {
   open: boolean;
   onClose: () => void;
   sessionId?: string;
-  model?: string; // 当前选中的 AI 模型
   onSessionCreated?: (sessionId: string) => void;
 }
 
@@ -52,7 +53,6 @@ interface MessageItem {
 interface ChatPanelProps {
   active: boolean;
   sessionId?: string;
-  model?: string;
   onSessionCreated?: (sessionId: string) => void;
 }
 
@@ -248,9 +248,9 @@ const MessageBubble: React.FC<{
 const ChatPanel: React.FC<ChatPanelProps> = ({
   active,
   sessionId,
-  model,
   onSessionCreated,
 }) => {
+  const model = useAppStore(s => s.model);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -277,6 +277,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const commandSuggestions: any[] = [];
 
+  const keyboardHeight = useKeyboardHeight();
+  const prevKeyboardHeightRef = useRef(0);
+
   /**
    * 自动滚动到底部
    */
@@ -287,6 +290,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // 键盘弹出时滚动到底部，确保最新消息可见
+  useEffect(() => {
+    if (keyboardHeight > 0 && prevKeyboardHeightRef.current === 0) {
+      setTimeout(scrollToBottom, 50);
+    }
+    prevKeyboardHeightRef.current = keyboardHeight;
+  }, [keyboardHeight]);
 
   useEffect(() => {
     if (!active) {
@@ -1078,7 +1089,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
   open,
   onClose,
   sessionId,
-  model,
   onSessionCreated,
 }) => {
   const isMobile = useIsMobile();
@@ -1107,7 +1117,6 @@ const ChatDrawer: React.FC<ChatDrawerProps> = ({
       <ChatPanel
         active={open}
         sessionId={sessionId}
-        model={model}
         onSessionCreated={onSessionCreated}
       />
     </Drawer>

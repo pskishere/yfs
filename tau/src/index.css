@@ -46,13 +46,26 @@ code {
 
 #root {
   min-height: 100vh;
-  min-height: 100dvh; /* 使用动态视口高度，适配移动端浏览器 */
+  min-height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
-  /* 移动端优化 */
   -webkit-overflow-scrolling: touch;
-  /* 禁用双击缩放 */
   touch-action: pan-x pan-y;
+}
+
+/* Tauri：锁死三层滚动，同时用 !important 压制 Ant Design ScrollLocker
+   写入的 inline style（top: -Npx / position: fixed / overflow: hidden），
+   防止 Drawer/Modal 打开关闭时页面折叠上移 */
+html.tauri-app,
+html.tauri-app body,
+html.tauri-app #root {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
 /* 移动端优化 */

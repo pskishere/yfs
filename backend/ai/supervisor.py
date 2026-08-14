@@ -59,7 +59,7 @@ class SupervisorEngine:
     # ------------------------------------------------------------------
 
     def _build_router_llm(self):
-        from langchain_community.chat_models import ChatLiteLLM
+        from langchain_litellm import ChatLiteLLM
         kwargs = {"model": self.config.model_name, "temperature": 0.0}
         if self.config.base_url:
             kwargs["api_base"] = self.config.base_url
@@ -84,11 +84,16 @@ class SupervisorEngine:
 
         llm = self._build_router_llm()
         response = await llm.ainvoke([HumanMessage(content=prompt)])
-        chosen = response.content.strip().lower()
+        chosen = response.content.strip().lower().split()[0].rstrip('.,;:')
 
         if chosen not in self.config.sub_namespaces:
-            logger.warning(f"Supervisor got unknown namespace '{chosen}', falling back to first")
-            chosen = self.config.sub_namespaces[0]
+            # try substring match (LLM may include extra words)
+            match = next((ns for ns in self.config.sub_namespaces if ns in chosen), None)
+            if match:
+                chosen = match
+            else:
+                logger.warning(f"Supervisor got unknown namespace '{chosen}', falling back to first")
+                chosen = self.config.sub_namespaces[0]
 
         logger.info(f"[supervisor:{self.namespace}] routed '{user_input[:40]}' → {chosen}")
         return chosen

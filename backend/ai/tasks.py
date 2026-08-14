@@ -22,7 +22,7 @@ async def generate_title(session_id: str, content: str, namespace: str, model_na
         if session.title:
             return
 
-        # 使用轻量级模型或当前模型生成标题
+        from .engine import AIAgentEngine
         agent_service = AIAgentEngine(namespace, model_name=model_name)
         
         # 构造生成标题的 Prompt

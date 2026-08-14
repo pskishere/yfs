@@ -1,16 +1,20 @@
 import logging
 import os
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import ChatSession
 from .serializers import ChatSessionSerializer
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 _ALLOWED_MIME_TYPES = {
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -24,16 +28,32 @@ _ALLOWED_MIME_TYPES = {
 _MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username', '').strip()
+        password = request.data.get('password', '').strip()
+        if not username or not password:
+            return Response({'error': '用户名和密码不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(password) < 6:
+            return Response({'error': '密码至少6位'}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(username=username).exists():
+            return Response({'error': '用户名已存在'}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.create_user(username=username, password=password)
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'username': user.username,
+        }, status=status.HTTP_201_CREATED)
+
+
 class FileUploadView(APIView):
-    """
-    文件上传接口
-    """
     parser_classes = (MultiPartParser, FormParser)
-    authentication_classes = []
-    permission_classes = []
 
     def post(self, request, *args, **kwargs):
-        logger.info(f"FileUploadView received request: FILES={request.FILES.keys()}, DATA={request.data.keys()}")
+        logger.info(f"FileUploadView received request: FILES={request.FILES.keys()}")
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
@@ -57,16 +77,14 @@ class FileUploadView(APIView):
                 "name": file_obj.name,
                 "url": request.build_absolute_uri(settings.MEDIA_URL + file_path),
                 "path": full_path,
-                "size": file_obj.size
+                "size": file_obj.size,
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
             logger.error(f"File upload failed: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class ModelListView(APIView):
-    """
-    从 AgentRegistry 动态读取已注册的模型列表
-    """
     def get(self, request):
         from .registry import AgentRegistry
         models = []
@@ -75,7 +93,6 @@ class ModelListView(APIView):
             config = AgentRegistry.get_config(ns)
             if config and config.model_name not in seen:
                 seen.add(config.model_name)
-                # model_name 格式如 "ollama/deepseek-v3" 或 "claude-sonnet-4-6"
                 provider = config.model_name.split("/")[0] if "/" in config.model_name else "anthropic"
                 models.append({
                     "id": config.model_name,
@@ -85,10 +102,13 @@ class ModelListView(APIView):
                 })
         return Response(models)
 
+
 class ChatSessionViewSet(viewsets.ModelViewSet):
-    """
-    通用聊天会话 ViewSet
-    """
-    queryset = ChatSession.objects.all().order_by('-updated_at')
     serializer_class = ChatSessionSerializer
     lookup_field = 'session_id'
+
+    def get_queryset(self):
+        return ChatSession.objects.filter(user=self.request.user).order_by('-updated_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

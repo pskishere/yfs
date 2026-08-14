@@ -1,11 +1,15 @@
 .app-layout {
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
-  /* 移动端优化 */
-  -webkit-overflow-scrolling: touch;
 }
 
+/* 非 Tauri 的浏览器环境回退到普通流式布局 */
 .app-layout.platform-browser {
+  position: static;
   height: 100dvh;
 }
 

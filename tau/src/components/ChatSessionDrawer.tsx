@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Drawer, List, Button, Typography, Space, Tag, Popconfirm, message, Empty } from 'antd';
 import { DeleteOutlined, MessageOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getChatSessions, deleteChatSession, type ChatSession } from '../services/api';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
@@ -19,96 +20,58 @@ interface ChatSessionDrawerProps {
   onSelectSession?: (sessionId?: string) => void;
 }
 
-/**
- * 会话列表抽屉组件
- */
 const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
   open,
   onClose,
   onSelectSession,
 }) => {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth <= 768);
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
-  // 监听窗口大小变化
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  /**
-   * 加载会话列表
-   */
-  const loadSessions = async () => {
-    setLoading(true);
-    try {
-      const data = await getChatSessions();
-      setSessions(data);
-    } catch (error) {
-      console.error('加载会话列表失败:', error);
-      message.error(t('session.loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: sessions = [], isFetching, refetch } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: getChatSessions,
+    enabled: open,
+  });
 
-  /**
-   * 处理新建会话
-   * 不再调用 API 创建会话，而是清空当前会话 ID，
-   * 实际的会话创建将延迟到发送第一条消息时。
-   */
+  const deleteMutation = useMutation({
+    mutationFn: deleteChatSession,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      message.success(t('session.deleted'));
+    },
+    onError: () => {
+      message.error(t('session.deleteFailed'));
+    },
+  });
+
   const handleCreateSession = () => {
     onClose();
     onSelectSession?.(undefined);
   };
 
-  /**
-   * 删除会话
-   */
-  const handleDeleteSession = async (sessionId: string) => {
-    try {
-      await deleteChatSession(sessionId);
-      message.success(t('session.deleted'));
-      await loadSessions();
-    } catch (error) {
-      console.error('删除会话失败:', error);
-      message.error(t('session.deleteFailed'));
-    }
-  };
-
-  /**
-   * 打开会话
-   */
   const handleOpenSession = (sessionId: string) => {
     onClose();
     onSelectSession?.(sessionId);
   };
 
-  /**
-   * 获取会话标题
-   */
   const getSessionTitle = (session: ChatSession): string => {
-    if (session.title) {
-      return session.title;
-    }
-    if (session.summary) {
-      return session.summary;
-    }
+    if (session.title) return session.title;
+    if (session.summary) return session.summary;
     if (session.context_symbols && session.context_symbols.length > 0) {
       let title = `关于 ${session.context_symbols.join(', ')} 的对话`;
-      if (session.model) {
-        title += ` (${session.model})`;
-      }
+      if (session.model) title += ` (${session.model})`;
       return title;
     }
     if (session.last_message) {
-      const content = session.last_message.content;
-      const plainText = content
+      const plainText = session.last_message.content
         .replace(/[#*`]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
@@ -117,12 +80,6 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
     const base = t('session.newTitle');
     return session.model ? `${base} (${session.model})` : base;
   };
-
-  useEffect(() => {
-    if (open) {
-      loadSessions();
-    }
-  }, [open]);
 
   return (
     <Drawer
@@ -136,45 +93,31 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
       onClose={onClose}
       open={open}
       styles={{
-        header: {
-          paddingTop: 'calc(16px + var(--sat, 0px))',
-        },
-        body: {
-          paddingBottom: 'calc(16px + var(--sab, 0px))',
-        },
-        wrapper: {
-          width: isMobile ? '100%' : 360
-        }
+        header: { paddingTop: 'calc(16px + var(--sat, 0px))' },
+        body: { paddingBottom: 'calc(16px + var(--sab, 0px))' },
+        wrapper: { width: isMobile ? '100%' : 360 },
       }}
       extra={
         <Space>
           <Button
             type="text"
             icon={<ReloadOutlined />}
-            onClick={loadSessions}
-            loading={loading}
+            onClick={() => refetch()}
+            loading={isFetching}
             title={t('session.refresh')}
           />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreateSession}
-            size="small"
-          >
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateSession} size="small">
             {t('session.new')}
           </Button>
         </Space>
       }
     >
       <List
-        loading={loading}
+        loading={isFetching}
         dataSource={sessions}
         locale={{
           emptyText: (
-            <Empty
-              description={t('session.empty')}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            >
+            <Empty description={t('session.empty')} image={Empty.PRESENTED_IMAGE_SIMPLE}>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateSession}>
                 {t('session.createFirst')}
               </Button>
@@ -213,19 +156,11 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
                     <Tag color="blue" style={{ fontSize: 11 }}>
                       {t('session.messageCount', { count: session.message_count })}
                     </Tag>
-                    {session.context_symbols && session.context_symbols.length > 0 && (
-                      <>
-                        {session.context_symbols.slice(0, 3).map(symbol => (
-                          <Tag key={symbol} style={{ fontSize: 11 }}>
-                            {symbol}
-                          </Tag>
-                        ))}
-                        {session.context_symbols.length > 3 && (
-                          <Tag style={{ fontSize: 11 }}>
-                            +{session.context_symbols.length - 3}
-                          </Tag>
-                        )}
-                      </>
+                    {session.context_symbols?.slice(0, 3).map(symbol => (
+                      <Tag key={symbol} style={{ fontSize: 11 }}>{symbol}</Tag>
+                    ))}
+                    {(session.context_symbols?.length ?? 0) > 3 && (
+                      <Tag style={{ fontSize: 11 }}>+{session.context_symbols.length - 3}</Tag>
                     )}
                   </Space>
                 </Space>
@@ -241,7 +176,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
               description={t('session.confirmDeleteDesc')}
               onConfirm={(e) => {
                 e?.stopPropagation();
-                handleDeleteSession(session.session_id);
+                deleteMutation.mutate(session.session_id);
               }}
               onCancel={(e) => e?.stopPropagation()}
               okText={t('session.ok')}
@@ -252,6 +187,7 @@ const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
                 danger
                 size="small"
                 icon={<DeleteOutlined />}
+                loading={deleteMutation.isPending && deleteMutation.variables === session.session_id}
                 onClick={(e) => e.stopPropagation()}
               />
             </Popconfirm>

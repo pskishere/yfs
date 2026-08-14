@@ -1,10 +1,18 @@
 import uuid
 from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
 
 class ChatSession(models.Model):
     """
     通用 AI 聊天会话模型
     """
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='chat_sessions', verbose_name='用户',
+    )
     session_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4, verbose_name='会话ID')
     title = models.CharField(max_length=200, null=True, blank=True, verbose_name="会话标题")
     summary = models.TextField(null=True, blank=True, verbose_name="会话摘要")

@@ -27,12 +27,13 @@ DB_DIR = BASE_DIR / 'data'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-f69899qv+b0-bgktdh0=cw8bp2)t79*_i)#l6_lfjs*%b#ih+q'
-)
+_INSECURE_KEY = 'django-insecure-dev-only-do-not-use-in-production'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _INSECURE_KEY)
 
-DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() == 'true'
+DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
+
+if SECRET_KEY == _INSECURE_KEY and not DEBUG:
+    raise RuntimeError('DJANGO_SECRET_KEY must be set when DEBUG=False (production mode)')
 
 _allowed = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = _allowed.split(',') if _allowed else ['localhost', '127.0.0.1', '[::1]']
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
     'channels',
     'ai',
@@ -68,7 +70,6 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'ai.middleware.SimpleCorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -153,13 +154,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 
 
-# Django Tasks 后端配置，开发环境直接立即执行
-TASKS = {
-    "default": {
-        "BACKEND": "django.tasks.backends.immediate.ImmediateBackend",
-    }
-}
-
 # Channels 配置
 
 # 根据环境变量决定使用 Redis 还是内存
@@ -185,31 +179,49 @@ else:
 
 # Django REST Framework 配置
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
 
-# CORS 配置
-CORS_ALLOW_ALL_ORIGINS = True
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# CORS 配置：生产环境通过 CORS_ALLOWED_ORIGINS 指定具体域名，开发环境允许全部
+_cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()]
+    CORS_ALLOW_ALL_ORIGINS = False
+else:
+    CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# 日志配置
+# 日志配置（structlog JSON 格式，生产友好）
+import structlog
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
+        'json': {
+            '()': structlog.stdlib.ProcessorFormatter,
+            'processor': structlog.processors.JSONRenderer(),
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'json',
         },
     },
     'root': {
@@ -229,3 +241,20 @@ LOGGING = {
         },
     },
 }
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.filter_by_level,
+        structlog.processors.TimeStamper(fmt='iso'),
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
+)
